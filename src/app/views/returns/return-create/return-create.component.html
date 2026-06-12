@@ -1,0 +1,430 @@
+<app-page-header title="Nueva solicitud de devolución" subtitle="Busca el pedido por documento o por cliente">
+  <button class="btn btn-outline-secondary btn-sm" routerLink="/returns/my">
+    <fa-icon icon="arrow-left" class="me-1" />Volver
+  </button>
+</app-page-header>
+
+<!-- ── Loading inicial ───────────────────────────────────────────────────── -->
+@if (loadingInit()) {
+  <div class="text-center py-5">
+    <c-spinner color="primary" class="mb-2" />
+    <div class="text-body-secondary small">Cargando...</div>
+  </div>
+}
+
+<!-- ── Contenido principal (solo cuando cargó) ──────────────────────────── -->
+@if (!loadingInit()) {
+
+<!-- ── Tabs de modo ────────────────────────────────────────────────────────── -->
+<div class="d-flex border-bottom mb-3">
+  <button class="btn border-0 rounded-0 fw-semibold px-4 py-2"
+          style="border-bottom: 3px solid transparent !important; font-size:.9rem;"
+          [style.borderBottomColor]="mode === 'document' ? 'var(--cui-primary)' : 'transparent'"
+          [class.text-primary]="mode === 'document'"
+          [class.text-body-secondary]="mode !== 'document'"
+          (click)="setMode('document')">
+    <fa-icon icon="file-invoice" class="me-2" />Por documento
+  </button>
+  <button class="btn border-0 rounded-0 fw-semibold px-4 py-2"
+          style="border-bottom: 3px solid transparent !important; font-size:.9rem;"
+          [style.borderBottomColor]="mode === 'client' ? 'var(--cui-primary)' : 'transparent'"
+          [class.text-primary]="mode === 'client'"
+          [class.text-body-secondary]="mode !== 'client'"
+          (click)="setMode('client')">
+    <fa-icon icon="user" class="me-2" />Por cliente
+  </button>
+</div>
+
+<!-- ── POR DOCUMENTO ──────────────────────────────────────────────────────── -->
+@if (mode === 'document') {
+  <c-card class="mb-3">
+    <c-card-body>
+      <div class="row g-2 align-items-end">
+
+        <!-- Select 1: Tipo de documento -->
+        <div class="col-6 col-sm-4 col-md-3">
+          <label class="form-label small mb-1">Tipo</label>
+          <select class="form-select"
+                  [ngModel]="docType"
+                  (ngModelChange)="onDocTypeChange($event)">
+            <option value="" disabled>Seleccionar...</option>
+            @for (t of availableDocTypes; track t.type) {
+              <option [value]="t.type">{{ t.label }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Select 2: Serie -->
+        <div class="col-6 col-sm-3 col-md-2">
+          <label class="form-label small mb-1">Serie</label>
+          <select class="form-select" [(ngModel)]="docSeries"
+                  [disabled]="!docType || filteredSeries.length <= 1">
+            @if (!docType) {
+              <option value="" disabled>—</option>
+            }
+            @for (s of filteredSeries; track s.id) {
+              <option [value]="s.series">{{ s.series }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Input de correlativo -->
+        <div class="col-12 col-sm-5 col-md-5">
+          <label class="form-label small mb-1">N° de correlativo</label>
+          <div class="input-group">
+            <span class="input-group-text font-monospace text-body-secondary px-2"
+                  style="font-size:.9rem;">{{ docSeries }}-</span>
+            <input type="text" class="form-control font-monospace"
+                   placeholder="Ej: 3"
+                   [(ngModel)]="docCorrelative"
+                   (keyup.enter)="searchByDocument()"
+                   [disabled]="searching()"
+                   inputmode="numeric"
+                   autocomplete="off" spellcheck="false" />
+            <button class="btn btn-primary px-3"
+                    [disabled]="!canSearch"
+                    (click)="searchByDocument()">
+              @if (searching()) { <c-spinner size="sm" /> }
+              @else { <fa-icon icon="search" /> }
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </c-card-body>
+  </c-card>
+}
+
+<!-- ── POR CLIENTE ────────────────────────────────────────────────────────── -->
+@if (mode === 'client') {
+  <c-card class="mb-3">
+    <c-card-body class="d-flex flex-column gap-3">
+
+      <!-- Paso 1: Cliente -->
+      <div>
+        <label class="form-label fw-medium">
+          <span class="badge bg-primary me-2" style="font-size:.72rem;">1</span>Cliente
+        </label>
+        <app-client-select [value]="selectedClient" (valueChange)="onClientSelect($event)" />
+        @if (loadingProducts()) {
+          <div class="d-flex align-items-center gap-2 mt-2 text-body-secondary small">
+            <c-spinner size="sm" />Cargando productos del cliente...
+          </div>
+        }
+      </div>
+
+      @if (selectedClient && !loadingProducts()) {
+        <!-- Paso 2: Producto -->
+        <div>
+          <label class="form-label fw-medium">
+            <span class="badge bg-secondary me-2" style="font-size:.72rem;">2</span>
+            Producto
+            <span class="text-body-secondary fw-normal ms-1">(opcional — para filtrar)</span>
+          </label>
+          @if (soldProducts().length > 0) {
+            <p-select [options]="soldProducts()" optionLabel="name"
+                      [ngModel]="selectedProduct" (ngModelChange)="onProductSelect($event)"
+                      [filter]="true" filterBy="name"
+                      placeholder="Todos los productos del cliente"
+                      [showClear]="true"
+                      styleClass="w-100" panelStyleClass="select-multiline" appendTo="body">
+              <ng-template #item let-p>
+                <div>
+                  <div class="fw-semibold" style="font-size:.875rem;">{{ p.name }}</div>
+                  @if (p.sku) { <div class="text-body-secondary" style="font-size:.75rem;">SKU: {{ p.sku }}</div> }
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ p.lots.length }} lote(s)</div>
+                </div>
+              </ng-template>
+            </p-select>
+          } @else {
+            <div class="text-body-secondary small">
+              <fa-icon icon="circle-info" class="me-1" />No se encontraron productos vendidos a este cliente.
+            </div>
+          }
+        </div>
+
+        <!-- Paso 3: Lote -->
+        @if (selectedProduct && availableLots().length > 0) {
+          <div>
+            <label class="form-label fw-medium">
+              <span class="badge bg-secondary me-2" style="font-size:.72rem;">3</span>
+              Lote <span class="text-body-secondary fw-normal ms-1">(opcional)</span>
+            </label>
+            <p-select [options]="availableLots()" optionLabel="label"
+                      [ngModel]="selectedLot" (ngModelChange)="onLotSelect($event)"
+                      placeholder="Todos los lotes"
+                      [showClear]="true"
+                      styleClass="w-100" panelStyleClass="select-multiline" appendTo="body">
+              <ng-template #item let-l>
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold font-monospace" style="font-size:.875rem;">
+                    {{ l.lot_number ?? 'Sin N° de lote' }}
+                  </span>
+                  @if (l.expiry_date) {
+                    <span class="text-body-secondary small ms-2">Vence: {{ l.expiry_date }}</span>
+                  }
+                </div>
+              </ng-template>
+            </p-select>
+          </div>
+        }
+      }
+
+    </c-card-body>
+  </c-card>
+
+  <!-- Lista de pedidos del cliente -->
+  @if (selectedClient && !loadingProducts()) {
+    @if (searching()) {
+      <div class="text-center py-3"><c-spinner color="primary" /></div>
+    } @else if (clientOrders().length > 0) {
+      <c-card class="mb-3">
+        <c-card-header class="py-2 px-3 d-flex align-items-center justify-content-between">
+          <strong style="font-size:.9rem;">{{ clientOrders().length }} pedido(s) encontrado(s)</strong>
+          <span class="text-body-secondary small">Selecciona el que corresponde</span>
+        </c-card-header>
+        <c-card-body class="p-0">
+          <div class="d-flex flex-column">
+            @for (o of clientOrders(); track o.id; let last = $last) {
+              <button class="btn text-start p-3 rounded-0"
+                      [class.border-bottom]="!last"
+                      [style.background]="order()?.id === o.id ? 'rgba(var(--cui-primary-rgb), .12)' : ''"
+                      [style.borderLeft]="order()?.id === o.id ? '3px solid var(--cui-primary)' : '3px solid transparent'"
+                      (click)="selectOrder(o)">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <div class="fw-bold font-monospace" style="font-size:.95rem;">
+                      {{ o.sale_document?.full_number ?? 'Sin documento' }}
+                    </div>
+                    <div class="text-body-secondary" style="font-size:.8rem;">
+                      {{ docTypeLabel(o.sale_document?.document_type) }}
+                      @if (o.sale_document?.issue_date) { · {{ o.sale_document!.issue_date | date:'dd/MM/yyyy' }} }
+                    </div>
+                    <div class="text-body-secondary" style="font-size:.75rem;">Pedido: {{ o.code }}</div>
+                  </div>
+                  <div class="text-end flex-shrink-0">
+                    <div class="fw-bold">S/ {{ o.total | number:'1.2-2' }}</div>
+                    @if (order()?.id === o.id) {
+                      <span class="text-primary small fw-semibold">
+                        <fa-icon icon="circle-check" class="me-1" />Seleccionado
+                      </span>
+                    }
+                  </div>
+                </div>
+              </button>
+            }
+          </div>
+        </c-card-body>
+      </c-card>
+    }
+  }
+}
+
+<!-- ── Error de búsqueda ──────────────────────────────────────────────────── -->
+@if (searchErr()) {
+  <div class="alert alert-warning d-flex gap-2 align-items-center mb-3 py-2" style="font-size:.875rem;">
+    <fa-icon icon="triangle-exclamation" class="flex-shrink-0" />{{ searchErr() }}
+  </div>
+}
+
+<!-- ── NC y devoluciones activas ─────────────────────────────────────────── -->
+@if (order(); as o) {
+  @let creditNotes = o.sale_document?.credit_notes ?? [];
+  @let activeReturns = existingReturns();
+
+  @if (creditNotes.length || activeReturns.length) {
+    <div class="mb-3 d-flex flex-column gap-2">
+
+      <!-- Notas de crédito -->
+      @if (creditNotes.length) {
+        <div class="rounded border p-2 bg-body-tertiary" style="font-size:.82rem;">
+          <div class="d-flex align-items-center gap-2 mb-2 fw-semibold" style="font-size:.8rem;">
+            <fa-icon icon="file-circle-minus" class="text-warning" />
+            <span>Notas de Crédito emitidas para este documento</span>
+          </div>
+          <div class="d-flex flex-column gap-1">
+            @for (nc of creditNotes; track nc.id) {
+              <div class="d-flex align-items-center justify-content-between gap-2 px-2 py-1 rounded bg-body">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="font-monospace fw-semibold">{{ nc.full_number ?? '—' }}</span>
+                  <c-badge [textBgColor]="ncStatusColor(nc.status)" style="font-size:.62rem;">
+                    {{ ncStatusLabel(nc.status) }}
+                  </c-badge>
+                  <span class="text-body-secondary">S/ {{ nc.total | number:'1.2-2' }}</span>
+                  @if (nc.issue_date) {
+                    <span class="text-body-secondary">· {{ nc.issue_date | date:'dd/MM/yyyy' }}</span>
+                  }
+                </div>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2 flex-shrink-0"
+                        style="font-size:.72rem;"
+                        (click)="openNcDetail(nc)">
+                  <fa-icon icon="eye" class="me-1" />Ver
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Devoluciones registradas (sin canceladas) -->
+      @if (activeReturns.length) {
+        <div class="rounded border p-2 bg-body-tertiary"
+             [class.border-danger]="hasActiveReturn"
+             [class.border-warning]="!hasActiveReturn"
+             style="font-size:.82rem;">
+          <div class="d-flex align-items-center gap-2 mb-2 fw-semibold" style="font-size:.8rem;">
+            <fa-icon icon="ban"
+                     [class.text-danger]="hasActiveReturn"
+                     [class.text-warning]="!hasActiveReturn" />
+            <span>Devoluciones registradas para este pedido</span>
+          </div>
+          <div class="d-flex flex-column gap-1">
+            @for (ret of activeReturns; track ret.id) {
+              <div class="d-flex align-items-center justify-content-between gap-2 px-2 py-1 rounded bg-body">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="font-monospace fw-semibold">{{ ret.code }}</span>
+                  <c-badge [textBgColor]="returnStatusColor[ret.status]" style="font-size:.62rem;">
+                    {{ returnStatusLabel[ret.status] }}
+                  </c-badge>
+                  <span class="text-body-secondary">{{ ret.created_at | date:'dd/MM/yy' }}</span>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2 flex-shrink-0"
+                        style="font-size:.72rem;"
+                        (click)="openReturnDetail(ret)">
+                  <fa-icon icon="eye" class="me-1" />Ver
+                </button>
+              </div>
+            }
+          </div>
+          @if (hasActiveReturn) {
+            <div class="text-danger fw-semibold mt-2" style="font-size:.8rem;">
+              No se puede crear otra solicitud mientras haya una activa (borrador o pendiente).
+              Espera a que sea gestionada o elimínala primero.
+            </div>
+          }
+        </div>
+      }
+
+    </div>
+  }
+}
+
+<!-- ── PEDIDO SELECCIONADO → ÍTEMS ───────────────────────────────────────── -->
+@if (order(); as o) {
+  <c-card class="mb-3">
+    <c-card-header class="py-2 px-3">
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+        <div>
+          @if (o.sale_document) {
+            <div class="fw-bold font-monospace" style="font-size:1rem;">
+              {{ o.sale_document.full_number }}
+            </div>
+            <div class="text-body-secondary small">
+              {{ docTypeLabel(o.sale_document.document_type) }}
+              · emitida el {{ o.sale_document.issue_date | date:'dd/MM/yyyy' }}
+            </div>
+          }
+          <div class="text-body-secondary small">{{ clientName(o) }} · {{ o.code }}</div>
+        </div>
+        <div class="badge bg-info-subtle text-info-emphasis border border-info-subtle py-2 px-3"
+             style="font-size:.75rem; white-space:normal; text-align:right; max-width:200px;">
+          <fa-icon icon="circle-info" class="me-1" />
+          La NC se emitirá contra este documento
+        </div>
+      </div>
+    </c-card-header>
+
+    <c-card-body class="p-0">
+      <app-return-items-editor [(lines)]="lines" />
+    </c-card-body>
+  </c-card>
+
+  <!-- Motivo -->
+  <c-card class="mb-3">
+    <c-card-body>
+      <label class="form-label fw-medium">
+        Motivo de la devolución <span class="text-danger">*</span>
+      </label>
+      <textarea class="form-control" rows="3"
+                placeholder="Ej: Producto defectuoso, lote incorrecto, error en pedido..."
+                [(ngModel)]="reason"></textarea>
+    </c-card-body>
+  </c-card>
+
+  <!-- Botones -->
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary fw-semibold flex-grow-1 py-3"
+            style="font-size:1rem;"
+            [disabled]="!isValid || saving()"
+            (click)="submit()">
+      @if (saving()) { <c-spinner size="sm" class="me-2" /> }
+      <fa-icon icon="paper-plane" class="me-2" />Enviar solicitud
+    </button>
+    <a class="btn btn-outline-secondary py-3 px-4" routerLink="/returns/my">Cancelar</a>
+  </div>
+}
+
+<!-- ── Modal detalle Nota de Crédito ─────────────────────────────────────── -->
+@if (selectedNc(); as nc) {
+  <c-modal [visible]="true" alignment="center" (visibleChange)="!$event && selectedNc.set(null)">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="file-circle-minus" class="me-2 text-warning" />
+        {{ nc.full_number ?? 'Nota de Crédito' }}
+      </h5>
+    </c-modal-header>
+    <c-modal-body>
+      <dl class="row mb-0" style="font-size:.875rem;">
+        <dt class="col-5 text-body-secondary fw-normal">Estado</dt>
+        <dd class="col-7">
+          <c-badge [textBgColor]="ncStatusColor(nc.status)">{{ ncStatusLabel(nc.status) }}</c-badge>
+        </dd>
+
+        @if (nc.issue_date) {
+          <dt class="col-5 text-body-secondary fw-normal">Fecha</dt>
+          <dd class="col-7">{{ nc.issue_date | date:'dd/MM/yyyy' }}</dd>
+        }
+
+        <dt class="col-5 text-body-secondary fw-normal">Total</dt>
+        <dd class="col-7 fw-semibold">S/ {{ nc.total | number:'1.2-2' }}</dd>
+
+        @if (nc.reason) {
+          <dt class="col-5 text-body-secondary fw-normal">Motivo</dt>
+          <dd class="col-7">{{ nc.reason }}</dd>
+        }
+      </dl>
+
+      @if (nc.pdf_url || nc.xml_url || nc.cdr_url) {
+        <hr class="my-3" />
+        <div class="d-flex gap-2 flex-wrap">
+          @if (nc.pdf_url) {
+            <button class="btn btn-sm btn-outline-secondary" (click)="downloadNcFile(nc.pdf_url!)">
+              <fa-icon icon="file-pdf" class="me-1 text-danger" />PDF
+            </button>
+          }
+          @if (nc.xml_url) {
+            <button class="btn btn-sm btn-outline-secondary" (click)="downloadNcFile(nc.xml_url!)">
+              <fa-icon icon="file-code" class="me-1 text-info" />XML
+            </button>
+          }
+          @if (nc.cdr_url) {
+            <button class="btn btn-sm btn-outline-secondary" (click)="downloadNcFile(nc.cdr_url!)">
+              <fa-icon icon="file-zipper" class="me-1 text-warning" />CDR
+            </button>
+          }
+        </div>
+      }
+    </c-modal-body>
+    <c-modal-footer>
+      <button class="btn btn-secondary btn-sm" (click)="selectedNc.set(null)">Cerrar</button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- Modal detalle devolución -->
+<app-return-detail-modal
+  [return_]="selectedReturn()"
+  [loadingItems]="loadingReturnDetail()"
+  (closed)="selectedReturn.set(null)" />
+
+} <!-- fin @if (!loadingInit()) -->

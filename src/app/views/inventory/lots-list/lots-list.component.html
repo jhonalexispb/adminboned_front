@@ -1,0 +1,391 @@
+<app-page-header title="Lotes" subtitle="Control de lotes y fechas de vencimiento">
+  <div class="d-flex gap-2">
+
+    <!-- Reportes -->
+    <c-dropdown alignment="end">
+      <button cDropdownToggle class="btn btn-sm btn-outline-primary"
+              [disabled]="!!downloadingReport()">
+        @if (downloadingReport()) {
+          <c-spinner size="sm" class="me-1" />Generando...
+        } @else {
+          <fa-icon icon="file-pdf" class="me-1" />Reportes
+          @if (selectedLaboratory()) {
+            <span class="badge text-bg-secondary ms-1 fw-normal" style="font-size:.65rem; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle">
+              {{ selectedLaboratory()!.name }}
+            </span>
+          }
+        }
+      </button>
+      <ul cDropdownMenu>
+        <li><h6 class="dropdown-header">Reportes de lotes</h6></li>
+        @if (activeReportFiltersHint) {
+          <li>
+            <span class="dropdown-item-text text-body-secondary" style="font-size:.75rem">
+              <fa-icon icon="filter" class="me-1" />{{ activeReportFiltersHint }}
+            </span>
+          </li>
+          <li><hr class="dropdown-divider my-1" /></li>
+        }
+        <li>
+          <button cDropdownItem (click)="downloadReport('full')">
+            <fa-icon icon="list" class="me-2 text-secondary" />Todos los lotes
+          </button>
+        </li>
+        <li>
+          <button cDropdownItem (click)="downloadReport('expiring')">
+            <fa-icon icon="clock" class="me-2 text-warning" />Próximos a vencer
+            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" style="font-size:.68rem">{{ expiryFilterLabel }}</span>
+          </button>
+        </li>
+        <li>
+          <button cDropdownItem (click)="downloadReport('expired')">
+            <fa-icon icon="triangle-exclamation" class="me-2 text-danger" />Lotes vencidos
+          </button>
+        </li>
+      </ul>
+    </c-dropdown>
+
+    <a class="btn btn-outline-secondary btn-sm" routerLink="/inventory/stock">
+      <fa-icon icon="boxes-stacked" class="me-1" />Ver stock
+    </a>
+  </div>
+</app-page-header>
+
+<!-- Filtros -->
+<c-card class="mb-4">
+  <c-card-header class="d-flex justify-content-between align-items-center py-2 px-3">
+    <span class="fw-semibold">
+      <fa-icon icon="filter" class="me-2 text-body-secondary" />Filtros
+    </span>
+    <c-badge color="secondary" class="fw-normal fs-6">{{ total() }} lote(s)</c-badge>
+  </c-card-header>
+  <c-card-body class="pb-3">
+
+    <!-- Producto / Laboratorio -->
+    <div class="row g-2">
+      <div class="col-12 col-md-6">
+        <label class="form-label small mb-1 text-body-secondary">Producto</label>
+        <p-select
+          [options]="products()"
+          optionLabel="name"
+          [ngModel]="selectedProduct()"
+          (ngModelChange)="onProductSelect($event)"
+          [filter]="true"
+          filterBy="name,sku,laboratory.name"
+          placeholder="Todos los productos"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+          appendTo="body">
+          <ng-template #selectedItem let-p>
+            <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
+            @if (p.laboratory) {
+              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            }
+            {{ p.name }}
+          </ng-template>
+          <ng-template #item let-p>
+            <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
+            @if (p.laboratory) {
+              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            }
+            {{ p.name }}
+          </ng-template>
+        </p-select>
+      </div>
+
+      <div class="col-12 col-md-6">
+        <label class="form-label small mb-1 text-body-secondary">Laboratorio</label>
+        <p-select
+          [options]="laboratories()"
+          optionLabel="name"
+          [ngModel]="selectedLaboratory()"
+          (ngModelChange)="onLaboratorySelect($event)"
+          [filter]="true"
+          filterBy="name"
+          placeholder="Todos los laboratorios"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+          appendTo="body">
+        </p-select>
+      </div>
+    </div>
+
+    <hr class="my-3" />
+
+    <!-- Vencimiento -->
+    <div>
+      <label class="form-label small mb-2 text-body-secondary d-block">
+        <fa-icon icon="calendar-days" class="me-1" />Vencimiento
+      </label>
+
+      <div class="d-flex flex-wrap gap-1 mb-2">
+        <button class="btn btn-sm"
+          [class.btn-danger]="isQuickExpiryActive(0)"
+          [class.btn-outline-danger]="!isQuickExpiryActive(0)"
+          (click)="filterExpiring(0)">Vencidos</button>
+        <button class="btn btn-sm"
+          [class.btn-warning]="isQuickExpiryActive(7)"
+          [class.btn-outline-warning]="!isQuickExpiryActive(7)"
+          (click)="filterExpiring(7)">7 días</button>
+        <button class="btn btn-sm"
+          [class.btn-warning]="isQuickExpiryActive(30)"
+          [class.btn-outline-warning]="!isQuickExpiryActive(30)"
+          (click)="filterExpiring(30)">30 días</button>
+        <button class="btn btn-sm"
+          [class.btn-warning]="isQuickExpiryActive(90)"
+          [class.btn-outline-warning]="!isQuickExpiryActive(90)"
+          (click)="filterExpiring(90)">3 meses</button>
+      </div>
+
+      <div class="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center">
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn"
+            [class.btn-primary]="expiryMode === 'days'"
+            [class.btn-outline-secondary]="expiryMode !== 'days'"
+            (click)="expiryMode = 'days'">Días</button>
+          <button class="btn"
+            [class.btn-primary]="expiryMode === 'months'"
+            [class.btn-outline-secondary]="expiryMode !== 'months'"
+            (click)="expiryMode = 'months'">Meses</button>
+          <button class="btn"
+            [class.btn-primary]="expiryMode === 'date'"
+            [class.btn-outline-secondary]="expiryMode !== 'date'"
+            (click)="expiryMode = 'date'">Fecha</button>
+        </div>
+
+        <div class="d-flex gap-1 align-items-center">
+          @if (expiryMode === 'days') {
+            <input cFormControl type="number" [(ngModel)]="expiryDays" min="0"
+                   placeholder="días" style="width:90px" />
+          }
+          @if (expiryMode === 'months') {
+            <input cFormControl type="number" [(ngModel)]="expiryMonths" min="1"
+                   placeholder="meses" style="width:90px" />
+          }
+          @if (expiryMode === 'date') {
+            <input cFormControl type="date" [(ngModel)]="filters.expiring_before" style="width:160px" />
+          }
+          <button class="btn btn-sm btn-primary"
+                  (click)="expiryMode === 'date' ? onSearch() : applyExpiryFilter()"
+                  title="Aplicar filtro">
+            <fa-icon icon="filter" />
+          </button>
+        </div>
+
+        @if (filters.expiring_before) {
+          <div class="d-flex align-items-center gap-2 ms-sm-auto">
+            <small class="text-body-secondary text-nowrap">
+              <fa-icon icon="calendar-xmark" class="me-1 text-warning" />
+              Hasta {{ filters.expiring_before | date:'dd/MM/yyyy' }}
+            </small>
+            <button class="btn btn-sm btn-outline-secondary" (click)="clearExpiry()" title="Quitar filtro de vencimiento">
+              <fa-icon icon="xmark" />
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+
+  </c-card-body>
+</c-card>
+
+<!-- Grupos por producto -->
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (lots().length === 0) {
+  <c-card>
+    <c-card-body class="text-center text-body-secondary py-5">
+      <fa-icon icon="box-open" class="mb-2 d-block" style="font-size:2rem;opacity:.3" />
+      Sin lotes para los filtros seleccionados.
+    </c-card-body>
+  </c-card>
+} @else {
+  @for (group of groupedLots; track group.productId) {
+    <c-card class="mb-3">
+      <c-card-header class="d-flex justify-content-between align-items-center py-2 px-3">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          @if (group.laboratory) {
+            <span class="text-info">{{ group.laboratory }}</span>
+          }
+          <span class="fw-semibold">{{ group.productName }}</span>
+          @if (group.sku) {
+            <code class="small text-body-secondary bg-body-secondary px-1 rounded">{{ group.sku }}</code>
+          }
+          <c-badge color="secondary" class="fw-normal">{{ group.lots.length }} lote(s)</c-badge>
+        </div>
+        <div class="text-end small">
+          <span class="text-body-secondary me-1">Stock total</span>
+          <strong class="fs-6">{{ productStockTotal(group.lots) }}</strong>
+        </div>
+      </c-card-header>
+
+      <!-- Vista mobile: cards -->
+      <c-card-body class="d-md-none p-2">
+        <div class="d-flex flex-column gap-2">
+          @for (lot of group.lots; track lot.id) {
+            <div class="rounded border p-2">
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <div>
+                  @if (lot.is_default) {
+                    <span class="badge bg-secondary font-monospace fw-normal">SIN-LOTE</span>
+                  } @else if (lot.lot_number) {
+                    <span class="font-monospace fw-medium">{{ lot.lot_number }}</span>
+                  } @else {
+                    <span class="text-body-tertiary">— sin número —</span>
+                  }
+                </div>
+                <div class="text-end">
+                  @if (lot.status === 'blocked') {
+                    <c-badge color="danger">Bloqueado</c-badge>
+                  } @else {
+                    <c-badge color="success">Activo</c-badge>
+                  }
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="small">
+                  @if (lot.expiry_date) {
+                    <div class="d-flex align-items-center gap-2">
+                      <span>{{ lot.expiry_date | date:'dd/MM/yyyy' }}</span>
+                      @switch (expiryStatus(lot)) {
+                        @case ('expired') { <c-badge color="danger">Vencido</c-badge> }
+                        @case ('soon')    { <c-badge color="warning">Próx. a vencer</c-badge> }
+                        @case ('ok')      { <c-badge color="success">Vigente</c-badge> }
+                      }
+                    </div>
+                  } @else {
+                    <span class="text-body-secondary">Sin fecha de vencimiento</span>
+                  }
+                </div>
+                <div class="text-end">
+                  <div class="text-body-secondary" style="font-size:.7rem">STOCK</div>
+                  <strong>{{ lot.current_stock }}</strong>
+                </div>
+              </div>
+
+              <div class="d-flex gap-2">
+                @if (!lot.is_default) {
+                  <button class="btn btn-sm btn-primary flex-fill" (click)="openEditLot(lot)">
+                    <fa-icon icon="pen" class="me-1" />Editar
+                  </button>
+                }
+                <button
+                  class="btn btn-sm flex-fill"
+                  [class.btn-outline-warning]="lot.status === 'active'"
+                  [class.btn-outline-success]="lot.status === 'blocked'"
+                  (click)="toggleStatus(lot)"
+                  [disabled]="togglingId() === lot.id">
+                  @if (togglingId() === lot.id) {
+                    <c-spinner size="sm" class="me-1" />
+                  } @else if (lot.status === 'active') {
+                    <fa-icon icon="lock" class="me-1" />Bloquear
+                  } @else {
+                    <fa-icon icon="lock-open" class="me-1" />Activar
+                  }
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      </c-card-body>
+
+      <!-- Vista desktop: tabla -->
+      <c-card-body class="d-none d-md-block p-0">
+        <div class="table-responsive">
+          <table cTable class="mb-0 align-middle" style="font-size:.85rem">
+            <thead style="font-size:.78rem">
+              <tr>
+                <th class="ps-3" style="width:160px">Lote</th>
+                <th style="width:220px">Vencimiento</th>
+                <th style="width:120px">Estado</th>
+                <th class="text-end" style="width:80px">Stock</th>
+                <th style="width:200px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (lot of group.lots; track lot.id) {
+                <tr>
+                  <!-- Lote -->
+                  <td class="ps-3">
+                    @if (lot.is_default) {
+                      <span class="badge bg-secondary font-monospace fw-normal">SIN-LOTE</span>
+                    } @else if (lot.lot_number) {
+                      <span class="font-monospace fw-medium">{{ lot.lot_number }}</span>
+                    } @else {
+                      <span class="text-body-tertiary">—</span>
+                    }
+                  </td>
+
+                  <!-- Vencimiento + badge -->
+                  <td>
+                    @if (lot.expiry_date) {
+                      <div class="d-flex align-items-center gap-2">
+                        <span>{{ lot.expiry_date | date:'dd/MM/yyyy' }}</span>
+                        @switch (expiryStatus(lot)) {
+                          @case ('expired') { <c-badge color="danger">Vencido</c-badge> }
+                          @case ('soon')    { <c-badge color="warning">Próx. a vencer</c-badge> }
+                          @case ('ok')      { <c-badge color="success">Vigente</c-badge> }
+                        }
+                      </div>
+                    } @else {
+                      <span class="text-body-secondary">Sin fecha</span>
+                    }
+                  </td>
+
+                  <!-- Estado del lote -->
+                  <td>
+                    @if (lot.status === 'blocked') {
+                      <c-badge color="danger">Bloqueado</c-badge>
+                    } @else {
+                      <c-badge color="success">Activo</c-badge>
+                    }
+                  </td>
+
+                  <!-- Stock -->
+                  <td class="text-end fw-semibold pe-3">{{ lot.current_stock }}</td>
+
+                  <!-- Acciones -->
+                  <td>
+                    <div class="d-inline-flex gap-2">
+                      @if (!lot.is_default) {
+                        <button class="btn btn-sm btn-primary"
+                                (click)="openEditLot(lot)"
+                                title="Editar lote"
+                                style="font-size:.78rem">
+                          <fa-icon icon="pen" class="me-1" />Editar
+                        </button>
+                      }
+                      <button
+                        class="btn btn-sm"
+                        [class.btn-outline-warning]="lot.status === 'active'"
+                        [class.btn-outline-success]="lot.status === 'blocked'"
+                        (click)="toggleStatus(lot)"
+                        [disabled]="togglingId() === lot.id"
+                        style="font-size:.78rem; min-width:85px">
+                        @if (togglingId() === lot.id) {
+                          <c-spinner size="sm" class="me-1" />
+                        } @else if (lot.status === 'active') {
+                          <fa-icon icon="lock" class="me-1" />Bloquear
+                        } @else {
+                          <fa-icon icon="lock-open" class="me-1" />Activar
+                        }
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+
+  <app-pagination
+    [currentPage]="filters.page!"
+    [lastPage]="lastPage()"
+    wrapperClass="py-3"
+    (pageChange)="goToPage($event)"
+  />
+}

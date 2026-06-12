@@ -1,0 +1,266 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form" id="clientForm" (ngSubmit)="onSubmit()">
+
+    @if (error) {
+      <div class="alert alert-danger py-2">{{ error }}</div>
+    }
+
+    <div class="row g-3">
+
+      <!-- Nombre comercial -->
+      <div class="col-md-6">
+        <label class="form-label" for="business_name">
+          Nombre comercial <span class="text-danger">*</span>
+        </label>
+        <input cFormControl id="business_name" formControlName="business_name"
+               [class.is-invalid]="form.get('business_name')?.invalid && form.get('business_name')?.touched"
+               placeholder="Ej: Bodega El Sol" />
+        @if (form.get('business_name')?.hasError('required') && form.get('business_name')?.touched) {
+          <div class="invalid-feedback">El nombre comercial es obligatorio.</div>
+        }
+      </div>
+
+      <!-- Nombre del contacto -->
+      <div class="col-md-6">
+        <label class="form-label" for="name">
+          Nombre del contacto
+          <span class="text-body-secondary fw-normal small">(opcional)</span>
+        </label>
+        <input
+          cFormControl id="name" formControlName="name"
+          placeholder="Ej: Juan Pérez"
+          [class.is-invalid]="form.get('name')?.invalid && form.get('name')?.touched"
+        />
+        @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+          <div class="invalid-feedback">El nombre es obligatorio.</div>
+        }
+      </div>
+
+      <!-- DNI -->
+      <div class="col-md-4">
+        <label class="form-label" for="dni">
+          DNI <span class="text-body-secondary fw-normal small">(para boletas)</span>
+        </label>
+        <div class="input-group">
+          <input
+            cFormControl id="dni" formControlName="dni"
+            placeholder="12345678" maxlength="8"
+            [class.is-invalid]="form.get('dni')?.invalid && form.get('dni')?.touched"
+          />
+          <button type="button" class="btn btn-outline-secondary"
+                  [disabled]="consultingDni() || (form.get('dni')?.value?.length !== 8)"
+                  (click)="consultDni()">
+            @if (consultingDni()) {
+              <span class="spinner-border spinner-border-sm"></span>
+            } @else {
+              Consultar
+            }
+          </button>
+          @if (form.get('dni')?.hasError('pattern') && form.get('dni')?.touched) {
+            <div class="invalid-feedback">El DNI debe tener 8 dígitos.</div>
+          }
+        </div>
+        @if (dniError) {
+          <div class="text-danger small mt-1">{{ dniError }}</div>
+        }
+        <div class="form-text">Consulta RENIEC para autocompletar el nombre.</div>
+      </div>
+
+      <!-- RUC -->
+      <div class="col-md-4">
+        <label class="form-label" for="ruc">
+          RUC <span class="text-body-secondary fw-normal small">(para facturas)</span>
+        </label>
+        <div class="input-group">
+          <input
+            cFormControl id="ruc" formControlName="ruc"
+            placeholder="20512345678" maxlength="11"
+            [class.is-invalid]="form.get('ruc')?.invalid && form.get('ruc')?.touched"
+          />
+          <button type="button" class="btn btn-outline-secondary"
+                  [disabled]="consultingRuc() || (form.get('ruc')?.value?.length !== 11)"
+                  (click)="consultRuc()">
+            @if (consultingRuc()) {
+              <span class="spinner-border spinner-border-sm"></span>
+            } @else {
+              Consultar
+            }
+          </button>
+          @if (form.get('ruc')?.hasError('pattern') && form.get('ruc')?.touched) {
+            <div class="invalid-feedback">El RUC debe tener 11 dígitos.</div>
+          }
+        </div>
+        @if (rucError) {
+          <div class="text-danger small mt-1">{{ rucError }}</div>
+        }
+        @if (rucResult(); as r) {
+          <div class="mt-1 p-2 rounded small"
+               [class.bg-success-subtle]="r.puede_facturar"
+               [class.bg-warning-subtle]="!r.puede_facturar">
+            <div class="fw-semibold">{{ r.razon_social }}</div>
+            @if (r.nombre_comercial) {
+              <div class="text-body-secondary">{{ r.nombre_comercial }}</div>
+            }
+            <div class="mt-1">
+              <span class="badge me-1"
+                    [class.bg-success]="r.estado === 'ACTIVO'"
+                    [class.bg-danger]="r.estado !== 'ACTIVO'">
+                {{ r.estado }}
+              </span>
+              <span class="badge"
+                    [class.bg-success]="r.condicion === 'HABIDO'"
+                    [class.bg-warning]="r.condicion !== 'HABIDO'">
+                {{ r.condicion }}
+              </span>
+            </div>
+            @if (!r.puede_facturar) {
+              <div class="text-warning-emphasis mt-1">
+                ⚠️ SUNAT muestra este RUC como {{ r.estado }} / {{ r.condicion }}. Verifique con el cliente antes de emitir factura — los datos pueden no reflejar cambios recientes.
+              </div>
+            } @else {
+              <div class="text-success-emphasis mt-1">✓ Activo y habido según SUNAT.</div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Teléfono -->
+      <div class="col-md-4">
+        <label class="form-label" for="phone">Teléfono</label>
+        <input cFormControl id="phone" formControlName="phone" placeholder="999 888 777" />
+      </div>
+
+      <!-- Email -->
+      <div class="col-md-6">
+        <label class="form-label" for="email">Correo</label>
+        <input
+          cFormControl id="email" formControlName="email" type="email"
+          placeholder="cliente@correo.com"
+          [class.is-invalid]="form.get('email')?.invalid && form.get('email')?.touched"
+        />
+        @if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+          <div class="invalid-feedback">El correo no es válido.</div>
+        }
+      </div>
+
+      <!-- Dirección -->
+      <div class="col-md-6">
+        <label class="form-label" for="address">Dirección del negocio</label>
+        <input cFormControl id="address" formControlName="address"
+               placeholder="Av. Los Pinos 456, stand 12" />
+      </div>
+
+      <!-- Selectores geográficos -->
+      <div class="col-12">
+        <label class="form-label">Ubicación</label>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <p-select
+              formControlName="department_id"
+              [options]="departments()"
+              optionLabel="name" optionValue="id"
+              [placeholder]="loadingDeps() ? 'Cargando departamentos...' : 'Departamento'"
+              [loading]="loadingDeps()"
+              [filter]="true" filterPlaceholder="Buscar departamento..."
+              emptyMessage="Sin resultados"
+              [style]="{ width: '100%' }" appendTo="body"
+            />
+          </div>
+          <div class="col-md-4">
+            <p-select
+              formControlName="province_id"
+              [options]="provinces()"
+              optionLabel="name" optionValue="id"
+              [placeholder]="loadingProvs() ? 'Cargando provincias...' : 'Provincia'"
+              [loading]="loadingProvs()"
+              [filter]="true" filterPlaceholder="Buscar provincia..."
+              emptyMessage="Selecciona un departamento"
+              [style]="{ width: '100%' }" appendTo="body"
+            />
+          </div>
+          <div class="col-md-4">
+            <p-select
+              formControlName="district_id"
+              [options]="districts()"
+              optionLabel="name" optionValue="id"
+              [placeholder]="loadingDists() ? 'Cargando distritos...' : 'Distrito'"
+              [loading]="loadingDists()"
+              [filter]="true" filterPlaceholder="Buscar distrito..."
+              emptyMessage="Selecciona una provincia"
+              [style]="{ width: '100%' }" appendTo="body"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Mapa GPS -->
+      <div class="col-12">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <label class="form-label mb-0">
+            Ubicación GPS
+            <span class="text-body-secondary fw-normal small">(para entrega de mercadería)</span>
+          </label>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    (click)="useCurrentLocation()" [disabled]="gettingLocation()">
+              @if (gettingLocation()) {
+                <span class="spinner-border spinner-border-sm me-1"></span>Obteniendo...
+              } @else {
+                📍 Usar mi ubicación
+              }
+            </button>
+            @if (form.get('latitude')?.value) {
+              <button type="button" class="btn btn-sm btn-outline-danger" (click)="clearCoords()">
+                Quitar
+              </button>
+            }
+          </div>
+        </div>
+
+        @if (locationError) {
+          <div class="alert alert-warning py-1 small mb-1">{{ locationError }}</div>
+        }
+
+        <!-- Coordenadas actuales -->
+        @if (form.get('latitude')?.value) {
+          <div class="text-body-secondary small mb-1">
+            Lat: {{ form.get('latitude')?.value | number:'1.6-8' }},
+            Lng: {{ form.get('longitude')?.value | number:'1.6-8' }}
+          </div>
+        }
+
+        <!-- Mapa -->
+        <div #mapEl style="height: 250px; border-radius: 8px; border: 1px solid var(--bs-border-color); overflow: hidden;"></div>
+        <div class="form-text">Haz clic en el mapa para marcar la ubicación, o arrastra el marcador para ajustarlo.</div>
+      </div>
+
+      <!-- Activo -->
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="active" formControlName="active" />
+          <label class="form-check-label" for="active">Activo</label>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="submit" form="clientForm" class="btn btn-primary"
+          [disabled]="form.invalid || saving() || loadingDeps() || loadingProvs() || loadingDists()">
+    @if (saving()) {
+      <c-spinner size="sm" class="me-1" />Guardando...
+    } @else if (loadingDeps() || loadingProvs() || loadingDists()) {
+      <c-spinner size="sm" class="me-1" />Cargando ubicación...
+    } @else {
+      {{ isEdit ? 'Guardar cambios' : 'Crear' }}
+    }
+  </button>
+</div>

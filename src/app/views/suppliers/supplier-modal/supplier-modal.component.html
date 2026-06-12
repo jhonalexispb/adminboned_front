@@ -1,0 +1,139 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form" id="supplierForm" (ngSubmit)="onSubmit()">
+
+    @if (error) {
+      <div class="alert alert-danger py-2">{{ error }}</div>
+    }
+
+    <div class="row g-3">
+
+      <!-- Nombre -->
+      <div class="col-12">
+        <label class="form-label" for="name">
+          Nombre / Razón social <span class="text-danger">*</span>
+        </label>
+        <input
+          cFormControl id="name" formControlName="name"
+          placeholder="Ej: Distribuidora ABC S.A.C."
+          [class.is-invalid]="form.get('name')?.invalid && form.get('name')?.touched"
+        />
+        @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+          <div class="invalid-feedback">El nombre es obligatorio.</div>
+        }
+      </div>
+
+      <!-- RUC y Contacto -->
+      <div class="col-md-6">
+        <label class="form-label" for="ruc">RUC</label>
+        <input cFormControl id="ruc" formControlName="ruc" placeholder="20512345678" maxlength="11" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="contact_name">Persona de contacto</label>
+        <input cFormControl id="contact_name" formControlName="contact_name" placeholder="Nombre del contacto" />
+      </div>
+
+      <!-- Teléfono y Email -->
+      <div class="col-md-6">
+        <label class="form-label" for="phone">Teléfono</label>
+        <input cFormControl id="phone" formControlName="phone" placeholder="999 888 777" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label" for="email">Correo</label>
+        <input
+          cFormControl id="email" formControlName="email" type="email"
+          placeholder="contacto@proveedor.com"
+          [class.is-invalid]="form.get('email')?.invalid && form.get('email')?.touched"
+        />
+        @if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+          <div class="invalid-feedback">El correo no es válido.</div>
+        }
+      </div>
+
+      <!-- Dirección -->
+      <div class="col-12">
+        <label class="form-label" for="address">Dirección</label>
+        <input cFormControl id="address" formControlName="address" placeholder="Av. Los Olivos 123" />
+      </div>
+
+      <!-- Selectores geográficos con búsqueda -->
+      <div class="col-12">
+        <label class="form-label">Ubicación</label>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <p-select
+              formControlName="department_id"
+              [options]="departments()"
+              optionLabel="name"
+              optionValue="id"
+              [placeholder]="loadingDeps() ? 'Cargando departamentos...' : 'Departamento'"
+              [loading]="loadingDeps()"
+              [filter]="true"
+              filterPlaceholder="Buscar departamento..."
+              emptyMessage="Sin resultados"
+              [style]="{ width: '100%' }"
+              appendTo="body"
+            />
+          </div>
+          <div class="col-md-4">
+            <p-select
+              formControlName="province_id"
+              [options]="provinces()"
+              optionLabel="name"
+              optionValue="id"
+              [placeholder]="loadingProvs() ? 'Cargando provincias...' : 'Provincia'"
+              [loading]="loadingProvs()"
+              [filter]="true"
+              filterPlaceholder="Buscar provincia..."
+              emptyMessage="Selecciona un departamento"
+              [style]="{ width: '100%' }"
+              appendTo="body"
+            />
+          </div>
+          <div class="col-md-4">
+            <p-select
+              formControlName="district_id"
+              [options]="districts()"
+              optionLabel="name"
+              optionValue="id"
+              [placeholder]="loadingDists() ? 'Cargando distritos...' : 'Distrito'"
+              [loading]="loadingDists()"
+              [filter]="true"
+              filterPlaceholder="Buscar distrito..."
+              emptyMessage="Selecciona una provincia"
+              [style]="{ width: '100%' }"
+              appendTo="body"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Activo -->
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="active" formControlName="active" />
+          <label class="form-check-label" for="active">Activo</label>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="submit" form="supplierForm" class="btn btn-primary"
+          [disabled]="form.invalid || saving() || loadingDeps() || loadingProvs() || loadingDists()">
+    @if (saving()) {
+      <c-spinner size="sm" class="me-1" />Guardando...
+    } @else if (loadingDeps() || loadingProvs() || loadingDists()) {
+      <c-spinner size="sm" class="me-1" />Cargando ubicación...
+    } @else {
+      {{ isEdit ? 'Guardar cambios' : 'Crear' }}
+    }
+  </button>
+</div>

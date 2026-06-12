@@ -1,0 +1,169 @@
+<app-page-header title="Roles y Permisos" subtitle="Define qué puede hacer cada rol en el sistema" />
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+  <div class="row g-3">
+
+    <!-- ── Panel izquierdo: lista de roles ───────────────────────────────── -->
+    <div class="col-12 col-md-3">
+      <c-card>
+        <c-card-header class="d-flex align-items-center justify-content-between py-2">
+          <span class="fw-semibold small">Roles</span>
+          <button class="btn btn-sm btn-outline-primary py-0 px-2"
+                  style="font-size:.75rem;"
+                  (click)="showNewRoleForm.update(v => !v)">
+            <fa-icon icon="plus" />
+          </button>
+        </c-card-header>
+        <c-card-body class="p-0">
+
+          <!-- Formulario nuevo rol -->
+          @if (showNewRoleForm()) {
+            <div class="p-2 border-bottom bg-body-tertiary">
+              <input type="text" class="form-control form-control-sm mb-1"
+                     placeholder="Nombre del rol…"
+                     [(ngModel)]="newRoleName"
+                     (keyup.enter)="createRole()" />
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-success flex-grow-1"
+                        [disabled]="savingNew() || !newRoleName.trim()"
+                        (click)="createRole()">
+                  @if (savingNew()) { <c-spinner size="sm" /> } @else { Crear }
+                </button>
+                <button class="btn btn-sm btn-outline-secondary"
+                        (click)="showNewRoleForm.set(false); newRoleName = ''">
+                  <fa-icon icon="xmark" />
+                </button>
+              </div>
+            </div>
+          }
+
+          <!-- Lista -->
+          <div class="list-group list-group-flush">
+            @for (role of roles(); track role.id) {
+              <!-- Modo renombrar -->
+              @if (renamingRole()?.id === role.id) {
+                <div class="list-group-item py-2 px-3" style="font-size:.85rem;">
+                  <div class="fw-semibold mb-1" style="font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;">
+                    Renombrar
+                  </div>
+                  <input type="text" class="form-control form-control-sm mb-1"
+                         [(ngModel)]="renameValue"
+                         (keyup.enter)="doRename()"
+                         (keyup.escape)="cancelRename()" />
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-success flex-grow-1"
+                            [disabled]="savingRename() || !renameValue.trim()"
+                            (click)="doRename()">
+                      @if (savingRename()) { <c-spinner size="sm" /> } @else { Guardar }
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" (click)="cancelRename()">
+                      <fa-icon icon="xmark" />
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <!-- Modo normal -->
+                <button type="button"
+                        class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 px-3"
+                        style="font-size:.85rem;"
+                        [class.active]="activeRole()?.id === role.id"
+                        (click)="selectRole(role)">
+                  <div class="flex-grow-1 min-width-0 me-1">
+                    <div class="fw-semibold">{{ roleLabel(role.name, role.display_name) }}</div>
+                    <div class="opacity-75" style="font-size:.72rem;">
+                      {{ role.permissions.length }} permisos · {{ role.users_count }} usuarios
+                    </div>
+                  </div>
+                  @if (role.name !== 'admin') {
+                    <div class="d-flex gap-1 flex-shrink-0">
+                      <button type="button"
+                              class="btn btn-sm btn-outline-secondary py-0 px-1"
+                              style="font-size:.65rem;"
+                              title="Renombrar"
+                              (click)="$event.stopPropagation(); startRename(role)">
+                        <fa-icon icon="pen" />
+                      </button>
+                      <button type="button"
+                              class="btn btn-sm btn-outline-danger py-0 px-1"
+                              style="font-size:.65rem;"
+                              title="Eliminar"
+                              (click)="$event.stopPropagation(); confirmDeleteRole(role)">
+                        <fa-icon icon="trash" />
+                      </button>
+                    </div>
+                  }
+                </button>
+              }
+            }
+          </div>
+        </c-card-body>
+      </c-card>
+    </div>
+
+    <!-- ── Panel derecho: permisos del rol activo ────────────────────────── -->
+    <div class="col-12 col-md-9">
+      @if (activeRole(); as role) {
+        <c-card>
+          <c-card-header class="d-flex align-items-center justify-content-between py-2">
+            <div>
+              <span class="fw-semibold">{{ roleLabel(role.name, role.display_name) }}</span>
+              <c-badge [color]="roleColor(role.name)" class="ms-2" style="font-size:.7rem;">
+                {{ role.name }}
+              </c-badge>
+            </div>
+            <button cButton color="primary" size="sm"
+                    [disabled]="!isDirty() || !!saving()"
+                    (click)="saveRole()">
+              @if (saving() === role.id) { <c-spinner size="sm" class="me-1" /> }
+              Guardar cambios
+            </button>
+          </c-card-header>
+
+          <c-card-body>
+            @if (isDirty()) {
+              <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.8rem;">
+                <fa-icon icon="triangle-exclamation" class="me-1" />
+                Tienes cambios sin guardar.
+              </div>
+            }
+
+            <div class="row g-3">
+              @for (group of permGroups(); track group.label) {
+                <div class="col-12 col-sm-6 col-xl-4">
+                  <div class="border rounded p-2" style="font-size:.8rem;">
+                    <div class="fw-semibold text-body-secondary mb-2" style="font-size:.72rem; text-transform:uppercase; letter-spacing:.05em;">
+                      {{ group.label }}
+                    </div>
+                    @for (perm of group.permissions; track perm) {
+                      <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox"
+                               [id]="'perm_' + perm"
+                               [checked]="hasPerm(perm)"
+                               (change)="togglePerm(perm)" />
+                        <label class="form-check-label" [for]="'perm_' + perm">
+                          {{ permLabel(perm) }}
+                        </label>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+  </div>
+}
+
+<!-- Confirm eliminar rol -->
+<app-confirm-modal
+  [visible]="!!deletingRole()"
+  title="Eliminar rol"
+  [message]="'¿Eliminar el rol ' + (roleLabel(deletingRole()?.name ?? '', deletingRole()?.display_name)) + '? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  confirmColor="danger"
+  (confirm)="doDeleteRole()"
+  (cancel)="deletingRole.set(null)" />

@@ -1,0 +1,65 @@
+<div class="modal-header border-0 pb-1">
+  <h5 class="modal-title fw-semibold d-flex align-items-center gap-2">
+    <span class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0"
+          style="width:32px;height:32px;background:var(--cui-primary-bg-subtle)">
+      <fa-icon icon="pen" class="text-primary" style="font-size:.85rem" />
+    </span>
+    Editar lote
+  </h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()">
+  <div class="modal-body pt-2">
+
+    <!-- Producto info -->
+    <div class="rounded-3 p-3 mb-4 d-flex align-items-start gap-3"
+         style="background:var(--cui-tertiary-bg)">
+      <div class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0"
+           style="width:36px;height:36px;background:var(--cui-primary-bg-subtle)">
+        <fa-icon icon="layer-group" class="text-primary" />
+      </div>
+      <div class="flex-grow-1 min-w-0">
+        <div class="fw-semibold text-truncate">{{ lot.product?.name ?? '—' }}</div>
+        @if (lot.product?.sku) {
+          <span class="font-monospace small text-body-secondary">{{ lot.product!.sku }}</span>
+        }
+      </div>
+    </div>
+
+    @if (error) {
+      <div class="alert alert-danger py-2 mb-3 small">{{ error }}</div>
+    }
+
+    <!-- Número de lote -->
+    <div class="mb-3">
+      <label class="form-label fw-medium" for="lot_number">Número de lote</label>
+      <input cFormControl id="lot_number" formControlName="lot_number"
+             type="text" placeholder="Ej. L-2026-001"
+             [class.is-invalid]="form.get('lot_number')?.invalid && form.get('lot_number')?.touched" />
+      @if (form.get('lot_number')?.invalid && form.get('lot_number')?.touched) {
+        <div class="invalid-feedback">Máximo 100 caracteres.</div>
+      }
+    </div>
+
+    <!-- Fecha de vencimiento -->
+    <div class="mb-0">
+      <label class="form-label fw-medium" for="expiry_date">Fecha de vencimiento</label>
+      <input cFormControl id="expiry_date" formControlName="expiry_date" type="date" />
+    </div>
+
+  </div>
+
+  <div class="modal-footer border-0 pt-0">
+    <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">
+      Cancelar
+    </button>
+    <button type="submit" class="btn btn-primary px-4" [disabled]="saving()">
+      @if (saving()) {
+        <c-spinner size="sm" class="me-1" />Guardando...
+      } @else {
+        Guardar cambios
+      }
+    </button>
+  </div>
+</form>

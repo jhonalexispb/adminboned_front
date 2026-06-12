@@ -1,0 +1,322 @@
+<app-page-header
+  [title]="data()?.product?.name ?? 'Precios'"
+  subtitle="Centro de precios y escalas">
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary btn-sm" routerLink="/products/list">
+      <fa-icon icon="arrow-left" class="me-1" />
+      <span class="d-none d-sm-inline">Volver</span>
+    </button>
+    <a class="btn btn-outline-secondary btn-sm"
+       [routerLink]="['/products', productId, 'edit']">
+      <fa-icon icon="pencil" class="me-1" />
+      <span class="d-none d-sm-inline">Editar</span>
+    </a>
+  </div>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (data(); as d) {
+
+  <!-- ── Métricas (siempre visibles) ───────────────────────────────────── -->
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-4 col-lg-3">
+      <c-card class="h-100">
+        <c-card-body class="py-2 px-3">
+          <div class="text-body-secondary" style="font-size:.72rem;">Precio de venta</div>
+          <div class="fw-bold" style="font-size:1.1rem;">S/ {{ d.product.base_price | number:'1.2-2' }}</div>
+          @if (margin(+d.product.base_price); as m) {
+            <div style="font-size:.73rem;"><span [class]="marginClass(m)">Margen: {{ m }}%</span></div>
+          }
+        </c-card-body>
+      </c-card>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <c-card class="h-100">
+        <c-card-body class="py-2 px-3">
+          <div class="text-body-secondary" style="font-size:.72rem;">Último costo</div>
+          @if (costValue !== null) {
+            <div class="fw-bold" style="font-size:1.1rem;">S/ {{ costValue | number:'1.2-2' }}</div>
+            <div class="text-body-secondary" style="font-size:.73rem;">{{ d.cost_history[0]?.date | date:'dd/MM/yyyy' }}</div>
+          } @else {
+            <div class="text-body-secondary fst-italic" style="font-size:.85rem; margin-top:4px;">Sin costo</div>
+          }
+        </c-card-body>
+      </c-card>
+    </div>
+    <div class="col-6 col-md-4 col-lg-3">
+      <c-card class="h-100">
+        <c-card-body class="py-2 px-3">
+          <div class="text-body-secondary" style="font-size:.72rem;">Escalas activas</div>
+          <div class="fw-bold" style="font-size:1.1rem;">
+            {{ activeTiers() }}<span class="fw-normal text-body-secondary" style="font-size:.85rem;"> / {{ d.price_tiers.length }}</span>
+          </div>
+          <div class="text-body-secondary" style="font-size:.73rem;">
+            {{ d.price_tiers.length > 0 ? 'Desde ' + d.price_tiers[0]?.min_quantity + ' uds' : 'Sin escalas' }}
+          </div>
+        </c-card-body>
+      </c-card>
+    </div>
+  </div>
+
+  <!-- ══ MOBILE: tabs ══════════════════════════════════════════════════════ -->
+  <ul class="nav nav-tabs mb-3 d-md-none">
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="activeTab() === 'precios'"
+              (click)="activeTab.set('precios')">
+        <fa-icon icon="tags" class="me-1" />Precios
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="activeTab() === 'grafico'"
+              (click)="activeTab.set('grafico')">
+        <fa-icon icon="chart-line" class="me-1" />Gráfico
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="activeTab() === 'analisis'"
+              (click)="activeTab.set('analisis')">
+        <fa-icon icon="chart-bar" class="me-1" />Análisis
+      </button>
+    </li>
+  </ul>
+
+  <!-- ── Contenido ─────────────────────────────────────────────────────── -->
+  <div class="row g-4">
+
+    <!-- ── Columna form: visible siempre en desktop; en mobile solo tab "precios" -->
+    <div class="col-md-7"
+         [class.d-none]="activeTab() !== 'precios'"
+         [class.d-md-block]="true">
+      <form [formGroup]="form" (ngSubmit)="onSubmit()">
+
+        @if (error) {
+          <div class="alert alert-danger py-2 mb-3">{{ error }}</div>
+        }
+
+        <!-- Precio base -->
+        <c-card class="mb-3">
+          <c-card-header class="py-2"><strong>Precio base de venta</strong></c-card-header>
+          <c-card-body>
+            <div class="row g-3">
+              <div class="col-sm-4">
+                <label class="form-label small text-body-secondary mb-1">
+                  Precio (S/) <span class="text-danger">*</span>
+                </label>
+                <input cFormControl formControlName="base_price"
+                       type="number" step="0.01" min="0" placeholder="0.00"
+                       [class.is-invalid]="form.get('base_price')?.invalid && form.get('base_price')?.touched" />
+                @if (form.get('base_price')?.value && margin(form.get('base_price')?.value); as m) {
+                  <div class="mt-1 small">Margen: <span [class]="marginClass(m)">{{ m }}%</span></div>
+                }
+              </div>
+              <div class="col-sm-8">
+                <label class="form-label small text-body-secondary mb-1">Calcular por margen objetivo</label>
+                @if (costValue !== null) {
+                  <div class="d-flex flex-wrap gap-1">
+                    @for (pct of referenceMargins; track pct) {
+                      <button type="button" class="btn btn-sm btn-outline-secondary"
+                              style="font-size:.75rem"
+                              (click)="applyMarginToBase(pct)">
+                        {{ pct }}% → S/{{ priceForMargin(pct) | number:'1.2-2' }}
+                      </button>
+                    }
+                  </div>
+                  <div class="form-text">Toca para aplicar ese precio.</div>
+                } @else {
+                  <p class="text-body-secondary small fst-italic mb-0 mt-2">
+                    Disponible cuando haya un costo registrado.
+                  </p>
+                }
+              </div>
+            </div>
+          </c-card-body>
+        </c-card>
+
+        <!-- Escalas -->
+        <c-card class="mb-3">
+          <c-card-header class="py-2">
+            <div class="d-flex align-items-center justify-content-between">
+              <div>
+                <strong>Escalas de precio</strong>
+                <span class="text-body-secondary fw-normal small ms-2 d-none d-sm-inline">
+                  Precios especiales por volumen
+                </span>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" (click)="addTier()">
+                <fa-icon icon="plus" class="me-1" />Agregar
+              </button>
+            </div>
+          </c-card-header>
+          <c-card-body>
+
+            @if (tiers.length === 0) {
+              <p class="text-body-secondary small mb-0 text-center py-2">
+                Sin escalas. El precio base aplica para todas las cantidades.
+              </p>
+            }
+
+            <div formArrayName="price_tiers" class="d-flex flex-column gap-2">
+              @for (tier of tierControls; track $index; let i = $index) {
+                <div [formGroupName]="i" class="border rounded p-2">
+
+                  <!-- Cabecera del tier: checkbox activo + botón eliminar -->
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="form-check mb-0">
+                      <input class="form-check-input" type="checkbox"
+                             formControlName="active" [id]="'ta_' + i" />
+                      <label class="form-check-label small fw-medium" [for]="'ta_' + i">
+                        Escala activa
+                      </label>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            (click)="removeTier(i)">
+                      <fa-icon icon="trash" />
+                    </button>
+                  </div>
+
+                  <!-- Campos principales: Desde + Precio -->
+                  <div class="row g-2 mb-2">
+                    <div class="col-6">
+                      <label class="form-label small text-body-secondary mb-1">Desde (uds)</label>
+                      <input cFormControl formControlName="min_quantity"
+                             type="number" min="1" placeholder="10"
+                             [class.is-invalid]="tier.get('min_quantity')?.invalid && tier.get('min_quantity')?.touched" />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small text-body-secondary mb-1">Precio (S/)</label>
+                      <input cFormControl formControlName="price"
+                             type="number" step="0.01" min="0" placeholder="0.00"
+                             [class.is-invalid]="tier.get('price')?.invalid && tier.get('price')?.touched" />
+                      @if (tier.get('price')?.value && margin(tier.get('price')?.value); as m) {
+                        <div class="small mt-1">Margen: <span [class]="marginClass(m)">{{ m }}%</span></div>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Calcular por margen -->
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text text-body-secondary" style="font-size:.75rem;">Margen %</span>
+                    <input #mi type="number" min="1" max="99" step="1"
+                           class="form-control" placeholder="25"
+                           [disabled]="costValue === null" />
+                    <button type="button" class="btn btn-outline-secondary"
+                            (click)="applyMargin(i, +mi.value)"
+                            [disabled]="costValue === null">
+                      Aplicar
+                    </button>
+                  </div>
+
+                </div>
+              }
+            </div>
+
+          </c-card-body>
+        </c-card>
+
+        <!-- Botones -->
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-outline-secondary" routerLink="/products/list">
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            @if (saving()) {
+              <c-spinner size="sm" class="me-1" />Guardando...
+            } @else {
+              <fa-icon icon="save" class="me-1" />Guardar cambios
+            }
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- ── Columna derecha: en desktop siempre visible; en mobile tabs "grafico" y "analisis" -->
+    <div class="col-md-5">
+
+      <!-- Gráfico + Historial: desktop siempre / mobile solo tab grafico -->
+      <div [class.d-none]="activeTab() !== 'grafico'"
+           [class.d-md-block]="true">
+
+        <c-card class="mb-3">
+          <c-card-header class="py-2"><strong>Evolución de precios</strong></c-card-header>
+          <c-card-body>
+            @if (chartData(); as cd) {
+              @if ((d.price_history.length + d.cost_history.length) > 1) {
+                <div style="position:relative;height:200px;width:100%">
+                  <c-chart type="line" [data]="cd" [options]="chartOptions"
+                           style="display:block;width:100%;height:100%" />
+                </div>
+              } @else {
+                <p class="text-body-secondary small text-center py-3 mb-0">
+                  El gráfico aparece cuando hay más de un registro en el historial.
+                </p>
+              }
+            }
+          </c-card-body>
+        </c-card>
+
+        <c-card>
+          <c-card-header class="py-2"><strong>Historial de precios</strong></c-card-header>
+          <c-card-body class="p-0">
+            @if (d.timeline.length === 0) {
+              <p class="text-body-secondary small text-center py-3 mb-0">Sin historial.</p>
+            } @else {
+              <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0 align-middle" style="font-size:.8rem;">
+                  <thead class="text-body-secondary">
+                    <tr>
+                      <th class="ps-3">Fecha</th>
+                      <th>Tipo</th>
+                      <th class="text-end">Precio</th>
+                      <th class="d-none d-sm-table-cell pe-3">Origen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (h of d.timeline; track h.id + h.type) {
+                      <tr>
+                        <td class="ps-3 text-nowrap">{{ h.date | date:'dd/MM/yy' }}</td>
+                        <td>
+                          @if (h.type === 'sale') {
+                            <c-badge color="success">Venta</c-badge>
+                          } @else {
+                            <c-badge color="danger">Costo</c-badge>
+                          }
+                        </td>
+                        <td class="text-end fw-medium">S/ {{ h.price | number:'1.2-2' }}</td>
+                        <td class="text-body-secondary d-none d-sm-table-cell pe-3">
+                          {{ sourceLabel(h.source, h.type) }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </c-card-body>
+        </c-card>
+
+      </div>
+
+      <!-- Análisis: desktop siempre / mobile solo tab analisis -->
+      <div [class.d-none]="activeTab() !== 'analisis'"
+           [class.d-md-block]="true"
+           [class.mt-md-3]="true">
+        <c-card>
+          <c-card-header class="py-2">
+            <div class="d-flex align-items-center gap-2">
+              <strong>Análisis de ventas</strong>
+              <span class="badge bg-secondary" style="font-size:.7rem">Próximamente</span>
+            </div>
+          </c-card-header>
+          <c-card-body class="text-center text-body-secondary small py-4">
+            <fa-icon icon="chart-bar" class="d-block mb-2" style="font-size:1.8rem;opacity:.25;" />
+            Unidades vendidas · Precio promedio · Rotación · Ticket por escala
+          </c-card-body>
+        </c-card>
+      </div>
+
+    </div>
+  </div>
+
+}

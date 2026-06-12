@@ -1,0 +1,135 @@
+<app-page-header title="Usuarios" subtitle="Gestión de cuentas y roles">
+  <button class="btn btn-primary btn-sm" (click)="openCreate()">
+    <fa-icon icon="plus" class="me-1" />Nuevo usuario
+  </button>
+</app-page-header>
+
+<!-- Filtros -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <input type="text" class="form-control form-control-sm" style="max-width:240px;"
+         placeholder="Buscar por nombre o email…"
+         [(ngModel)]="search"
+         (keyup.enter)="load(1)" />
+  <select class="form-select form-select-sm" style="max-width:180px;"
+          [(ngModel)]="filterRole"
+          (ngModelChange)="load(1)">
+    <option value="">Todos los roles</option>
+    @for (r of roles(); track r.id) {
+      <option [value]="r.name">{{ roleLabel(r.name, r.display_name) }}</option>
+    }
+  </select>
+  <button class="btn btn-outline-secondary btn-sm" (click)="load(1)">
+    <fa-icon icon="magnifying-glass" />
+  </button>
+</div>
+
+<!-- Tabla -->
+<c-card>
+  <c-card-body class="p-0">
+    @if (loading()) {
+      <div class="text-center py-5"><c-spinner color="primary" /></div>
+    } @else if (!users().length) {
+      <div class="text-center text-body-secondary py-5" style="font-size:.9rem;">
+        <fa-icon icon="users" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+        No se encontraron usuarios.
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle" style="font-size:.875rem;">
+          <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+            <tr>
+              <th class="ps-3">Nombre</th>
+              <th>Email</th>
+              <th>Teléfono</th>
+              <th>Roles</th>
+              <th style="width:80px;">Estado</th>
+              <th style="width:120px;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of users(); track u.id) {
+              <tr [class.table-secondary]="u.deleted_at || !u.active" [class.opacity-50]="!!u.deleted_at">
+                <td class="ps-3">
+                  <div class="fw-semibold">{{ u.name }}</div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">
+                    desde {{ u.created_at | date:'dd/MM/yyyy' }}
+                  </div>
+                </td>
+                <td class="text-body-secondary">{{ u.email }}</td>
+                <td class="text-body-secondary">{{ u.phone || '—' }}</td>
+                <td>
+                  <div class="d-flex flex-wrap gap-1">
+                    @for (r of u.roles; track r) {
+                      <c-badge [color]="roleColor(r)" style="font-size:.68rem;">{{ roleLabel(r) }}</c-badge>
+                    }
+                  </div>
+                </td>
+                <td>
+                  @if (u.deleted_at) {
+                    <c-badge color="dark" style="font-size:.68rem;">Eliminado</c-badge>
+                  } @else if (!u.active) {
+                    <c-badge color="secondary" style="font-size:.68rem;">Inactivo</c-badge>
+                  } @else {
+                    <c-badge color="success" style="font-size:.68rem;">Activo</c-badge>
+                  }
+                </td>
+                <td>
+                  <div class="d-flex gap-1">
+                    @if (u.deleted_at) {
+                      <button class="btn btn-sm btn-outline-success" title="Restaurar"
+                              (click)="restore(u)">
+                        <fa-icon icon="rotate-left" />
+                      </button>
+                    } @else {
+                      <button class="btn btn-sm btn-outline-primary" title="Editar"
+                              (click)="openEdit(u)">
+                        <fa-icon icon="pen" />
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" title="Eliminar"
+                              (click)="confirmDelete(u)">
+                        <fa-icon icon="trash" />
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginación -->
+      @if (lastPage() > 1) {
+        <div class="d-flex justify-content-between align-items-center px-3 py-2" style="font-size:.8rem;">
+          <span class="text-body-secondary">{{ total() }} usuarios</span>
+          <div class="d-flex gap-1">
+            @for (p of pages(); track p) {
+              <button class="btn btn-sm"
+                      [class.btn-primary]="p === page()"
+                      [class.btn-outline-secondary]="p !== page()"
+                      (click)="load(p)">{{ p }}</button>
+            }
+          </div>
+        </div>
+      }
+    }
+  </c-card-body>
+</c-card>
+
+<!-- Modal crear/editar -->
+<app-user-modal
+  [visible]="showModal()"
+  [user]="editingUser()"
+  [roles]="roles()"
+  (saved)="onSaved()"
+  (cancelled)="showModal.set(false)" />
+
+<!-- Confirm eliminar -->
+<app-confirm-modal
+  [visible]="!!deletingUser()"
+  title="Eliminar usuario"
+  [message]="'¿Eliminar a ' + (deletingUser()?.name ?? '') + '? Podrá ser restaurado después.'"
+  confirmLabel="Eliminar"
+  confirmColor="danger"
+  (confirm)="doDelete()"
+  (cancel)="deletingUser.set(null)" />

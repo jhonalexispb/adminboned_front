@@ -1,0 +1,393 @@
+<app-page-header title="Mi Empresa" subtitle="Configuración general del sistema">
+</app-page-header>
+
+@if (cargando()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- Tabs -->
+  <div class="d-flex gap-2 mb-3 flex-wrap">
+    <button class="btn btn-sm"
+            [class.btn-primary]="tabActiva() === 'empresa'"
+            [class.btn-outline-secondary]="tabActiva() !== 'empresa'"
+            (click)="tabActiva.set('empresa')">
+      <fa-icon icon="building" class="me-1" />Datos de la empresa
+    </button>
+    <button class="btn btn-sm"
+            [class.btn-primary]="tabActiva() === 'sunat'"
+            [class.btn-outline-secondary]="tabActiva() !== 'sunat'"
+            (click)="tabActiva.set('sunat')">
+      <fa-icon icon="link" class="me-1" />ApiSunat
+      @if (tieneApisunat) {
+        <c-badge color="success" class="ms-1">✓</c-badge>
+      } @else {
+        <c-badge color="warning" class="ms-1">!</c-badge>
+      }
+    </button>
+    <button class="btn btn-sm"
+            [class.btn-primary]="tabActiva() === 'facturacion'"
+            [class.btn-outline-secondary]="tabActiva() !== 'facturacion'"
+            (click)="tabActiva.set('facturacion')">
+      <fa-icon icon="file-invoice" class="me-1" />Facturación
+    </button>
+    <button class="btn btn-sm"
+            [class.btn-primary]="tabActiva() === 'metas'"
+            [class.btn-outline-secondary]="tabActiva() !== 'metas'"
+            (click)="tabActiva.set('metas')">
+      <fa-icon icon="bullseye" class="me-1" />Metas del negocio
+    </button>
+  </div>
+
+  <!-- ── Tab: Datos de la empresa ── -->
+  @if (tabActiva() === 'empresa') {
+    <c-card class="mb-3">
+      <c-card-header><strong>Datos de la empresa</strong></c-card-header>
+      <c-card-body>
+        <div class="row g-3">
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-body-secondary">RUC <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" [(ngModel)]="form.ruc"
+                   maxlength="11" placeholder="11 dígitos" />
+          </div>
+
+          <div class="col-12 col-md-8">
+            <label class="form-label small text-body-secondary">Razón Social <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" [(ngModel)]="form.razon_social"
+                   placeholder="Razón social completa" />
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-body-secondary">Nombre Comercial</label>
+            <input type="text" class="form-control" [(ngModel)]="form.nombre_comercial"
+                   placeholder="Nombre visible en documentos (opcional)" />
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-body-secondary">Dirección <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" [(ngModel)]="form.direccion"
+                   placeholder="Dirección fiscal completa" />
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-body-secondary">Departamento</label>
+            <select class="form-select"
+                    [ngModel]="selectedDeptId()"
+                    (ngModelChange)="onDeptChange($event)">
+              <option [ngValue]="null">— Seleccionar —</option>
+              @for (d of departments(); track d.id) {
+                <option [value]="d.id">{{ d.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-body-secondary">Provincia</label>
+            <select class="form-select"
+                    [ngModel]="selectedProvId()"
+                    (ngModelChange)="onProvChange($event)"
+                    [disabled]="!selectedDeptId()">
+              <option [ngValue]="null">— Seleccionar —</option>
+              @for (p of provinces(); track p.id) {
+                <option [value]="p.id">{{ p.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-body-secondary">Distrito</label>
+            <select class="form-select"
+                    [ngModel]="districts().find(d => d.name === form.distrito)?.id ?? null"
+                    (ngModelChange)="onDistrictChange($event)"
+                    [disabled]="!selectedProvId()">
+              <option [ngValue]="null">— Seleccionar —</option>
+              @for (d of districts(); track d.id) {
+                <option [value]="d.id">{{ d.name }}</option>
+              }
+            </select>
+          </div>
+
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-body-secondary">Teléfono</label>
+            <input type="text" class="form-control" [(ngModel)]="form.telefono" placeholder="Opcional" />
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label small text-body-secondary">Email</label>
+            <input type="email" class="form-control" [(ngModel)]="form.email" placeholder="Opcional" />
+          </div>
+
+        </div>
+      </c-card-body>
+    </c-card>
+
+    <!-- Logo -->
+    <c-card class="mb-3">
+      <c-card-header><strong>Logo</strong></c-card-header>
+      <c-card-body>
+        <div class="d-flex align-items-center gap-4 flex-wrap">
+          @if (empresa()?.logo_url) {
+            <img [src]="empresa()!.logo_url" alt="Logo" style="height:64px;object-fit:contain;" />
+          } @else {
+            <div class="text-body-secondary small border rounded p-3">Sin logo</div>
+          }
+          <div>
+            <input type="file" class="form-control form-control-sm mb-2"
+                   accept="image/png,image/jpeg,image/svg+xml"
+                   (change)="onLogoChange($event)" />
+            <button class="btn btn-sm btn-secondary"
+                    [disabled]="!logoFile || subiendoLogo()"
+                    (click)="subirLogo()">
+              @if (subiendoLogo()) { <c-spinner size="sm" class="me-1" /> }
+              Subir logo
+            </button>
+            <div class="text-body-secondary mt-1" style="font-size:.78rem;">PNG, JPG o SVG · Máx. 2 MB</div>
+          </div>
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- ── Tab: ApiSunat ── -->
+  @if (tabActiva() === 'sunat') {
+    <c-card class="mb-3">
+      <c-card-header>
+        <strong>Credenciales ApiSunat</strong>
+        @if (tieneApisunat) {
+          <c-badge color="success" class="ms-2">Configurado</c-badge>
+        } @else {
+          <c-badge color="warning" class="ms-2">Sin configurar</c-badge>
+        }
+      </c-card-header>
+      <c-card-body>
+
+        <div class="row g-3">
+
+          <div class="col-12 col-md-5">
+            <label class="form-label small text-body-secondary">Persona ID</label>
+            <input type="text" class="form-control font-monospace"
+                   [(ngModel)]="form.apisunat_persona_id"
+                   placeholder="ID de 24 caracteres hex" />
+          </div>
+
+          <div class="col-12 col-md-7">
+            <label class="form-label small text-body-secondary">
+              Token secreto
+              @if (empresa()?.apisunat_token_set) {
+                <span class="text-success ms-1">(ya configurado)</span>
+              }
+            </label>
+            <div class="input-group">
+              <input [type]="mostrarToken() ? 'text' : 'password'"
+                     class="form-control font-monospace"
+                     [(ngModel)]="form.apisunat_persona_token"
+                     placeholder="{{ empresa()?.apisunat_token_set ? 'Dejar vacío para no cambiar' : 'Token secreto' }}" />
+              <button class="btn btn-outline-secondary" type="button"
+                      (click)="mostrarToken.set(!mostrarToken())">
+                <fa-icon [icon]="mostrarToken() ? 'eye-slash' : 'eye'" />
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- ── Tab: Facturación ── -->
+  @if (tabActiva() === 'facturacion') {
+
+    <c-card class="mb-3">
+      <c-card-header class="d-flex align-items-center justify-content-between">
+        <strong>Series y Correlativos</strong>
+        <button class="btn btn-sm btn-outline-primary" (click)="showNewForm.set(!showNewForm())">
+          <fa-icon icon="plus" class="me-1" />Nueva serie
+        </button>
+      </c-card-header>
+      <c-card-body>
+
+        <p class="small text-body-secondary mb-3">
+          Solo puede haber <strong>una serie activa</strong> por tipo de documento. Para cambiar de serie,
+          desactiva la actual y activa (o crea) la nueva.
+        </p>
+
+        @if (!documentSeries().length) {
+          <p class="text-body-secondary small">No hay series registradas.</p>
+        } @else {
+
+          <!-- Cabecera escritorio -->
+          <div class="row g-2 mb-1 d-none d-md-flex"
+               style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--cui-secondary-color)">
+            <div class="col-md-3">Tipo</div>
+            <div class="col-md-2">Serie</div>
+            <div class="col-md-2">Último emitido</div>
+            <div class="col-md-2">Próximo</div>
+            <div class="col-md-3">Estado</div>
+          </div>
+
+          @for (s of documentSeries(); track s.id) {
+            <div class="row g-2 align-items-center py-2 border-bottom"
+                 [style.opacity]="s.active ? '1' : '0.45'">
+
+              <!-- Tipo -->
+              <div class="col-6 col-md-3">
+                <span class="badge bg-{{ seriesBadgeColor(s.document_type) }}-subtle text-{{ seriesBadgeColor(s.document_type) }}-emphasis">
+                  {{ s.document_type_label }}
+                </span>
+              </div>
+
+              <!-- Serie -->
+              <div class="col-6 col-md-2 text-end text-md-start">
+                <code class="fs-6">{{ s.series }}</code>
+              </div>
+
+              <!-- Último emitido -->
+              <div class="col-6 col-md-2">
+                <label class="d-md-none form-label small text-body-secondary mb-1">Último emitido</label>
+                <input type="number" class="form-control form-control-sm"
+                       min="0" [disabled]="!s.active"
+                       [(ngModel)]="seriesEdits[s.id]" />
+              </div>
+
+              <!-- Próximo -->
+              <div class="col-6 col-md-2 d-flex align-items-center gap-1">
+                <label class="d-md-none form-label small text-body-secondary mb-0">Próximo:</label>
+                <code class="text-success fs-6">{{ nextCorrelative(s.id) }}</code>
+              </div>
+
+              <!-- Toggle activa + eliminar -->
+              <div class="col-12 col-md-3 d-flex gap-2 align-items-center">
+                @if (togglingId() === s.id || deletingId() === s.id) {
+                  <c-spinner size="sm" />
+                } @else {
+                  @if (s.active) {
+                    <button class="btn btn-sm btn-success" disabled>
+                      <fa-icon icon="check" class="me-1" />Activa
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" (click)="toggleActive(s)">
+                      Desactivar
+                    </button>
+                  } @else {
+                    <button class="btn btn-sm btn-outline-success" (click)="toggleActive(s)">
+                      <fa-icon icon="power-off" class="me-1" />Activar
+                    </button>
+                  }
+                  @if (!s.has_documents) {
+                    <button class="btn btn-sm btn-outline-danger ms-auto" (click)="eliminarSerie(s)"
+                            title="Eliminar serie">
+                      <fa-icon icon="trash" />
+                    </button>
+                  }
+                }
+              </div>
+
+            </div>
+          }
+
+          <div class="mt-3">
+            <button class="btn btn-primary btn-sm" [disabled]="guardandoSeries()" (click)="guardarSeries()">
+              @if (guardandoSeries()) { <c-spinner size="sm" class="me-1" /> }
+              @else { <fa-icon icon="save" class="me-1" /> }
+              Guardar correlativos
+            </button>
+          </div>
+
+        }
+
+        <!-- ── Formulario nueva serie ── -->
+        @if (showNewForm()) {
+          <hr class="my-3" />
+          <p class="small fw-semibold mb-2">Nueva serie</p>
+          <div class="row g-2 align-items-end">
+
+            <div class="col-12 col-md-4">
+              <label class="form-label small text-body-secondary mb-1">Tipo de documento</label>
+              <select class="form-select form-select-sm" [(ngModel)]="nuevaSerie.document_type">
+                <option value="">— Selecciona —</option>
+                @for (opt of docTypeOptions; track opt.value) {
+                  <option [value]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="col-6 col-md-2">
+              <label class="form-label small text-body-secondary mb-1">Serie</label>
+              <input type="text" class="form-control form-control-sm text-uppercase font-monospace"
+                     maxlength="10" placeholder="F002"
+                     [(ngModel)]="nuevaSerie.series" />
+            </div>
+
+            <div class="col-6 col-md-2">
+              <label class="form-label small text-body-secondary mb-1">Último emitido</label>
+              <input type="number" class="form-control form-control-sm"
+                     min="0" placeholder="0"
+                     [(ngModel)]="nuevaSerie.current_correlative" />
+            </div>
+
+            <div class="col-12 col-md-4 d-flex gap-2">
+              <button class="btn btn-sm btn-primary" [disabled]="guardandoNueva()" (click)="crearSerie()">
+                @if (guardandoNueva()) { <c-spinner size="sm" class="me-1" /> }
+                @else { <fa-icon icon="plus" class="me-1" /> }
+                Crear
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="showNewForm.set(false)">
+                Cancelar
+              </button>
+            </div>
+
+          </div>
+        }
+
+      </c-card-body>
+    </c-card>
+
+  }
+
+  <!-- ── Tab: Metas del negocio ── -->
+  @if (tabActiva() === 'metas') {
+    <c-card class="mb-3">
+      <c-card-header><strong>Metas del negocio</strong></c-card-header>
+      <c-card-body>
+
+        <p class="small text-body-secondary mb-3">
+          La <strong>meta</strong> es lo que aspiras a vender cada día — tú la defines según
+          tus objetivos. Se muestra como referencia en el dashboard y como línea punteada
+          en el gráfico de ventas diarias.
+        </p>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-body-secondary">Meta de ventas diarias (S/)</label>
+            <div class="input-group">
+              <span class="input-group-text">S/</span>
+              <input type="number" class="form-control" min="0" step="50"
+                     [(ngModel)]="form.meta_diaria" placeholder="1500" />
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-start gap-2 mt-3 p-3 rounded-3 bg-info bg-opacity-10">
+          <fa-icon icon="circle-info" class="text-info flex-shrink-0 mt-1"></fa-icon>
+          <span class="small">
+            El <strong>punto de equilibrio</strong> (lo mínimo que necesitas vender para no perder
+            dinero) ya no se configura manualmente: el dashboard lo calcula solo, cada mes,
+            dividiendo tu ritmo de gastos registrados entre el margen real que estás obteniendo
+            en tus ventas. Así siempre refleja tu situación actual, no un supuesto fijo.
+          </span>
+        </div>
+
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- Guardar (siempre visible) -->
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
+      @if (guardando()) { <c-spinner size="sm" class="me-1" /> }
+      @else { <fa-icon icon="save" class="me-1" /> }
+      Guardar cambios
+    </button>
+  </div>
+
+}

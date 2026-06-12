@@ -1,0 +1,40 @@
+<c-modal [visible]="!!payment()" (visibleChange)="!$event && cancel()" alignment="center">
+  @if (payment(); as p) {
+    <c-modal-header>
+      <h5 cModalTitle><fa-icon icon="upload" class="me-2 text-warning" />Comprobante de depósito</h5>
+    </c-modal-header>
+    <c-modal-body>
+      <div class="bg-body-tertiary rounded p-3 mb-3" style="font-size:.875rem;">
+        <div class="fw-semibold">{{ clientName(p) }}</div>
+        <div class="text-body-secondary small">{{ p.order?.code }} · S/ {{ p.amount | number:'1.2-2' }}</div>
+      </div>
+      <p class="text-body-secondary small mb-3">
+        Sube el comprobante del depósito (captura de Yape, BCP, agente, etc.)
+        para que el administrador pueda validar el pago.
+      </p>
+      <div class="mb-3">
+        <label class="form-label small fw-medium">Imagen del comprobante <span class="text-danger">*</span></label>
+        <input type="file" class="form-control form-control-sm" accept="image/*,application/pdf"
+               (change)="onFileSelected($event)" />
+        @if (file) {
+          <div class="text-body-secondary small mt-1">
+            <fa-icon icon="check" class="text-success me-1" />{{ file.name }}
+          </div>
+        }
+      </div>
+      <div>
+        <label class="form-label small fw-medium">Descripción (opcional)</label>
+        <input type="text" class="form-control form-control-sm"
+               placeholder="Ej: Depósito BCP 12/05"
+               [(ngModel)]="description" />
+      </div>
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="uploading()" (click)="cancel()">Cancelar</button>
+      <button cButton color="warning" [disabled]="!file || uploading()" (click)="submit()">
+        @if (uploading()) { <c-spinner size="sm" class="me-1" /> }
+        <fa-icon icon="upload" class="me-1" />Enviar comprobante
+      </button>
+    </c-modal-footer>
+  }
+</c-modal>

@@ -1,0 +1,251 @@
+<app-page-header title="Almacén" subtitle="Armar pedidos documentados para despacho">
+  <button cButton color="secondary" size="sm" variant="outline" (click)="load()">
+    <fa-icon icon="rotate" class="me-1" />Actualizar
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ── Tabs nav ─────────────────────────────────────────────────────────── -->
+  <ul class="nav nav-tabs nav-fill mb-4">
+    <li class="nav-item">
+      <button class="nav-link d-flex flex-column align-items-center justify-content-center gap-1 w-100"
+              [class.active]="activeTab() === 'toAssemble'"
+              (click)="activeTab.set('toAssemble')">
+        <span class="position-relative d-inline-flex p-1">
+          <fa-icon icon="box-open" />
+          @if (toAssemble().length) {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark"
+                  style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
+              {{ toAssemble().length }}
+            </span>
+          }
+        </span>
+        <span style="font-size:.75rem;">Por armar</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link d-flex flex-column align-items-center justify-content-center gap-1 w-100"
+              [class.active]="activeTab() === 'assembled'"
+              (click)="activeTab.set('assembled')">
+        <span class="position-relative d-inline-flex p-1">
+          <fa-icon icon="box" />
+          @if (assembled().length) {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success"
+                  style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
+              {{ assembled().length }}
+            </span>
+          }
+        </span>
+        <span style="font-size:.75rem;">Armados</span>
+      </button>
+    </li>
+  </ul>
+
+  <!-- ══ TAB: Por armar ═══════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'toAssemble') {
+
+    @if (!toAssemble().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        <fa-icon icon="box-open" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+        No hay pedidos pendientes de armado.
+      </div>
+    } @else {
+
+      <!-- Mobile cards -->
+      <div class="d-md-none d-flex flex-column gap-3">
+        @for (o of toAssemble(); track o.id) {
+          @let acting = actingId() === o.id;
+          <c-card>
+            <c-card-header class="d-flex align-items-center justify-content-between py-2 px-3">
+              <span class="font-monospace fw-bold" style="font-size:.9rem;">{{ o.code }}</span>
+              <span class="text-body-secondary small">{{ o.created_at | date:'dd/MM/yy' }}</span>
+            </c-card-header>
+            <c-card-body class="px-3 py-2">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <div class="fw-semibold">{{ clientName(o) }}</div>
+                  <div class="text-body-secondary small">{{ o.seller?.name ?? '—' }}</div>
+                </div>
+                <div class="fw-bold">S/ {{ o.total | number:'1.2-2' }}</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button cButton color="success"
+                        class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1"
+                        style="min-height:60px; font-size:.78rem;"
+                        [disabled]="actingId() !== null"
+                        (click)="markAssembled(o)">
+                  @if (acting) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="box" /> }
+                  <span>Marcar armado</span>
+                </button>
+                <button cButton color="secondary" variant="ghost"
+                        class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1"
+                        style="min-height:60px; font-size:.78rem;"
+                        (click)="previewId.set(o.id)" title="Ver detalle">
+                  <fa-icon icon="eye" />
+                  <span>Ver</span>
+                </button>
+              </div>
+            </c-card-body>
+          </c-card>
+        }
+      </div>
+
+      <!-- Desktop table -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.875rem">
+            <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3" style="width:130px">Código</th>
+                <th>Cliente</th>
+                <th style="width:120px">Vendedor</th>
+                <th class="text-end" style="width:90px">Total</th>
+                <th style="width:85px">Fecha</th>
+                <th style="width:160px">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of toAssemble(); track o.id) {
+                @let acting = actingId() === o.id;
+                <tr>
+                  <td class="ps-3 font-monospace fw-semibold" style="font-size:.82rem;">{{ o.code }}</td>
+                  <td class="fw-medium">{{ clientName(o) }}</td>
+                  <td class="text-body-secondary small">{{ o.seller?.name ?? '—' }}</td>
+                  <td class="text-end fw-semibold">S/ {{ o.total | number:'1.2-2' }}</td>
+                  <td class="text-body-secondary small">{{ o.created_at | date:'dd/MM/yy' }}</td>
+                  <td>
+                    <div class="d-inline-flex gap-2">
+                      <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              [disabled]="actingId() !== null"
+                              (click)="markAssembled(o)">
+                        @if (acting) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="box" /> }
+                        <small>Armado ✓</small>
+                      </button>
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="previewId.set(o.id)">
+                        <fa-icon icon="eye" /><small>Ver</small>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
+  <!-- ══ TAB: Armados ══════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'assembled') {
+
+    @if (!assembled().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        <fa-icon icon="box" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+        No hay pedidos armados en espera de despacho.
+      </div>
+    } @else {
+
+      <!-- Mobile cards -->
+      <div class="d-md-none d-flex flex-column gap-3">
+        @for (o of assembled(); track o.id) {
+          @let acting = actingId() === o.id;
+          <c-card>
+            <c-card-header class="d-flex align-items-center justify-content-between py-2 px-3">
+              <span class="font-monospace fw-bold" style="font-size:.9rem;">{{ o.code }}</span>
+              <c-badge color="success" style="font-size:.72rem;">Armado</c-badge>
+            </c-card-header>
+            <c-card-body class="px-3 py-2">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <div class="fw-semibold">{{ clientName(o) }}</div>
+                  <div class="text-body-secondary small">{{ o.seller?.name ?? '—' }}</div>
+                </div>
+                <div class="fw-bold">S/ {{ o.total | number:'1.2-2' }}</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button cButton color="secondary" variant="ghost"
+                        class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1"
+                        style="min-height:60px; font-size:.78rem;"
+                        (click)="previewId.set(o.id)" title="Ver detalle">
+                  <fa-icon icon="eye" />
+                  <span>Ver</span>
+                </button>
+                <button cButton color="warning" variant="outline"
+                        class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1"
+                        style="min-height:60px; font-size:.78rem;"
+                        [disabled]="actingId() !== null"
+                        (click)="undoAssemble(o)"
+                        title="Deshacer armado">
+                  @if (acting) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="rotate-left" /> }
+                  <span>Deshacer</span>
+                </button>
+              </div>
+            </c-card-body>
+          </c-card>
+        }
+      </div>
+
+      <!-- Desktop table -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.875rem">
+            <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3" style="width:130px">Código</th>
+                <th>Cliente</th>
+                <th style="width:120px">Vendedor</th>
+                <th class="text-end" style="width:90px">Total</th>
+                <th style="width:85px">Fecha</th>
+                <th style="width:160px">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of assembled(); track o.id) {
+                @let acting = actingId() === o.id;
+                <tr>
+                  <td class="ps-3 font-monospace fw-semibold" style="font-size:.82rem;">{{ o.code }}</td>
+                  <td class="fw-medium">{{ clientName(o) }}</td>
+                  <td class="text-body-secondary small">{{ o.seller?.name ?? '—' }}</td>
+                  <td class="text-end fw-semibold">S/ {{ o.total | number:'1.2-2' }}</td>
+                  <td class="text-body-secondary small">{{ o.created_at | date:'dd/MM/yy' }}</td>
+                  <td>
+                    <div class="d-inline-flex gap-2">
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="previewId.set(o.id)">
+                        <fa-icon icon="eye" /><small>Ver</small>
+                      </button>
+                      <button class="btn btn-sm btn-warning d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              [disabled]="actingId() !== null"
+                              (click)="undoAssemble(o)">
+                        @if (acting) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="rotate-left" /> }
+                        <small>Deshacer</small>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
+} <!-- /loading -->
+
+<!-- ── Modal preview ───────────────────────────────────────────────────────── -->
+<app-order-preview-modal
+  [orderId]="previewId()"
+  (closed)="previewId.set(null)" />

@@ -1,0 +1,249 @@
+<div class="modal-header">
+  <div>
+    <h5 class="modal-title mb-0">Centro de precios</h5>
+    <div class="text-body-secondary small">{{ product.name }}</div>
+  </div>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body p-0">
+
+  <!-- ── Banda superior: métricas clave ─────────────────────────────── -->
+  <div class="row g-0 border-bottom">
+
+    <div class="col-sm-4 p-3 border-end">
+      <div class="text-body-secondary small mb-1">Último costo de compra</div>
+      @if (costValue !== null) {
+        <div class="fs-5 fw-semibold">S/ {{ costValue | number:'1.2-2' }}</div>
+        @if (lastCost) {
+          <div class="text-body-secondary" style="font-size:.75rem">
+            {{ lastCost.source === 'purchase_receipt' ? 'Recepción' : 'Manual' }}
+            &nbsp;·&nbsp;{{ lastCost.created_at | slice:0:10 }}
+          </div>
+        }
+      } @else {
+        <div class="text-body-secondary fst-italic">Sin costo registrado</div>
+        <div class="text-body-secondary" style="font-size:.75rem">
+          Se registra al procesar una recepción de compra
+        </div>
+      }
+    </div>
+
+    <div class="col-sm-4 p-3 border-end">
+      <div class="text-body-secondary small mb-1">Precio base actual</div>
+      <div class="fs-5 fw-semibold">S/ {{ product.base_price | number:'1.2-2' }}</div>
+      @if (margin(+product.base_price); as m) {
+        <div style="font-size:.8rem">
+          Margen: <span class="fw-semibold" [class]="marginClass(m)">{{ m }}%</span>
+        </div>
+      }
+    </div>
+
+    <div class="col-sm-4 p-3">
+      <div class="text-body-secondary small mb-1">Escalas activas</div>
+      <div class="fs-5 fw-semibold">
+        {{ (product.price_tiers ?? []).filter(t => t.active).length }}
+        <span class="fs-6 fw-normal text-body-secondary">
+          / {{ (product.price_tiers ?? []).length }} total
+        </span>
+      </div>
+      @if ((product.price_tiers ?? []).length > 0) {
+        <div class="text-body-secondary" style="font-size:.75rem">
+          Desde {{ minTierQty() }} uds en adelante
+        </div>
+      }
+    </div>
+
+  </div>
+
+  <div class="p-3">
+
+    <form [formGroup]="form" id="tiersForm" (ngSubmit)="onSubmit()">
+
+      @if (error) {
+        <div class="alert alert-danger py-2 mb-3">{{ error }}</div>
+      }
+
+      <!-- ── Precio base + simulador ───────────────────────────────── -->
+      <div class="row g-3 mb-4">
+
+        <div class="col-md-5">
+          <c-card>
+            <c-card-header class="py-2"><strong class="small">Precio base</strong></c-card-header>
+            <c-card-body class="py-2">
+              <label class="form-label small text-body-secondary mb-1">
+                Precio de venta (S/) <span class="text-danger">*</span>
+              </label>
+              <input cFormControl formControlName="base_price"
+                     type="number" step="0.01" min="0" placeholder="0.00"
+                     [class.is-invalid]="form.get('base_price')?.invalid && form.get('base_price')?.touched" />
+              @if (margin(form.get('base_price')?.value); as m) {
+                <div class="mt-1 small">
+                  Margen: <span class="fw-semibold" [class]="marginClass(m)">{{ m }}%</span>
+                </div>
+              }
+            </c-card-body>
+          </c-card>
+        </div>
+
+        <div class="col-md-7">
+          <c-card>
+            <c-card-header class="py-2">
+              <strong class="small">Precios por margen objetivo</strong>
+            </c-card-header>
+            <c-card-body class="py-2">
+              @if (costValue !== null) {
+                <div class="row g-0">
+                  @for (pct of referenceMargins; track pct) {
+                    <div class="col-4 d-flex justify-content-between align-items-center py-1 px-2"
+                         [class.border-start]="$index % 3 !== 0">
+                      <span class="text-body-secondary small">{{ pct }}%</span>
+                      <span class="fw-medium small">S/ {{ priceForMargin(pct) | number:'1.2-2' }}</span>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="text-body-secondary small mb-0 fst-italic py-1">
+                  Disponible cuando haya un costo registrado.
+                </p>
+              }
+            </c-card-body>
+          </c-card>
+        </div>
+
+      </div>
+
+      <!-- ── Escalas ───────────────────────────────────────────────── -->
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <strong>Escalas de precio</strong>
+        <button type="button" class="btn btn-sm btn-outline-primary" (click)="addTier()">
+          <fa-icon icon="plus" class="me-1" />Agregar escala
+        </button>
+      </div>
+
+      @if (tiers.length === 0) {
+        <p class="text-body-secondary small mb-3">
+          Sin escalas. El precio base aplica para todas las cantidades.
+        </p>
+      }
+
+      <div formArrayName="price_tiers">
+        @for (tier of tierControls; track $index; let i = $index) {
+          <div [formGroupName]="i" class="border rounded p-3 mb-2">
+            <div class="row g-2 align-items-end">
+
+              <div class="col-md-3">
+                <label class="form-label small text-body-secondary mb-1">Desde (uds)</label>
+                <input cFormControl formControlName="min_quantity" type="number" min="1" placeholder="10"
+                       [class.is-invalid]="tier.get('min_quantity')?.invalid && tier.get('min_quantity')?.touched" />
+              </div>
+
+              <div class="col-md-3">
+                <label class="form-label small text-body-secondary mb-1">Precio (S/)</label>
+                <input cFormControl formControlName="price" type="number" step="0.01" min="0" placeholder="0.00"
+                       [class.is-invalid]="tier.get('price')?.invalid && tier.get('price')?.touched" />
+                @if (margin(tier.get('price')?.value); as m) {
+                  <div class="small mt-1">
+                    Margen: <span class="fw-semibold" [class]="marginClass(m)">{{ m }}%</span>
+                  </div>
+                }
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label small text-body-secondary mb-1">
+                  Calcular desde margen (%)
+                </label>
+                <div class="input-group input-group-sm">
+                  <input #mi type="number" min="1" max="99" step="1"
+                         class="form-control" placeholder="25"
+                         [disabled]="costValue === null" />
+                  <button type="button" class="btn btn-outline-secondary"
+                          (click)="applyMargin(i, +mi.value)"
+                          [disabled]="costValue === null">
+                    Aplicar
+                  </button>
+                </div>
+                @if (costValue === null) {
+                  <div class="form-text text-warning small">Requiere costo registrado.</div>
+                }
+              </div>
+
+              <div class="col-md-2 d-flex align-items-center gap-2 pb-1">
+                <div class="form-check mb-0">
+                  <input class="form-check-input" type="checkbox" formControlName="active"
+                         [id]="'ta_' + i" />
+                  <label class="form-check-label small" [for]="'ta_' + i">Activo</label>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger ms-auto"
+                        (click)="removeTier(i)">
+                  <fa-icon icon="trash" />
+                </button>
+              </div>
+
+            </div>
+          </div>
+        }
+      </div>
+
+    </form>
+
+    <!-- ── Historial de costos ───────────────────────────────────── -->
+    @if ((product.cost_history ?? []).length > 0) {
+      <hr class="my-3">
+      <div class="d-flex align-items-center mb-2">
+        <strong class="small">Historial de precio de compra</strong>
+        <span class="badge bg-secondary ms-2">{{ product.cost_history!.length }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless mb-0">
+          <thead class="text-body-secondary small">
+            <tr>
+              <th>Fecha</th>
+              <th class="text-end">Costo</th>
+              <th>Origen</th>
+              <th>Usuario</th>
+            </tr>
+          </thead>
+          <tbody class="small">
+            @for (h of product.cost_history!; track h.id) {
+              <tr [class.fw-semibold]="$first">
+                <td>{{ h.created_at | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td class="text-end">S/ {{ h.cost_price }}</td>
+                <td class="text-body-secondary">
+                  {{ h.source === 'purchase_receipt' ? 'Recepción' : 'Manual' }}
+                </td>
+                <td class="text-body-secondary">{{ h.user ?? '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <!-- ── Ventas (próximamente) ────────────────────────────────── -->
+    <hr class="my-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <strong class="small">Análisis de ventas</strong>
+      <span class="badge bg-secondary" style="font-size:.7rem">Próximamente</span>
+    </div>
+    <div class="border rounded p-3 text-center text-body-secondary small">
+      <fa-icon icon="chart-line" class="me-1" />
+      Aquí se mostrarán: unidades vendidas por período, precio promedio de venta,
+      ticket promedio por escala y rotación del producto — para tomar mejores decisiones sobre precios y escalas.
+    </div>
+
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">
+    Cancelar
+  </button>
+  <button type="submit" form="tiersForm" class="btn btn-primary" [disabled]="saving()">
+    @if (saving()) {
+      <c-spinner size="sm" class="me-1" />Guardando...
+    } @else {
+      <fa-icon icon="save" class="me-1" />Guardar precios
+    }
+  </button>
+</div>

@@ -1,0 +1,24 @@
+@if (action(); as a) {
+  <c-modal [visible]="true" (visibleChange)="!$event && cancel()" alignment="center">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon [icon]="a.btnColor === 'success' ? 'check-circle' : 'truck'"
+                 [class]="'me-2 text-' + a.btnColor" />
+        {{ a.title }}
+      </h5>
+    </c-modal-header>
+    <c-modal-body>
+      <p class="mb-3">{{ a.message }}</p>
+      <textarea class="form-control form-control-sm" rows="2"
+                placeholder="Notas (Observaciones, etc.)..."
+                [(ngModel)]="notes"></textarea>
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="confirming()" (click)="cancel()">Cancelar</button>
+      <button cButton [color]="a.btnColor" [disabled]="confirming()" (click)="confirm()">
+        @if (confirming()) { <c-spinner size="sm" class="me-1" /> }
+        {{ a.btnLabel }}
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}

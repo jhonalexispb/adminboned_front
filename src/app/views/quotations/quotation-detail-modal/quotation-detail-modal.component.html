@@ -1,0 +1,349 @@
+@if (quotation(); as q) {
+  <c-modal [visible]="true" (visibleChange)="!$event && close()"
+           size="xl" [scrollable]="true" alignment="center">
+
+    <c-modal-header>
+      <h5 cModalTitle class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="font-monospace">{{ q.code }}</span>
+        <c-badge [color]="statusColors[q.status]" style="font-size:.75rem;">
+          {{ statusLabels[q.status] }}
+        </c-badge>
+        @if (q.document_type) {
+          <span class="badge rounded-pill" style="font-size:.65rem;"
+                [style.background]="q.document_type === 'invoice' ? 'var(--cui-primary-bg-subtle)' :
+                                    q.document_type === 'receipt' ? 'var(--cui-success-bg-subtle)' :
+                                    'var(--cui-secondary-bg)'"
+                [style.color]="q.document_type === 'invoice' ? 'var(--cui-primary-text-emphasis)' :
+                               q.document_type === 'receipt' ? 'var(--cui-success-text-emphasis)' :
+                               'var(--cui-secondary-color)'">
+            {{ q.document_type === 'invoice' ? 'Factura' :
+               q.document_type === 'receipt' ? 'Boleta' : 'Nota de venta' }}
+          </span>
+        }
+      </h5>
+      <button type="button" class="btn-close" (click)="close()"></button>
+    </c-modal-header>
+
+    <c-modal-body>
+      @if (loading()) {
+        <div class="text-center py-4"><c-spinner color="primary" /></div>
+      } @else {
+        @let data = fullQ() ?? q;
+        <div class="row g-3">
+
+          <!-- Columna izquierda: info -->
+          <div class="col-lg-4 d-flex flex-column gap-3">
+            <c-card>
+              <c-card-body class="p-0">
+                <dl class="mb-0" style="font-size:.875rem">
+                  <div class="px-3 py-2 border-bottom">
+                    <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Cliente</div>
+                    <div class="fw-semibold">{{ clientName(data) }}</div>
+                    @if (data.client?.phone) {
+                      <div class="text-body-secondary small">
+                        <fa-icon icon="phone" class="me-1" style="font-size:.75rem;" />{{ data.client!.phone }}
+                      </div>
+                    }
+                    @if (data.client?.ruc) {
+                      <div class="text-body-secondary small font-monospace">RUC {{ data.client!.ruc }}</div>
+                    }
+                  </div>
+                  <div class="px-3 py-2 border-bottom">
+                    <div class="row g-0">
+                      <div class="col-6">
+                        <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Vendedor</div>
+                        <div class="small fw-medium">{{ data.seller?.name ?? '—' }}</div>
+                      </div>
+                      <div class="col-6">
+                        <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Fecha</div>
+                        <div class="small">{{ data.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="px-3 py-2 border-bottom">
+                    <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Condición</div>
+                    <span class="badge bg-success-subtle text-success-emphasis" style="font-size:.7rem;">Contado</span>
+                  </div>
+                  @if (data.approved_at) {
+                    <div class="px-3 py-2">
+                      <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Aprobada</div>
+                      <div class="small">{{ data.approved_at | date:'dd/MM/yyyy HH:mm' }}</div>
+                    </div>
+                  }
+                </dl>
+              </c-card-body>
+            </c-card>
+
+            @if (data.shipping_type) {
+              <c-card>
+                <c-card-header class="py-2"><strong>Envío</strong></c-card-header>
+                <c-card-body style="font-size:.875rem;">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge" [class]="data.shipping_type === 'province' ? 'bg-warning text-dark' : 'bg-info text-white'">
+                      <fa-icon [icon]="data.shipping_type === 'province' ? 'truck' : 'location-dot'" class="me-1" />
+                      {{ data.shipping_type === 'province' ? 'Provincia' : 'Local' }}
+                    </span>
+                  </div>
+                  @if (data.carrier) {
+                    <div class="mb-2 p-2 rounded bg-body-tertiary" style="font-size:.85rem;">
+                      <div class="fw-semibold">{{ data.carrier.name }}</div>
+                      @if (data.carrier.ruc) { <div class="text-body-secondary small font-monospace">RUC {{ data.carrier.ruc }}</div> }
+                      @if (data.carrier.phone) {
+                        <div class="text-body-secondary small">
+                          <fa-icon icon="phone" class="me-1" style="font-size:.75rem;" />{{ data.carrier.phone }}
+                        </div>
+                      }
+                    </div>
+                  }
+                </c-card-body>
+              </c-card>
+            }
+
+            @if (data.notes) {
+              <c-card>
+                <c-card-header class="py-2"><strong>Notas</strong></c-card-header>
+                <c-card-body>
+                  <p class="mb-0 small" style="white-space:pre-wrap">{{ data.notes }}</p>
+                </c-card-body>
+              </c-card>
+            }
+          </div>
+
+          <!-- Columna derecha: productos -->
+          <div class="col-lg-8">
+            <c-card>
+              <c-card-header class="py-2 d-flex justify-content-between align-items-center">
+                <strong>Productos</strong>
+                @let totalUnits = (data.items ?? []).reduce((s, i) => s + i.quantity, 0);
+                <span class="text-body-secondary small">
+                  {{ (data.items ?? []).length }} línea(s) · {{ totalUnits }} uds
+                </span>
+              </c-card-header>
+              <c-card-body class="p-0">
+
+                <!-- MOBILE: cards por producto -->
+                <div class="d-lg-none">
+                  @for (group of groupedItems(data.items ?? []); track group.productId) {
+                    <div class="border-bottom px-3 py-3">
+                      <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="d-flex align-items-center gap-2 flex-wrap lh-sm">
+                          @if (group.productLaboratory) {
+                            <span class="text-info me-1" style="font-size:.78rem;">{{ group.productLaboratory }}</span>
+                          }
+                          <span class="fw-semibold" style="font-size:.9rem;">{{ group.productName }}</span>
+                        </div>
+                        <span class="badge bg-primary-subtle text-primary-emphasis ms-2 flex-shrink-0" style="font-size:.68rem;">
+                          {{ group.lots.reduce((s, l) => s + l.quantity, 0) }} uds
+                        </span>
+                      </div>
+                      @for (lot of group.lots; track lot.id) {
+                        <div class="rounded bg-body-tertiary px-2 py-2 mb-2" style="font-size:.82rem;">
+                          <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                            @if (lot.lot_number) {
+                              <code class="text-body-secondary bg-body-secondary px-1 rounded" style="font-size:.78rem;">{{ lot.lot_number }}</code>
+                            } @else {
+                              <span class="badge bg-secondary fw-normal" style="font-size:.7rem;">SIN LOTE</span>
+                            }
+                            @if (lot.expiry_date) {
+                              <span class="badge {{ expiryClass(lot.expiry_date) }}" style="font-size:.68rem;">
+                                {{ lot.expiry_date | date:'dd/MM/yyyy' }}
+                              </span>
+                            }
+                          </div>
+                          <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-body-secondary">{{ lot.quantity }} u. × S/ {{ lot.unit_price | number:'1.2-2' }}</span>
+                            <span class="fw-semibold">S/ {{ lot.total | number:'1.2-2' }}</span>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  } @empty {
+                    <div class="text-center text-body-secondary py-4 small">Sin ítems</div>
+                  }
+                  <!-- Totales mobile -->
+                  <div class="px-3 py-2 d-flex flex-column gap-1" style="font-size:.85rem;">
+                    <div class="d-flex justify-content-between">
+                      <span class="text-body-secondary">Subtotal</span>
+                      <span>S/ {{ data.subtotal | number:'1.2-2' }}</span>
+                    </div>
+                    @if (+data.discount > 0) {
+                      <div class="d-flex justify-content-between text-success">
+                        <span>Descuento</span>
+                        <span>- S/ {{ data.discount | number:'1.2-2' }}</span>
+                      </div>
+                    }
+                    <div class="d-flex justify-content-between fw-bold border-top pt-1 mt-1">
+                      <span>Total</span>
+                      <span class="fs-6">S/ {{ data.total | number:'1.2-2' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- DESKTOP: tabla -->
+                <div class="d-none d-lg-block table-responsive">
+                  <table class="table mb-0 align-middle" style="font-size:.875rem">
+                    <thead style="font-size:.78rem">
+                      <tr>
+                        <th class="ps-3">Lote</th>
+                        <th>Vencimiento</th>
+                        <th class="text-end" style="width:60px">Cant.</th>
+                        <th class="text-end" style="width:90px">P. Unit.</th>
+                        <th class="text-end pe-3" style="width:90px">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (group of groupedItems(data.items ?? []); track group.productId) {
+                        <tr class="bg-body-secondary">
+                          <td colspan="5" class="ps-3 py-2">
+                            @if (group.productLaboratory) {
+                              <span class="text-info me-1" style="font-size:.78rem;">{{ group.productLaboratory }}</span>
+                            }
+                            <span class="fw-semibold">{{ group.productName }}</span>
+                            <span class="badge bg-primary-subtle text-primary-emphasis ms-2" style="font-size:.68rem;">
+                              {{ group.lots.reduce((s, l) => s + l.quantity, 0) }} uds
+                            </span>
+                          </td>
+                        </tr>
+                        @for (lot of group.lots; track lot.id) {
+                          <tr>
+                            <td class="ps-4">
+                              @if (lot.lot_number) {
+                                <code class="text-body-secondary bg-body-secondary px-1 rounded" style="font-size:.8rem;">{{ lot.lot_number }}</code>
+                              } @else {
+                                <span class="badge bg-secondary fw-normal" style="font-size:.72rem;">SIN LOTE</span>
+                              }
+                            </td>
+                            <td>
+                              @if (lot.expiry_date) {
+                                <span class="badge {{ expiryClass(lot.expiry_date) }}" style="font-size:.7rem;">
+                                  {{ lot.expiry_date | date:'dd/MM/yyyy' }}
+                                </span>
+                              } @else {
+                                <span class="text-body-secondary small">—</span>
+                              }
+                            </td>
+                            <td class="text-end">{{ lot.quantity }}</td>
+                            <td class="text-end">S/ {{ lot.unit_price | number:'1.2-2' }}</td>
+                            <td class="text-end pe-3 fw-medium">S/ {{ lot.total | number:'1.2-2' }}</td>
+                          </tr>
+                        }
+                      } @empty {
+                        <tr><td colspan="5" class="text-center text-body-secondary py-4">Sin ítems</td></tr>
+                      }
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="3"></td>
+                        <td class="text-end text-body-secondary small">Subtotal</td>
+                        <td class="text-end pe-3">S/ {{ data.subtotal | number:'1.2-2' }}</td>
+                      </tr>
+                      @if (+data.discount > 0) {
+                        <tr>
+                          <td colspan="3"></td>
+                          <td class="text-end text-success small">Descuento</td>
+                          <td class="text-end pe-3 text-success">- S/ {{ data.discount | number:'1.2-2' }}</td>
+                        </tr>
+                      }
+                      <tr>
+                        <td colspan="3"></td>
+                        <td class="text-end fw-bold">Total</td>
+                        <td class="text-end pe-3 fw-bold fs-5">S/ {{ data.total | number:'1.2-2' }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+              </c-card-body>
+            </c-card>
+          </div>
+
+        </div>
+
+      }
+    </c-modal-body>
+
+    <c-modal-footer class="p-2">
+      @let data = fullQ() ?? q;
+
+      @if (viewOnly()) {
+        <button cButton color="secondary" size="sm" (click)="close()">Cerrar</button>
+      } @else {
+
+      <!-- MOBILE: scroll horizontal con icono+texto -->
+      <div class="d-lg-none d-flex gap-1 w-100 overflow-auto pb-1"
+           style="scrollbar-width:none; -ms-overflow-style:none;">
+
+        @if (data.status === 'draft') {
+          <a class="btn btn-warning d-flex flex-column align-items-center flex-shrink-0"
+             style="min-width:56px; font-size:.7rem;"
+             [routerLink]="['/quotations', q.id, 'edit']" (click)="close()">
+            <fa-icon icon="pen" style="font-size:.95rem;" /><small>Editar</small>
+          </a>
+        }
+
+        @if (data.status === 'draft' || data.status === 'sent') {
+          <button class="btn btn-success d-flex flex-column align-items-center flex-shrink-0"
+                  style="min-width:56px; font-size:.7rem;"
+                  [disabled]="acting()" (click)="approve()">
+            @if (acting()) { <c-spinner size="sm" /> }
+            @else { <fa-icon icon="check" style="font-size:.95rem;" /> }
+            <small>Aprobar</small>
+          </button>
+        }
+
+        <button class="btn btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                style="min-width:56px; font-size:.7rem;"
+                [disabled]="acting()" (click)="downloadPdf()">
+          @if (acting()) { <c-spinner size="sm" /> }
+          @else { <fa-icon icon="file-pdf" style="font-size:.95rem;" /> }
+          <small>PDF</small>
+        </button>
+
+        @if (data.status === 'draft') {
+          <button class="btn btn-danger d-flex flex-column align-items-center flex-shrink-0"
+                  style="min-width:56px; font-size:.7rem;" [disabled]="deleting()" (click)="askDelete()">
+            @if (deleting()) { <c-spinner size="sm" /> }
+            @else { <fa-icon icon="trash" style="font-size:.95rem;" /> }
+            <small>Eliminar</small>
+          </button>
+        }
+      </div>
+
+      <!-- DESKTOP: layout normal con wrap -->
+      <div class="d-none d-lg-flex gap-2 flex-wrap justify-content-between w-100">
+        <div class="d-flex gap-2 flex-wrap">
+          @if (data.status === 'draft' || data.status === 'sent') {
+            <button cButton color="success" [disabled]="acting()" (click)="approve()">
+              @if (acting()) { <c-spinner size="sm" class="me-1" /> }
+              @else { <fa-icon icon="check" class="me-1" /> }
+              Aprobar
+            </button>
+          }
+          @if (data.status === 'draft') {
+            <a cButton color="warning" [routerLink]="['/quotations', q.id, 'edit']" (click)="close()">
+              <fa-icon icon="pen" class="me-1" />Editar
+            </a>
+          }
+          <button cButton color="info" [disabled]="acting()" (click)="downloadPdf()">
+            @if (acting()) { <c-spinner size="sm" class="me-1" /> }
+            @else { <fa-icon icon="file-pdf" class="me-1" /> }
+            PDF
+          </button>
+        </div>
+        <div class="d-flex gap-2">
+          @if (data.status === 'draft') {
+            <button cButton color="danger" variant="outline" [disabled]="deleting()" (click)="askDelete()">
+              @if (deleting()) { <c-spinner size="sm" class="me-1" /> }
+              @else { <fa-icon icon="trash" class="me-1" /> }
+              Eliminar
+            </button>
+          }
+        </div>
+      </div>
+
+      }
+    </c-modal-footer>
+
+  </c-modal>
+}
+

@@ -1,0 +1,467 @@
+<app-page-header title="Kardex" subtitle="Historial de movimientos de inventario">
+  <div class="d-flex gap-2">
+    <button class="btn btn-sm btn-outline-primary"
+            [disabled]="downloadingReport()"
+            (click)="downloadReport()">
+      @if (downloadingReport()) {
+        <c-spinner size="sm" class="me-1" />Generando...
+      } @else {
+        <fa-icon icon="file-pdf" class="me-1" />PDF
+      }
+    </button>
+    <a class="btn btn-outline-secondary btn-sm" routerLink="/inventory/stock">
+      <fa-icon icon="boxes-stacked" class="me-1" />Ver stock
+    </a>
+  </div>
+</app-page-header>
+
+<!-- Filtros -->
+<c-card class="mb-4">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <!-- Producto -->
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Producto</label>
+        <p-select
+          [options]="products()"
+          optionLabel="name"
+          [ngModel]="selectedProduct()"
+          (ngModelChange)="onProductSelect($event)"
+          [filter]="true"
+          filterBy="name,sku,laboratory.name"
+          placeholder="Todos los productos"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+          appendTo="body">
+          <ng-template #selectedItem let-p>
+            <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
+            @if (p.laboratory) {
+              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            }
+            {{ p.name }}
+          </ng-template>
+          <ng-template #item let-p>
+            <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
+            @if (p.laboratory) {
+              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            }
+            {{ p.name }}
+          </ng-template>
+        </p-select>
+      </div>
+
+      <!-- Lote -->
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">
+          Lote
+          @if (!selectedProduct()) {
+            <span class="fw-normal">(selec. producto)</span>
+          }
+        </label>
+        <p-select
+          [options]="lots()"
+          [ngModel]="selectedLot()"
+          (ngModelChange)="onLotSelect($event)"
+          [disabled]="!selectedProduct()"
+          placeholder="Todos"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+          appendTo="body">
+          <ng-template #selectedItem let-l>
+            <span class="font-monospace small">{{ lotLabel(l) }}</span>
+          </ng-template>
+          <ng-template #item let-l>
+            <div>
+              <span class="font-monospace small fw-medium">
+                {{ l.is_default ? 'SIN-LOTE' : (l.lot_number ?? '#' + l.id) }}
+              </span>
+              @if (l.expiry_date) {
+                <span class="text-body-secondary small ms-2">
+                  vence {{ l.expiry_date | date:'dd/MM/yyyy' }}
+                </span>
+              }
+              <span class="badge bg-secondary fw-normal ms-2" style="font-size:.68rem">
+                {{ l.current_stock }} uds
+              </span>
+            </div>
+          </ng-template>
+        </p-select>
+      </div>
+
+      <!-- Tipo de movimiento -->
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Tipo</label>
+        <p-select
+          [options]="movementOptions"
+          optionLabel="label"
+          optionValue="value"
+          [(ngModel)]="filters.movement_type"
+          (ngModelChange)="onSearch()"
+          [style]="{ width: '100%' }"
+          appendTo="body" />
+      </div>
+
+      <!-- Desde / Hasta -->
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Desde</label>
+        <input cFormControl type="date" [(ngModel)]="filters.from" (change)="onSearch()" />
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Hasta</label>
+        <input cFormControl type="date" [(ngModel)]="filters.to" (change)="onSearch()" />
+      </div>
+
+      <!-- Total -->
+      <div class="col-12 col-md-auto ms-md-auto d-flex align-items-center justify-content-end">
+        <span class="text-body-secondary small">{{ total() }} registros</span>
+      </div>
+
+    </div>
+
+    <!-- Hint de seguimiento de lote -->
+    @if (selectedLot()) {
+      <div class="mt-2 rounded-3 px-3 py-2 d-flex align-items-center gap-2 flex-wrap border border-info text-body small">
+        <fa-icon icon="magnifying-glass" class="text-info flex-shrink-0" />
+        <span>Seguimiento del lote</span>
+        <span class="badge bg-info text-white font-monospace fw-semibold">
+          {{ selectedLot()!.is_default ? 'SIN-LOTE' : (selectedLot()!.lot_number ?? '#' + selectedLot()!.id) }}
+        </span>
+        <span>de <strong>{{ selectedProduct()?.name }}</strong></span>
+        <span class="ms-auto text-info fw-semibold">{{ total() }} movimiento(s)</span>
+      </div>
+    }
+  </c-card-body>
+</c-card>
+
+<!-- Vista mobile: cards -->
+<c-card class="d-md-none">
+  <c-card-body class="p-0">
+    @if (loading()) {
+      <div class="text-center py-5"><c-spinner color="primary" /></div>
+    } @else if (entries().length === 0) {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="list" class="mb-2 d-block" style="font-size:2rem;opacity:.3" />
+        Sin movimientos para los filtros seleccionados.
+      </div>
+    } @else {
+      <div class="d-flex flex-column gap-2 p-2">
+        @for (e of entries(); track e.id) {
+          @let notes = parseNotes(e);
+          <div class="rounded border p-2" style="font-size:.84rem">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <div class="text-body-secondary" style="font-size:.8rem">
+                {{ e.created_at | date:'dd/MM/yy HH:mm' }}
+              </div>
+              <c-badge [color]="movementBadge(e.movement_type)">
+                {{ movementLabel(e.movement_type) }}
+              </c-badge>
+            </div>
+
+            <div class="fw-medium">
+              @if (e.product?.laboratory) {
+                <span class="text-info">{{ e.product!.laboratory!.name }}</span>
+              }
+              {{ e.product?.name ?? '(eliminado)' }}
+            </div>
+            <div class="d-flex align-items-center gap-1 mt-1 mb-2 flex-wrap">
+              @if (e.product?.sku) {
+                <span class="font-monospace text-body-secondary" style="font-size:.72rem">
+                  {{ e.product!.sku }}
+                </span>
+              }
+              @if (e.lot) {
+                @if (e.lot.is_default) {
+                  <span class="badge bg-secondary font-monospace fw-normal">SIN-LOTE</span>
+                } @else {
+                  <span class="badge bg-info text-white font-monospace fw-semibold">
+                    {{ e.lot.lot_number ?? '—' }}
+                  </span>
+                }
+                @if (e.lot.expiry_date) {
+                  <span class="text-body-secondary" style="font-size:.7rem">
+                    · vence {{ e.lot.expiry_date | date:'dd/MM/yy' }}
+                  </span>
+                }
+              }
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div [ngClass]="quantityClass(e)" class="fw-semibold">
+                {{ quantityDisplay(e) }}
+              </div>
+              <div class="text-end small">
+                <span class="text-body-secondary me-1">Stock post:</span>
+                <span class="fw-medium">{{ e.stock_after }}</span>
+              </div>
+            </div>
+
+            <!-- Origen / Documento -->
+            <div class="small mb-1">
+              @if (e.reference_type === 'purchase_receipt') {
+                <button class="btn btn-link p-0 text-start text-decoration-none"
+                        style="font-size:.8rem"
+                        (click)="openReceiptModal(e)">
+                  @if (purchaseReceiptMeta(e); as pr) {
+                    <div class="fw-semibold text-primary">
+                      <fa-icon icon="file-invoice" class="me-1" style="font-size:.75rem" />
+                      {{ pr.code }}
+                    </div>
+                    <div class="text-body-secondary mt-1 d-flex align-items-center gap-1 flex-wrap">
+                      <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle"
+                            style="font-size:.68rem">
+                        {{ pr.document_label }}
+                      </span>
+                      @if (pr.document_number) {
+                        <span class="font-monospace" style="font-size:.75rem">
+                          {{ pr.document_number }}
+                        </span>
+                      }
+                    </div>
+                  } @else {
+                    <fa-icon icon="file-invoice" class="me-1 text-body-secondary" />
+                    Recepción #{{ e.reference_id }}
+                  }
+                </button>
+              } @else if (saleRefMeta(e); as meta) {
+                <div class="d-flex flex-column gap-1">
+                  <button class="btn btn-link p-0 text-start text-decoration-none"
+                          style="font-size:.8rem"
+                          (click)="viewOrder(meta.order_id)">
+                    <fa-icon icon="file-lines" class="me-1 text-primary" style="font-size:.75rem" />
+                    Pedido {{ meta.order_code ?? '#' + meta.order_id }}
+                  </button>
+                  @if (meta.document; as doc) {
+                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                      <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle"
+                            style="font-size:.68rem">
+                        {{ saleDocTypeLabels[doc.document_type] ?? doc.document_type }}
+                      </span>
+                      @if (doc.full_number) {
+                        <span class="font-monospace" style="font-size:.75rem">{{ doc.full_number }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              } @else if (e.reference_type) {
+                <span class="text-body-secondary">
+                  {{ referenceLabels[e.reference_type] ?? e.reference_type }}
+                  @if (e.reference_id && e.reference_type !== 'initial_stock') { #{{ e.reference_id }} }
+                </span>
+              }
+            </div>
+
+            <!-- Notas -->
+            @if (notes.reasonLabel || notes.text) {
+              <div class="small">
+                @if (notes.reasonLabel) {
+                  <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle me-1"
+                        style="font-size:.68rem">
+                    {{ notes.reasonLabel }}
+                  </span>
+                }
+                @if (notes.text) {
+                  {{ notes.text }}
+                }
+              </div>
+            }
+
+            <!-- Usuario -->
+            <div class="text-body-secondary small mt-1">{{ userDisplay(e) }}</div>
+          </div>
+        }
+      </div>
+
+      <app-pagination
+        [currentPage]="filters.page!"
+        [lastPage]="lastPage()"
+        wrapperClass="py-3"
+        (pageChange)="goToPage($event)"
+      />
+    }
+  </c-card-body>
+</c-card>
+
+<!-- Vista desktop: tabla -->
+<c-card class="d-none d-md-block">
+  <c-card-body class="p-0">
+    @if (loading()) {
+      <div class="text-center py-5"><c-spinner color="primary" /></div>
+    } @else {
+      <div class="table-responsive">
+        <table cTable hover class="mb-0 align-middle" style="font-size:.84rem">
+          <thead style="font-size:.76rem">
+            <tr>
+              <th class="ps-3" style="width:85px">Fecha</th>
+              <th style="width:175px">Producto / Lote</th>
+              <th class="text-center" style="width:90px">Tipo</th>
+              <th class="text-end" style="width:75px">Cantidad</th>
+              <th class="text-end" style="width:90px">Stock post</th>
+              <th style="width:200px">Origen / Documento</th>
+              <th>Notas</th>
+              <th style="width:95px">Usuario</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (entries().length === 0) {
+              <tr>
+                <td colspan="8" class="text-center text-body-secondary py-5">
+                  <fa-icon icon="list" class="mb-2 d-block" style="font-size:2rem;opacity:.3" />
+                  Sin movimientos para los filtros seleccionados.
+                </td>
+              </tr>
+            }
+            @for (e of entries(); track e.id) {
+              @let notes = parseNotes(e);
+              <tr>
+                <!-- Fecha -->
+                <td class="ps-3 text-nowrap text-body-secondary">
+                  {{ e.created_at | date:'dd/MM/yy' }}<br>
+                  <span style="font-size:.73rem">{{ e.created_at | date:'HH:mm' }}</span>
+                </td>
+
+                <!-- Producto + Lote fusionados -->
+                <td>
+                  <div class="fw-medium text-truncate" style="max-width:170px">
+                    @if (e.product?.laboratory) {
+                      <span class="text-info">{{ e.product!.laboratory!.name }}</span>
+                    }
+                    {{ e.product?.name ?? '(eliminado)' }}
+                  </div>
+                  <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                    @if (e.product?.sku) {
+                      <span class="font-monospace text-body-secondary" style="font-size:.72rem">
+                        {{ e.product!.sku }}
+                      </span>
+                    }
+                    @if (e.lot) {
+                      @if (e.lot.is_default) {
+                        <span class="badge bg-secondary font-monospace fw-normal">SIN-LOTE</span>
+                      } @else {
+                        <span class="badge bg-info text-white font-monospace fw-semibold">
+                          {{ e.lot.lot_number ?? '—' }}
+                        </span>
+                      }
+                      @if (e.lot.expiry_date) {
+                        <span class="text-body-secondary" style="font-size:.7rem">
+                          · vence {{ e.lot.expiry_date | date:'dd/MM/yy' }}
+                        </span>
+                      }
+                    }
+                  </div>
+                </td>
+
+                <!-- Tipo -->
+                <td class="text-center">
+                  <c-badge [color]="movementBadge(e.movement_type)">
+                    {{ movementLabel(e.movement_type) }}
+                  </c-badge>
+                </td>
+
+                <!-- Cantidad -->
+                <td class="text-end fw-semibold" [ngClass]="quantityClass(e)">
+                  {{ quantityDisplay(e) }}
+                </td>
+
+                <!-- Stock tras movimiento -->
+                <td class="text-end fw-medium">{{ e.stock_after }}</td>
+
+                <!-- Origen / Documento -->
+                <td style="font-size:.8rem">
+                  @if (e.reference_type === 'purchase_receipt') {
+                    <!-- Recepción con código + documento -->
+                    <button class="btn btn-link p-0 text-start text-decoration-none"
+                            style="font-size:.8rem"
+                            (click)="openReceiptModal(e)">
+                      @if (purchaseReceiptMeta(e); as pr) {
+                        <div class="fw-semibold text-primary">
+                          <fa-icon icon="file-invoice" class="me-1" style="font-size:.75rem" />
+                          {{ pr.code }}
+                        </div>
+                        <div class="text-body-secondary mt-1 d-flex align-items-center gap-1">
+                          <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle"
+                                style="font-size:.68rem">
+                            {{ pr.document_label }}
+                          </span>
+                          @if (pr.document_number) {
+                            <span class="font-monospace" style="font-size:.75rem">
+                              {{ pr.document_number }}
+                            </span>
+                          }
+                        </div>
+                      } @else {
+                        <fa-icon icon="file-invoice" class="me-1 text-body-secondary" />
+                        Recepción #{{ e.reference_id }}
+                      }
+                    </button>
+                  } @else if (saleRefMeta(e); as meta) {
+                    <div class="d-flex flex-column gap-1">
+                      <button class="btn btn-link p-0 text-start text-decoration-none"
+                              style="font-size:.8rem"
+                              (click)="viewOrder(meta.order_id)">
+                        <fa-icon icon="file-lines" class="me-1 text-primary" style="font-size:.75rem" />
+                        Pedido {{ meta.order_code ?? '#' + meta.order_id }}
+                      </button>
+                      @if (meta.document; as doc) {
+                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                          <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle"
+                                style="font-size:.68rem">
+                            {{ saleDocTypeLabels[doc.document_type] ?? doc.document_type }}
+                          </span>
+                          @if (doc.full_number) {
+                            <span class="font-monospace" style="font-size:.75rem">{{ doc.full_number }}</span>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else if (e.reference_type) {
+                    <span class="text-body-secondary">
+                      {{ referenceLabels[e.reference_type] ?? e.reference_type }}
+                      @if (e.reference_id) { #{{ e.reference_id }} }
+                    </span>
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+
+                <!-- Notas con reason badge -->
+                <td style="font-size:.78rem; max-width:190px">
+                  @if (notes.reasonLabel) {
+                    <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle me-1"
+                          style="font-size:.68rem">
+                      {{ notes.reasonLabel }}
+                    </span>
+                  }
+                  @if (notes.text) {
+                    @if (notes.text.length > 50) {
+                      <span [title]="notes.text">{{ notes.text | slice:0:50 }}…</span>
+                    } @else {
+                      {{ notes.text }}
+                    }
+                  } @else if (!notes.reasonLabel) {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+
+                <!-- Usuario -->
+                <td class="text-body-secondary small">{{ userDisplay(e) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [currentPage]="filters.page!"
+        [lastPage]="lastPage()"
+        wrapperClass="py-3"
+        (pageChange)="goToPage($event)"
+      />
+    }
+  </c-card-body>
+</c-card>
+
+<app-order-detail-modal
+  [orderId]="previewOrderId()"
+  [viewOnly]="true"
+  (closed)="previewOrderId.set(null)" />

@@ -1,0 +1,352 @@
+<app-page-header
+  [title]="isEdit ? 'Editar recepción' : 'Nueva recepción de compra'"
+  subtitle="Registro de mercadería recibida">
+  <button class="btn btn-outline-secondary btn-sm" routerLink="/purchases/receipts">
+    <fa-icon icon="arrow-left" class="me-1" />Volver
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+@if (linkedOrder(); as lo) {
+  <div class="alert alert-info py-2 mb-3 small">
+    <fa-icon icon="link" class="me-1" />
+    Vinculada a orden <strong class="font-monospace">{{ lo.code }}</strong>
+    — {{ lo.supplier?.name }} · S/ {{ lo.subtotal | number:'1.2-2' }}
+  </div>
+}
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()">
+
+  @if (error) {
+    <div class="alert alert-danger py-2 mb-3">{{ error }}</div>
+  }
+
+  <!-- ══ MOBILE: tabs ════════════════════════════════════════════════════ -->
+  <ul class="nav nav-tabs mb-3 d-lg-none">
+    <li class="nav-item flex-grow-1">
+      <button type="button" class="nav-link w-100 d-flex flex-column align-items-center py-2"
+              [class.active]="activeTab() === 'datos'"
+              (click)="activeTab.set('datos')">
+        <fa-icon icon="file-lines" style="font-size:1.1rem;" />
+        <small style="font-size:.7rem;">Datos</small>
+      </button>
+    </li>
+    <li class="nav-item flex-grow-1">
+      <button type="button" class="nav-link w-100 d-flex flex-column align-items-center py-2 position-relative"
+              [class.active]="activeTab() === 'productos'"
+              (click)="activeTab.set('productos')">
+        <fa-icon icon="box" style="font-size:1.1rem;" />
+        <small style="font-size:.7rem;">Productos</small>
+        @if (items().length) {
+          <span class="position-absolute top-0 end-0 badge bg-secondary m-1" style="font-size:.6rem;">
+            {{ items().length }}
+          </span>
+        }
+      </button>
+    </li>
+  </ul>
+
+  <div class="row g-4">
+
+    <!-- ── Datos del documento ──────────────────────────────── col-lg-4 -->
+    <div class="col-lg-4"
+         [class.d-none]="activeTab() !== 'datos'"
+         [class.d-lg-block]="true">
+      <c-card>
+        <c-card-header><strong>Datos del documento</strong></c-card-header>
+        <c-card-body class="d-flex flex-column gap-3">
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">
+              Proveedor <span class="text-danger">*</span>
+            </label>
+            <div class="d-flex gap-1">
+              <p-select
+                formControlName="supplier_id"
+                [options]="suppliers()"
+                optionLabel="name" optionValue="id"
+                placeholder="Seleccionar proveedor"
+                [filter]="true" filterPlaceholder="Buscar..."
+                emptyMessage="Sin resultados"
+                [style]="{ flex: '1' }" appendTo="body"
+                [class.is-invalid]="form.get('supplier_id')?.invalid && form.get('supplier_id')?.touched"
+              />
+              <button type="button" class="btn btn-outline-secondary btn-sm" title="Nuevo proveedor"
+                      (click)="openNewSupplier()">
+                <fa-icon icon="plus" />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">
+              Tipo de documento <span class="text-danger">*</span>
+            </label>
+            <p-select
+              formControlName="document_type"
+              [options]="docTypeOptions"
+              optionLabel="label" optionValue="value"
+              [style]="{ width: '100%' }" appendTo="body"
+            />
+          </div>
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">N° documento</label>
+            <input cFormControl formControlName="document_number"
+                   type="text" placeholder="Ej: F001-00123" />
+          </div>
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">F. emisión</label>
+            <input cFormControl formControlName="document_date" type="date" />
+          </div>
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">F. vencimiento doc.</label>
+            <input cFormControl formControlName="due_date" type="date" />
+          </div>
+
+          <div class="row g-2">
+            <div class="col-7">
+              <label class="form-label small text-body-secondary mb-1">Condición de pago</label>
+              <p-select
+                formControlName="payment_condition"
+                [options]="paymentOptions"
+                optionLabel="label" optionValue="value"
+                [style]="{ width: '100%' }" appendTo="body"
+              />
+            </div>
+            <div class="col-5">
+              <label class="form-label small text-body-secondary mb-1">Moneda</label>
+              <p-select
+                formControlName="currency"
+                [options]="currencyOptions"
+                optionLabel="label" optionValue="value"
+                [style]="{ width: '100%' }" appendTo="body"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">Notas</label>
+            <textarea cFormControl formControlName="notes" rows="2"
+                      placeholder="Observaciones..."></textarea>
+          </div>
+
+          <!-- Comprobante digital -->
+          <div>
+            <label class="form-label small text-body-secondary mb-1">
+              Comprobante digital
+              <span class="fw-normal text-body-tertiary">(PDF, opcional)</span>
+            </label>
+            <input type="file" accept="application/pdf"
+                   class="form-control form-control-sm"
+                   (change)="onFileChange($event)" />
+            @if (selectedFile()) {
+              <div class="mt-1 d-flex align-items-center gap-1 text-success small">
+                <fa-icon icon="paperclip" />
+                {{ selectedFile()!.name }}
+              </div>
+            }
+            @if (uploading()) {
+              <div class="mt-1 small text-body-secondary">
+                <c-spinner size="sm" class="me-1" />Subiendo archivo...
+              </div>
+            }
+          </div>
+
+        </c-card-body>
+      </c-card>
+    </div>
+
+    <!-- ── Productos recibidos ──────────────────────────────── col-lg-8 -->
+    <div class="col-lg-8"
+         [class.d-none]="activeTab() !== 'productos'"
+         [class.d-lg-block]="true">
+      <c-card>
+        <c-card-header>
+          <div class="d-flex align-items-center justify-content-between">
+            <strong>Productos recibidos</strong>
+            <button type="button" class="btn btn-sm btn-primary" (click)="openAddItem()">
+              <fa-icon icon="plus" class="me-1" />Agregar producto
+            </button>
+          </div>
+        </c-card-header>
+        <c-card-body class="p-0">
+
+          @if (items().length === 0) {
+            <div class="text-center text-body-secondary py-5 small">
+              <fa-icon icon="box-open" class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+              Sin productos. Usa el botón para agregar.
+            </div>
+          } @else {
+
+            <!-- Desktop: tabla -->
+            <div class="d-none d-sm-block table-responsive">
+              <table class="table table-sm table-hover mb-0 align-middle" style="font-size:.83rem;">
+                <thead class="text-body-secondary">
+                  <tr>
+                    <th class="ps-3">Producto</th>
+                    <th class="text-center" style="width:70px;">Cant.</th>
+                    <th class="text-center" style="width:60px;">Bon.</th>
+                    <th class="text-end"    style="width:85px;">Costo</th>
+                    <th class="text-end"    style="width:85px;">Subtotal</th>
+                    <th style="width:70px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (it of items(); track $index; let i = $index) {
+                    <tr>
+                      <td class="ps-3">
+                        <div class="fw-medium lh-sm">
+                          @if (it.product.laboratory?.name) {
+                            <span class="text-info me-1">{{ it.product.laboratory?.name }}</span>
+                          }
+                          {{ it.product.name }}
+                        </div>
+                        @if (it.product.tracks_lot && it.lots.length) {
+                          <div class="text-body-secondary" style="font-size:.7rem;">
+                            @for (lot of it.lots; track $index) {
+                              <span class="me-2">
+                                <fa-icon icon="tag" class="me-1" />{{ lot.lot_number || 'S/N' }}
+                                @if (lot.expiry_date) { · Vence: {{ lot.expiry_date | date:'dd/MM/yyyy' }} }
+                                ({{ lot.quantity }} uds.)
+                              </span>
+                            }
+                          </div>
+                        }
+                        @if (it.product.tracks_lot && it.bonus_lots.length) {
+                          <div class="text-success" style="font-size:.7rem;">
+                            @for (lot of it.bonus_lots; track $index) {
+                              @if (lot.quantity > 0) {
+                                <span class="me-2">
+                                  <fa-icon icon="tag" class="me-1" />Bon. {{ lot.lot_number || 'S/N' }}
+                                  @if (lot.expiry_date) { · Vence: {{ lot.expiry_date | date:'dd/MM/yyyy' }} }
+                                  (+{{ lot.quantity }} uds.)
+                                </span>
+                              }
+                            }
+                          </div>
+                        }
+                        @if (it.item_notes) {
+                          <div class="text-body-secondary fst-italic" style="font-size:.7rem;">{{ it.item_notes }}</div>
+                        }
+                      </td>
+                      <td class="text-center fw-medium">{{ displayQty(it) }}</td>
+                      <td class="text-center">
+                        @if (displayBonusQty(it) > 0) {
+                          <span class="text-success fw-medium">+{{ displayBonusQty(it) }}</span>
+                        } @else {
+                          <span class="text-body-secondary">—</span>
+                        }
+                      </td>
+                      <td class="text-end">S/ {{ it.unit_cost | number:'1.2-2' }}</td>
+                      <td class="text-end fw-semibold">S/ {{ displayQty(it) * it.unit_cost | number:'1.2-2' }}</td>
+                      <td class="text-end pe-2">
+                        <div class="d-inline-flex gap-1">
+                          <button type="button" class="btn btn-xs btn-outline-secondary"
+                                  style="padding:2px 6px;" (click)="openEditItem(i)" title="Editar">
+                            <fa-icon icon="pencil" />
+                          </button>
+                          <button type="button" class="btn btn-xs btn-outline-danger"
+                                  style="padding:2px 6px;" (click)="removeItem(i)" title="Eliminar">
+                            <fa-icon icon="trash" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Mobile: cards -->
+            <div class="d-sm-none d-flex flex-column gap-2 p-2">
+              @for (it of items(); track $index; let i = $index) {
+                <div class="border rounded p-2" style="font-size:.83rem;">
+                  <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                    <div class="flex-grow-1 min-width-0">
+                      <div class="fw-medium lh-sm">
+                        @if (it.product.laboratory?.name) {
+                          <span class="text-info me-1">{{ it.product.laboratory?.name }}</span>
+                        }
+                        {{ it.product.name }}
+                      </div>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0">
+                      <button type="button" class="btn btn-xs btn-outline-secondary"
+                              style="padding:2px 6px;" (click)="openEditItem(i)">
+                        <fa-icon icon="pencil" />
+                      </button>
+                      <button type="button" class="btn btn-xs btn-outline-danger"
+                              style="padding:2px 6px;" (click)="removeItem(i)">
+                        <fa-icon icon="trash" />
+                      </button>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-3" style="font-size:.78rem;">
+                    <span>Cant: <strong>{{ displayQty(it) }}</strong></span>
+                    @if (displayBonusQty(it) > 0) {
+                      <span class="text-success">Bon: +{{ displayBonusQty(it) }}</span>
+                    }
+                    <span>Costo: S/{{ it.unit_cost | number:'1.2-2' }}</span>
+                    <span class="fw-semibold ms-auto">S/{{ displayQty(it) * it.unit_cost | number:'1.2-2' }}</span>
+                  </div>
+                  @if (it.product.tracks_lot && it.lots.length) {
+                    <div class="text-body-secondary mt-1" style="font-size:.72rem;">
+                      @for (lot of it.lots; track $index) {
+                        <span class="me-2">{{ lot.lot_number || 'S/N' }}
+                          @if (lot.expiry_date) { · {{ lot.expiry_date | date:'dd/MM/yyyy' }} }
+                          ({{ lot.quantity }})
+                        </span>
+                      }
+                    </div>
+                  }
+                  @if (it.product.tracks_lot && it.bonus_lots.length) {
+                    <div class="text-success mt-1" style="font-size:.72rem;">
+                      @for (lot of it.bonus_lots; track $index) {
+                        @if (lot.quantity > 0) {
+                          <span class="me-2">Bon. {{ lot.lot_number || 'S/N' }}
+                            @if (lot.expiry_date) { · {{ lot.expiry_date | date:'dd/MM/yyyy' }} }
+                            (+{{ lot.quantity }})
+                          </span>
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Total -->
+            <div class="text-end border-top px-3 py-2">
+              <span class="text-body-secondary me-2 small">Total recepción:</span>
+              <strong class="fs-5">S/ {{ subtotal | number:'1.2-2' }}</strong>
+            </div>
+          }
+
+        </c-card-body>
+      </c-card>
+    </div>
+
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mt-3">
+    <button type="button" class="btn btn-outline-secondary" routerLink="/purchases/receipts">
+      Cancelar
+    </button>
+    <button type="submit" class="btn btn-primary" [disabled]="saving()">
+      @if (saving()) {
+        <c-spinner size="sm" class="me-1" />Guardando...
+      } @else {
+        <fa-icon icon="save" class="me-1" />{{ isEdit ? 'Guardar cambios' : 'Registrar recepción' }}
+      }
+    </button>
+  </div>
+
+</form>
+
+}

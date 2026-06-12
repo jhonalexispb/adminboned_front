@@ -1,0 +1,215 @@
+<app-page-header title="Órdenes de compra" subtitle="Solicitudes a proveedores">
+  <button class="btn btn-primary" (click)="openNew()">
+    <fa-icon icon="plus" class="me-1" />Nueva orden
+  </button>
+</app-page-header>
+
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-5">
+        <label class="form-label small mb-1 text-body-secondary">Proveedor</label>
+        <p-select
+          [(ngModel)]="filters.supplier_id"
+          [options]="suppliers()"
+          optionLabel="name" optionValue="id"
+          placeholder="Todos los proveedores"
+          [showClear]="true"
+          [filter]="true" filterPlaceholder="Buscar..."
+          emptyMessage="Sin resultados"
+          [style]="{ width: '100%' }" appendTo="body"
+          (ngModelChange)="onSearch()"
+        />
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <p-select
+          [(ngModel)]="filters.status"
+          [options]="statusOptions"
+          optionLabel="label" optionValue="value"
+          [style]="{ width: '100%' }" appendTo="body"
+          (ngModelChange)="onSearch()"
+        />
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ MOBILE: cards ══════════════════════════════════════════════════════ -->
+  <div class="d-md-none d-flex flex-column gap-2 mb-3">
+    @for (o of orders(); track o.id) {
+      <c-card>
+        <c-card-body class="px-3 py-2">
+
+          <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+            <div>
+              <span class="font-monospace fw-medium" style="font-size:.88rem;">{{ o.code }}</span>
+              <div class="text-body-secondary" style="font-size:.75rem;">{{ o.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+            </div>
+            <c-badge [color]="statusColor[o.status]">{{ statusLabel[o.status] }}</c-badge>
+          </div>
+
+          <div class="fw-semibold lh-sm mb-1">{{ o.supplier?.name ?? '—' }}</div>
+
+          <div class="d-flex gap-3 mb-2" style="font-size:.8rem;">
+            <span class="text-body-secondary">
+              Total: <strong class="text-body-emphasis">S/ {{ o.subtotal | number:'1.2-2' }}</strong>
+            </span>
+            @if (o.expected_date) {
+              <span class="text-body-secondary">
+                Esp: {{ o.expected_date | date:'dd/MM/yyyy' }}
+              </span>
+            }
+          </div>
+
+          <div class="d-flex gap-2 pt-2 border-top" style="overflow-x:auto;">
+            <div class="d-inline-flex gap-2">
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                      (click)="openDetail(o)">
+                <fa-icon icon="eye" /><small>Ver</small>
+              </button>
+              @if (canManage && o.status === 'draft') {
+                <a class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                   [routerLink]="['/purchases/orders', o.id, 'edit']">
+                  <fa-icon icon="pencil" /><small>Editar</small>
+                </a>
+                <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                        [disabled]="changingId() === o.id"
+                        (click)="sendOrder(o, $event)">
+                  @if (changingId() === o.id) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="paper-plane" /> }
+                  <small>Aprobar</small>
+                </button>
+              }
+              @if (canManage && o.status === 'sent') {
+                <button class="btn btn-sm btn-warning d-flex flex-column align-items-center"
+                        [disabled]="changingId() === o.id"
+                        (click)="revertOrder(o, $event)">
+                  @if (changingId() === o.id) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="rotate-left" /> }
+                  <small>Revertir</small>
+                </button>
+              }
+              <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                      [disabled]="downloadingId() === o.id"
+                      (click)="downloadPdf(o, $event)">
+                @if (downloadingId() === o.id) { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-pdf" /> }
+                <small>PDF</small>
+              </button>
+              @if (canManage && o.status === 'draft') {
+                <button class="btn btn-sm btn-danger d-flex flex-column align-items-center"
+                        (click)="deleteOrder(o, $event)">
+                  <fa-icon icon="trash" /><small>Eliminar</small>
+                </button>
+              }
+            </div>
+          </div>
+
+        </c-card-body>
+      </c-card>
+    } @empty {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="file-invoice" class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+        No hay órdenes de compra.
+      </div>
+    }
+  </div>
+
+  <!-- ══ DESKTOP: tabla ════════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Proveedor</th>
+              <th>F. esperada</th>
+              <th class="text-end">Subtotal</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+              <th class="text-nowrap">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (o of orders(); track o.id) {
+              <tr style="cursor:pointer" (click)="openDetail(o)">
+                <td class="font-monospace fw-medium">{{ o.code }}</td>
+                <td>{{ o.supplier?.name ?? '—' }}</td>
+                <td class="text-nowrap">{{ o.expected_date ? (o.expected_date | date:'dd/MM/yyyy') : '—' }}</td>
+                <td class="text-end">S/ {{ o.subtotal | number:'1.2-2' }}</td>
+                <td><c-badge [color]="statusColor[o.status]">{{ statusLabel[o.status] }}</c-badge></td>
+                <td class="text-nowrap text-body-secondary">{{ o.created_at | date:'dd/MM/yy HH:mm' }}</td>
+                <td (click)="$event.stopPropagation()">
+                  <div class="d-inline-flex gap-2">
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                            (click)="openDetail(o)">
+                      <fa-icon icon="eye" /><small>Ver</small>
+                    </button>
+                    @if (canManage && o.status === 'draft') {
+                      <a class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                         [routerLink]="['/purchases/orders', o.id, 'edit']">
+                        <fa-icon icon="pencil" /><small>Editar</small>
+                      </a>
+                      <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                              [disabled]="changingId() === o.id"
+                              (click)="sendOrder(o, $event)">
+                        @if (changingId() === o.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="paper-plane" /> }
+                        <small>Aprobar</small>
+                      </button>
+                    }
+                    @if (canManage && o.status === 'sent') {
+                      <button class="btn btn-sm btn-warning d-flex flex-column align-items-center"
+                              [disabled]="changingId() === o.id"
+                              (click)="revertOrder(o, $event)">
+                        @if (changingId() === o.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="rotate-left" /> }
+                        <small>Revertir</small>
+                      </button>
+                    }
+                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                            [disabled]="downloadingId() === o.id"
+                            (click)="downloadPdf(o, $event)">
+                      @if (downloadingId() === o.id) { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-pdf" /> }
+                      <small>PDF</small>
+                    </button>
+                    @if (canManage && o.status === 'draft') {
+                      <button class="btn btn-sm btn-danger d-flex flex-column align-items-center"
+                              (click)="deleteOrder(o, $event)">
+                        <fa-icon icon="trash" /><small>Eliminar</small>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="text-center py-4 text-body-secondary">
+                  No hay órdenes de compra.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </c-card-body>
+  </c-card>
+
+} <!-- /loading -->
+
+<app-pagination
+  [currentPage]="filters.page!"
+  [lastPage]="lastPage()"
+  [total]="total()"
+  (pageChange)="goToPage($event)"
+/>

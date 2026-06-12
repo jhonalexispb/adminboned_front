@@ -1,0 +1,56 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form" id="categoryForm" (ngSubmit)="onSubmit()">
+
+    @if (error) {
+      <div class="alert alert-danger py-2">{{ error }}</div>
+    }
+
+    <div class="mb-3">
+      <label class="form-label" for="name">
+        Nombre <span class="text-danger">*</span>
+      </label>
+      <input
+        cFormControl
+        id="name"
+        formControlName="name"
+        placeholder="Ej: Pañales"
+        [class.is-invalid]="form.get('name')?.invalid && form.get('name')?.touched"
+      />
+      @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+        <div class="invalid-feedback">El nombre es obligatorio.</div>
+      }
+      @if (form.get('name')?.hasError('maxlength') && form.get('name')?.touched) {
+        <div class="invalid-feedback">Máximo 150 caracteres.</div>
+      }
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label" for="description">Descripción</label>
+      <textarea
+        cFormControl
+        id="description"
+        formControlName="description"
+        rows="3"
+        placeholder="Descripción opcional..."
+      ></textarea>
+    </div>
+
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" id="active" formControlName="active" />
+      <label class="form-check-label" for="active">Activo</label>
+    </div>
+
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="submit" form="categoryForm" class="btn btn-primary" [disabled]="form.invalid">
+    {{ isEdit ? 'Guardar cambios' : 'Crear' }}
+  </button>
+</div>

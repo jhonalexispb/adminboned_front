@@ -1,0 +1,87 @@
+@if (isOpen && bank()) {
+  <c-modal [visible]="true" alignment="center" (visibleChange)="!$event && cancel()">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="credit-card" class="me-2 text-primary" />
+        {{ isEditMode ? 'Editar medio de pago' : 'Nuevo medio de pago' }}
+        <span class="text-body-secondary ms-1" style="font-size:.85rem;">— {{ bank()!.name }}</span>
+      </h5>
+    </c-modal-header>
+
+    <c-modal-body>
+      <!-- Nombre -->
+      <div class="mb-3">
+        <label class="form-label small mb-1">Nombre <span class="text-danger">*</span></label>
+        <input type="text" class="form-control form-control-sm"
+               placeholder="Ej: Transferencia interbancaria, Agente BCP, Yape..."
+               [(ngModel)]="form.name" maxlength="100" />
+      </div>
+
+      <!-- Formato del N° operación -->
+      <div class="mb-3">
+        <label class="form-label small mb-1">Formato del N° de operación <span class="text-danger">*</span></label>
+        <select class="form-select form-select-sm" [(ngModel)]="form.op_format">
+          @for (opt of formatOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Longitud -->
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label small mb-1">Longitud mínima <span class="text-body-secondary">(opc.)</span></label>
+          <input type="number" class="form-control form-control-sm" min="1" max="100"
+                 placeholder="—"
+                 [(ngModel)]="form.op_min_length" />
+        </div>
+        <div class="col-6">
+          <label class="form-label small mb-1">Longitud máxima <span class="text-body-secondary">(opc.)</span></label>
+          <input type="number" class="form-control form-control-sm" min="1" max="100"
+                 placeholder="—"
+                 [(ngModel)]="form.op_max_length" />
+        </div>
+        <div class="col-12">
+          <div class="text-body-secondary" style="font-size:.75rem;">
+            <fa-icon icon="circle-info" class="me-1" />
+            Si se configuran, el repartidor verá un error en tiempo real si el N° no cumple.
+          </div>
+        </div>
+      </div>
+
+      <!-- Imagen guía -->
+      <div class="mb-2">
+        <label class="form-label small mb-1">
+          Imagen guía
+          <span class="text-body-secondary">(opcional — muestra al repartidor dónde encontrar el N° de operación)</span>
+        </label>
+        @if (isEditMode && method()?.guide_image_url && !guidePreview) {
+          <div class="mb-2">
+            <img [src]="method()!.guide_image_url" alt="Guía actual"
+                 class="rounded border"
+                 style="max-height:160px; max-width:100%; object-fit:contain;" />
+            <div class="text-body-secondary mt-1" style="font-size:.72rem;">Imagen actual — sube una nueva para reemplazar.</div>
+          </div>
+        }
+        <input type="file" class="form-control form-control-sm"
+               accept="image/jpg,image/jpeg,image/png,image/webp"
+               (change)="onGuideSelected($event)" />
+        @if (guidePreview) {
+          <div class="mt-2">
+            <img [src]="guidePreview" alt="Nueva guía"
+                 class="rounded border"
+                 style="max-height:160px; max-width:100%; object-fit:contain;" />
+          </div>
+        }
+      </div>
+    </c-modal-body>
+
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="saving()" (click)="cancel()">Cancelar</button>
+      <button cButton color="primary" [disabled]="saving() || !isValid" (click)="submit()">
+        @if (saving()) { <c-spinner size="sm" class="me-1" /> }
+        {{ isEditMode ? 'Guardar cambios' : 'Crear medio de pago' }}
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}

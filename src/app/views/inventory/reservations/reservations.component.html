@@ -1,0 +1,208 @@
+<app-page-header title="Reservas activas" subtitle="Stock comprometido en cotizaciones y pedidos">
+  <button class="btn btn-sm btn-outline-secondary" (click)="load()">
+    <fa-icon icon="rotate" class="me-1" />Actualizar
+  </button>
+</app-page-header>
+
+<!-- Filtros -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label small mb-1 text-body-secondary">Producto</label>
+        <p-select
+          [options]="products()"
+          optionLabel="name"
+          [ngModel]="selectedProduct()"
+          (ngModelChange)="onProductSelect($event)"
+          [filter]="true"
+          filterBy="name,sku,laboratory.name"
+          placeholder="Todos los productos"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+          appendTo="body">
+          <ng-template #selectedItem let-p>
+            <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
+            @if (p.laboratory) {
+              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            }
+            {{ p.name }}
+          </ng-template>
+          <ng-template #item let-p>
+            <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
+            @if (p.laboratory) {
+              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            }
+            {{ p.name }}
+          </ng-template>
+        </p-select>
+      </div>
+      <div class="col-12 col-md-auto d-flex align-items-end">
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="oversold_only"
+                 [(ngModel)]="oversoldOnly" (change)="load()" />
+          <label class="form-check-label fw-medium text-danger" for="oversold_only">
+            <fa-icon icon="triangle-exclamation" class="me-1" />Solo con sobreventa
+          </label>
+        </div>
+      </div>
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (groups().length === 0) {
+  <c-card>
+    <c-card-body class="text-center text-body-secondary py-5">
+      <fa-icon icon="check-circle" class="mb-2 d-block text-success" style="font-size:2rem" />
+      @if (oversoldOnly) {
+        No hay productos con sobreventa. Todo en orden.
+      } @else {
+        No hay reservas activas en este momento.
+      }
+    </c-card-body>
+  </c-card>
+} @else {
+  @for (group of groups(); track group.product_id) {
+    <c-card class="mb-3" [class.border-danger]="group.oversold">
+
+      <c-card-header class="d-flex justify-content-between align-items-center py-2 px-3 flex-wrap gap-2"
+                     [class.bg-danger-subtle]="group.oversold">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          @if (group.oversold) {
+            <fa-icon icon="triangle-exclamation" class="text-danger" />
+          }
+          @if (group.product_laboratory) {
+            <span class="text-info">{{ group.product_laboratory }}</span>
+          }
+          <span class="fw-semibold">{{ group.product_name }}</span>
+          @if (group.product_sku) {
+            <code class="small text-body-secondary bg-body-secondary px-1 rounded">{{ group.product_sku }}</code>
+          }
+          @if (group.oversold) {
+            <c-badge color="danger">Sobreventa</c-badge>
+          }
+        </div>
+
+        <div class="d-flex align-items-center gap-3 text-end small">
+          <div>
+            <div class="text-body-secondary" style="font-size:.72rem">EN ALMACÉN</div>
+            <strong class="fs-6">{{ group.current_stock }}</strong>
+          </div>
+          <div>
+            <div class="text-body-secondary" style="font-size:.72rem">RESERVADO</div>
+            <strong class="fs-6 text-warning">{{ group.reserved_stock }}</strong>
+          </div>
+          <div>
+            <div class="text-body-secondary" style="font-size:.72rem">LIBRE</div>
+            <strong class="fs-6" [class.text-success]="group.available_stock > 0"
+                    [class.text-danger]="group.available_stock <= 0">
+              {{ group.available_stock }}
+            </strong>
+          </div>
+        </div>
+      </c-card-header>
+
+      <!-- Vista mobile: cards -->
+      <c-card-body class="d-md-none p-2">
+        <div class="d-flex flex-column gap-2">
+          @for (r of group.reservations; track r.id) {
+            <div class="rounded border p-2">
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  @if (r.type === 'quotation') {
+                    <c-badge color="secondary">Cotización</c-badge>
+                  } @else {
+                    <c-badge color="primary">Pedido</c-badge>
+                  }
+                  <span class="font-monospace fw-semibold">{{ r.code }}</span>
+                </div>
+                <c-badge [color]="ageBadgeColor(r.age_days)">
+                  {{ r.age_days === 0 ? 'Hoy' : 'Hace ' + r.age_days + ' día(s)' }}
+                </c-badge>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mb-2 small">
+                <div>
+                  <div class="text-body-secondary">{{ r.seller }}</div>
+                  <span class="badge bg-body-secondary text-body-secondary border">{{ statusLabel(r) }}</span>
+                </div>
+                <div class="text-end">
+                  <div class="text-body-secondary" style="font-size:.7rem">UDS RESERVADAS</div>
+                  <strong>{{ r.quantity }}</strong>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary w-100" (click)="viewReservation(r)">Ver</button>
+            </div>
+          }
+          <div class="d-flex justify-content-between px-1 pt-1 small">
+            <span class="text-body-secondary">Total reservado</span>
+            <strong>{{ totalReserved(group) }}</strong>
+          </div>
+        </div>
+      </c-card-body>
+
+      <!-- Vista desktop: tabla -->
+      <c-card-body class="d-none d-md-block p-0">
+        <table class="table table-sm mb-0 align-middle" style="font-size:.85rem">
+          <thead style="font-size:.78rem">
+            <tr>
+              <th class="ps-3">Tipo</th>
+              <th>Código</th>
+              <th>Vendedor</th>
+              <th>Estado</th>
+              <th class="text-center">Uds reservadas</th>
+              <th>Antigüedad</th>
+              <th class="pe-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of group.reservations; track r.id) {
+              <tr>
+                <td class="ps-3">
+                  @if (r.type === 'quotation') {
+                    <c-badge color="secondary">Cotización</c-badge>
+                  } @else {
+                    <c-badge color="primary">Pedido</c-badge>
+                  }
+                </td>
+                <td class="font-monospace fw-semibold">{{ r.code }}</td>
+                <td>{{ r.seller }}</td>
+                <td>
+                  <span class="badge bg-body-secondary text-body-secondary border">{{ statusLabel(r) }}</span>
+                </td>
+                <td class="text-center fw-semibold">{{ r.quantity }}</td>
+                <td>
+                  <c-badge [color]="ageBadgeColor(r.age_days)">
+                    {{ r.age_days === 0 ? 'Hoy' : 'Hace ' + r.age_days + ' día(s)' }}
+                  </c-badge>
+                </td>
+                <td class="pe-3">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="viewReservation(r)">Ver</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+          <tfoot class="border-top">
+            <tr>
+              <td colspan="4" class="ps-3 text-body-secondary small">Total reservado</td>
+              <td class="text-center fw-bold">{{ totalReserved(group) }}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </c-card-body>
+
+    </c-card>
+  }
+}
+
+<app-order-detail-modal
+  [orderId]="previewOrderId()"
+  [viewOnly]="true"
+  (closed)="previewOrderId.set(null)" />
+
+<app-quotation-detail-modal
+  [quotation]="previewQuotation()"
+  [viewOnly]="true"
+  (closed)="previewQuotation.set(null)" />

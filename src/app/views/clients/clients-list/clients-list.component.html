@@ -1,0 +1,275 @@
+<app-page-header title="Clientes" subtitle="Gestión de clientes">
+  <button class="btn btn-primary" (click)="openCreate()">
+    <fa-icon icon="plus" class="me-1" />Nuevo cliente
+  </button>
+</app-page-header>
+
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-6">
+        <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+        <div class="input-group input-group-sm">
+          <input class="form-control" placeholder="Nombre, documento o teléfono..."
+                 [(ngModel)]="filters.search" (keyup.enter)="onSearch()" />
+          @if (filters.search) {
+            <button class="btn btn-outline-secondary" type="button"
+                    (click)="filters.search = ''; onSearch()">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+          <button class="btn btn-primary" type="button" (click)="onSearch()">
+            <fa-icon icon="search" />
+          </button>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <select class="form-select form-select-sm" [(ngModel)]="filters.active" (change)="onSearch()">
+          <option value="">Todos</option>
+          <option [ngValue]="true">Activos</option>
+          <option [ngValue]="false">Inactivos</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-auto ms-md-auto d-flex align-items-end">
+        <span class="text-body-secondary small">
+          {{ total() }} cliente{{ total() !== 1 ? 's' : '' }}
+        </span>
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ MOBILE: cards ══════════════════════════════════════════════════════ -->
+  <div class="d-md-none d-flex flex-column gap-2 mb-3">
+    @for (client of clients(); track client.id) {
+      <c-card>
+        <c-card-body class="px-3 py-2">
+
+          <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+            <div class="flex-grow-1 min-width-0">
+              @if (client.business_name) {
+                <div class="fw-semibold lh-sm">{{ client.business_name }}</div>
+              }
+              @if (client.name) {
+                <div class="text-body-secondary small">{{ client.name }}</div>
+              }
+            </div>
+            <app-status-badge [active]="client.active" />
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mb-1" style="font-size:.75rem;">
+            @if (client.ruc) {
+              <span class="badge bg-light text-dark">RUC {{ client.ruc }}</span>
+            }
+            @if (client.dni) {
+              <span class="badge bg-light text-dark">DNI {{ client.dni }}</span>
+            }
+          </div>
+
+          <div class="d-flex flex-column gap-1" style="font-size:.8rem;">
+            @if (client.phone) {
+              <div class="d-flex align-items-center gap-2">
+                <fa-icon icon="phone" class="text-body-secondary" style="width:12px;" />
+                <span>{{ client.phone }}</span>
+              </div>
+            }
+            @if (client.district?.name) {
+              <div class="d-flex align-items-start gap-2 text-body-secondary">
+                <fa-icon icon="location-dot" style="width:12px;margin-top:2px;" />
+                <span>
+                  {{ client.district?.name }}
+                  @if (client.district?.province?.name) {
+                    · {{ client.district?.province?.name }}
+                  }
+                  @if (client.district?.province?.department?.name) {
+                    · {{ client.district?.province?.department?.name }}
+                  }
+                </span>
+              </div>
+            }
+            @if (client.seller_assignment?.seller_name) {
+              <div class="d-flex align-items-center gap-2 text-body-secondary">
+                <fa-icon icon="user" style="width:12px;" />
+                <span>{{ client.seller_assignment?.seller_name }}</span>
+              </div>
+            }
+          </div>
+
+          <div class="d-flex gap-2 mt-2 pt-2 border-top">
+            @if (client.latitude && client.longitude) {
+              <a [href]="'https://www.google.com/maps?q=' + client.latitude + ',' + client.longitude"
+                 target="_blank"
+                 class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center flex-grow-1"
+                 style="font-size:.68rem;">
+                <fa-icon icon="map-location-dot" style="font-size:.85rem;" /><small>Mapa</small>
+              </a>
+            }
+            @if (client.phone || client.email) {
+              <div ngbDropdown class="flex-grow-1">
+                <button type="button" ngbDropdownToggle
+                        class="btn btn-sm btn-success d-flex flex-column align-items-center w-100"
+                        style="font-size:.68rem;">
+                  <fa-icon icon="address-book" style="font-size:.85rem;" /><small>Contactar</small>
+                </button>
+                <div ngbDropdownMenu>
+                  @if (client.phone) {
+                    <button ngbDropdownItem (click)="call(client.phone)">
+                      <fa-icon icon="phone" class="me-2 text-primary" />Llamar
+                    </button>
+                    <button ngbDropdownItem (click)="whatsapp(client.phone)">
+                      <fa-icon [icon]="['fab','whatsapp']" class="me-2 text-success" />WhatsApp
+                    </button>
+                  }
+                  @if (client.phone && client.email) {
+                    <div class="dropdown-divider"></div>
+                  }
+                  @if (client.email) {
+                    <button ngbDropdownItem (click)="mail(client.email)">
+                      <fa-icon icon="envelope" class="me-2 text-secondary" />Correo
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+            <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-grow-1"
+                    style="font-size:.68rem;" (click)="openEdit(client)">
+              <fa-icon icon="pencil" style="font-size:.85rem;" /><small>Editar</small>
+            </button>
+            <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-grow-1"
+                    style="font-size:.68rem;" (click)="confirmDelete(client)">
+              <fa-icon icon="trash" style="font-size:.85rem;" /><small>Eliminar</small>
+            </button>
+          </div>
+
+        </c-card-body>
+      </c-card>
+    } @empty {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="users" class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+        No hay clientes registrados.
+      </div>
+    }
+  </div>
+
+  <!-- ══ DESKTOP: tabla ════════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th style="width:60px">#</th>
+              <th>Nombre comercial</th>
+              <th>Contacto</th>
+              <th style="width:160px">Documento</th>
+              <th>Teléfono</th>
+              <th>Distrito</th>
+              <th>Vendedor</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:130px" class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (client of clients(); track client.id) {
+              <tr>
+                <td class="text-body-secondary">{{ client.id }}</td>
+                <td><span class="fw-semibold">{{ client.business_name }}</span></td>
+                <td><span>{{ client.name }}</span></td>
+                <td class="text-body-secondary small">
+                  @if (client.ruc) {
+                    <span class="badge bg-light text-dark me-1">RUC</span>{{ client.ruc }}<br>
+                  }
+                  @if (client.dni) {
+                    <span class="badge bg-light text-dark me-1">DNI</span>{{ client.dni }}
+                  }
+                  @if (!client.ruc && !client.dni) { — }
+                </td>
+                <td>{{ client.phone ?? '—' }}</td>
+                <td class="text-body-secondary">{{ client.district?.name ?? '—' }} - {{client.district?.province?.name ?? '-' }} - {{client.district?.province?.department?.name ?? ''}}</td>
+                <td class="text-body-secondary">{{ client.seller_assignment?.seller_name ?? '—' }}</td>
+                <td><app-status-badge [active]="client.active" /></td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2 align-items-center">
+                    @if (client.latitude && client.longitude) {
+                      <a [href]="'https://www.google.com/maps?q=' + client.latitude + ',' + client.longitude"
+                         target="_blank"
+                         class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center"
+                         title="Ver en Google Maps">
+                        <fa-icon icon="map-location-dot" /><small>Mapa</small>
+                      </a>
+                    }
+                    @if (client.phone || client.email) {
+                      <div ngbDropdown container="body">
+                        <button type="button" ngbDropdownToggle
+                                class="btn btn-sm btn-success d-flex flex-column align-items-center">
+                          <fa-icon icon="address-book" />
+                          <small>Contactar</small>
+                        </button>
+                        <div ngbDropdownMenu>
+                          @if (client.phone) {
+                            <button ngbDropdownItem (click)="call(client.phone)">
+                              <fa-icon icon="phone" class="me-2 text-primary" />Llamar
+                            </button>
+                            <button ngbDropdownItem (click)="whatsapp(client.phone)">
+                              <fa-icon [icon]="['fab', 'whatsapp']" class="me-2 text-success" />WhatsApp
+                            </button>
+                          }
+                          @if (client.phone && client.email) {
+                            <div class="dropdown-divider"></div>
+                          }
+                          @if (client.email) {
+                            <button ngbDropdownItem (click)="mail(client.email)">
+                              <fa-icon icon="envelope" class="me-2 text-secondary" />Correo
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    }
+                    <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEdit(client)">
+                      <fa-icon icon="pencil" /><small>Editar</small>
+                    </button>
+                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDelete(client)">
+                      <fa-icon icon="trash" /><small>Eliminar</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="9" class="text-center py-4 text-body-secondary">
+                  No hay clientes registrados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </c-card-body>
+  </c-card>
+
+} <!-- /loading -->
+
+<app-pagination
+  [currentPage]="filters.page!"
+  [lastPage]="lastPage()"
+  [total]="total()"
+  (pageChange)="goToPage($event)"
+/>
+
+<app-confirm-modal
+  [visible]="showConfirm()"
+  title="Eliminar cliente"
+  [message]="'¿Eliminar &quot;' + deletingName() + '&quot;? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  (confirm)="onConfirmDelete()"
+  (cancel)="showConfirm.set(false)"
+/>

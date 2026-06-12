@@ -1,0 +1,237 @@
+@if (isOpen) {
+  <c-modal [visible]="true" alignment="center" size="lg" (visibleChange)="!$event && cancel()">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="money-bill-wave" class="me-2 text-success" />
+        {{ isEditMode ? 'Corregir cobro' : 'Registrar cobro' }}
+      </h5>
+    </c-modal-header>
+
+    <c-modal-body>
+
+      <!-- Info pedido -->
+      @if (order(); as o) {
+        <div class="rounded border bg-body-secondary px-3 py-2 mb-3" style="font-size:.85rem;">
+          <div class="fw-semibold">{{ o.client?.business_name || o.client?.name }}</div>
+          <div class="text-body-secondary">
+            {{ o.code }} · Total <strong>S/ {{ o.total | number:'1.2-2' }}</strong>
+            @if (totalEntered > 0 && totalEntered !== +o.total) {
+              <span class="ms-2 fw-semibold"
+                    [class.text-danger]="totalEntered > +o.total"
+                    [class.text-warning]="totalEntered < +o.total">
+                Ingresado S/ {{ totalEntered | number:'1.2-2' }}
+              </span>
+            }
+          </div>
+          @if (isOverPaid) {
+            <div class="mt-1 text-danger fw-semibold" style="font-size:.78rem;">
+              <fa-icon icon="triangle-exclamation" class="me-1" />
+              El monto ingresado (S/ {{ alreadyPaid + totalEntered | number:'1.2-2' }}) excede el total del pedido.
+            </div>
+          } @else if (totalEntered > 0 && (alreadyPaid + totalEntered) < +o.total) {
+            <div class="mt-1 text-warning" style="font-size:.78rem;">
+              <fa-icon icon="triangle-exclamation" class="me-1" />
+              Pago parcial — faltan S/ {{ +o.total - alreadyPaid - totalEntered | number:'1.2-2' }}. El pedido quedará pendiente.
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Alerta rechazo -->
+      @if (payment(); as p) {
+        <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.85rem;">
+          <fa-icon icon="triangle-exclamation" class="me-1" />
+          <strong>Rechazado</strong> — corrígelo y reenvía.
+          @if (p.notes) { <div class="mt-1">Motivo: {{ p.notes }}</div> }
+        </div>
+      }
+
+      <!-- Entradas -->
+      @if (loadingHistory()) {
+        <div class="text-center text-body-secondary py-4">
+          <c-spinner size="sm" class="me-2" />Cargando opciones de pago...
+        </div>
+      } @else {
+      @for (entry of entries(); track entry._id; let i = $index) {
+        <div class="border rounded p-3 mb-3" style="font-size:.875rem;">
+
+          @if (entries().length > 1) {
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="text-body-secondary small fw-semibold">Pago {{ i + 1 }}</span>
+              <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                      style="font-size:.75rem;" (click)="removeEntry(entry._id)">
+                <fa-icon icon="xmark" /> Quitar
+              </button>
+            </div>
+          }
+
+          <!-- Tipo + Monto -->
+          <div class="row g-2 mb-2">
+            <div class="col-12 col-sm-6">
+              <label class="form-label small mb-1">Tipo</label>
+              <div class="d-flex gap-1">
+                <button type="button" class="btn btn-sm flex-grow-1"
+                        [class.btn-success]="entry.collection_form === 'cash'"
+                        [class.btn-outline-secondary]="entry.collection_form !== 'cash'"
+                        (click)="patch(entry._id, {collection_form: 'cash', payment_method_id: null})">
+                  <fa-icon icon="money-bill-wave" class="me-1" />Efectivo
+                </button>
+                <button type="button" class="btn btn-sm flex-grow-1"
+                        [class.btn-primary]="entry.collection_form === 'transfer'"
+                        [class.btn-outline-secondary]="entry.collection_form !== 'transfer'"
+                        (click)="patch(entry._id, {collection_form: 'transfer'})">
+                  <fa-icon icon="building-columns" class="me-1" />Transferencia
+                </button>
+              </div>
+              @if (entry.collection_form === 'cash') {
+                <div class="text-body-secondary mt-1" style="font-size:.75rem;">
+                  <fa-icon icon="circle-info" class="me-1" />Se suma a tu deuda. Luego deposita.
+                </div>
+              }
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label small mb-1">Monto <span class="text-danger">*</span></label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">S/</span>
+                <input type="number" class="form-control" step="0.01" min="0.01" placeholder="0.00"
+                       [ngModel]="entry.amount"
+                       (ngModelChange)="patch(entry._id, {amount: $event})" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Campos transferencia -->
+          @if (entry.collection_form === 'transfer') {
+
+            <!-- Medio de pago -->
+            <div class="mb-2">
+              <label class="form-label small mb-1">Medio de pago <span class="text-danger">*</span></label>
+              <div class="d-flex gap-2">
+                <select class="form-select form-select-sm flex-grow-1"
+                        [ngModel]="entry.payment_method_id"
+                        (ngModelChange)="patch(entry._id, {payment_method_id: +$event, operation_number: '', showGuide: false})">
+                  <option [ngValue]="null" disabled>Seleccionar...</option>
+                  @for (m of methods(); track m.id) {
+                    <option [ngValue]="m.id">{{ m.bank?.name }} — {{ m.name }}</option>
+                  }
+                </select>
+                @if (methodFor(entry.payment_method_id)?.guide_image_url) {
+                  <button type="button" class="btn btn-sm btn-outline-info flex-shrink-0"
+                          style="font-size:.75rem;"
+                          title="Ver dónde está el N° de operación"
+                          (click)="patch(entry._id, {showGuide: !entry.showGuide})">
+                    <fa-icon icon="circle-question" />
+                  </button>
+                }
+              </div>
+
+              <!-- Guía desplegable -->
+              @if (entry.showGuide && methodFor(entry.payment_method_id)?.guide_image_url; as guideUrl) {
+                <div class="mt-2 p-2 bg-body-secondary rounded border">
+                  <div class="small text-body-secondary mb-1">
+                    <fa-icon icon="circle-info" class="text-info me-1" />¿Dónde está el N° de operación?
+                  </div>
+                  <img [src]="guideUrl" alt="Guía"
+                       class="rounded d-block"
+                       style="max-height:130px; max-width:100%; object-fit:contain; cursor:zoom-in;"
+                       (click)="openPreview(guideUrl)" />
+                </div>
+              }
+            </div>
+
+            <!-- N° operación -->
+            <div class="mb-2">
+              <label class="form-label small mb-1">N° de operación <span class="text-danger">*</span></label>
+              @if (methodFor(entry.payment_method_id); as m) {
+                <input type="text" class="form-control form-control-sm"
+                       [class.is-invalid]="!!opNumberError(entry) && !!entry.operation_number"
+                       [placeholder]="m.op_format === 'numeric' ? 'Solo números' : m.op_format === 'alpha' ? 'Solo letras' : 'Letras y/o números'"
+                       [ngModel]="entry.operation_number"
+                       (ngModelChange)="patch(entry._id, {operation_number: $event})" />
+                @if (opNumberError(entry)) {
+                  <div class="invalid-feedback d-block" style="font-size:.72rem;">
+                    <fa-icon icon="triangle-exclamation" class="me-1" />{{ opNumberError(entry) }}
+                  </div>
+                }
+                @if (m.op_min_length || m.op_max_length) {
+                  <div class="form-text" style="font-size:.72rem;">
+                    @if (m.op_min_length && m.op_max_length) { {{ m.op_min_length }}–{{ m.op_max_length }} caracteres }
+                    @else if (m.op_min_length) { Mínimo {{ m.op_min_length }} }
+                    @else { Máximo {{ m.op_max_length }} }
+                  </div>
+                }
+              } @else {
+                <input type="text" class="form-control form-control-sm"
+                       placeholder="Selecciona primero el medio de pago" disabled />
+              }
+            </div>
+
+            <!-- Comprobante -->
+            <div class="mb-2">
+              <label class="form-label small mb-1">
+                Comprobante
+                @if (!isEditMode) { <span class="text-danger">*</span> }
+                @else { <span class="text-body-secondary">(opc.)</span> }
+              </label>
+              <input type="file" class="form-control form-control-sm"
+                     accept="image/*,.pdf"
+                     (change)="onFileSelected($event, entry._id)" />
+              @if (entry.previewUrl) {
+                <img [src]="entry.previewUrl" alt="Voucher"
+                     class="mt-2 rounded border d-block"
+                     style="max-height:200px; max-width:100%; object-fit:contain; cursor:zoom-in;"
+                     (click)="openPreview(entry.previewUrl)" />
+              }
+            </div>
+
+            <!-- Fecha / Hora -->
+            <div class="row g-2">
+              <div class="col-7">
+                <label class="form-label small mb-1">Fecha <span class="text-danger">*</span></label>
+                <input type="date" class="form-control form-control-sm"
+                       [ngModel]="entry.operation_date"
+                       (ngModelChange)="patch(entry._id, {operation_date: $event})" />
+              </div>
+              <div class="col-5">
+                <label class="form-label small mb-1">Hora <span class="text-danger">*</span></label>
+                <input type="time" class="form-control form-control-sm"
+                       [ngModel]="entry.operation_time"
+                       (ngModelChange)="patch(entry._id, {operation_time: $event})" />
+              </div>
+            </div>
+
+          }
+        </div>
+      }
+
+      @if (!isEditMode) {
+        <button type="button" class="btn btn-outline-secondary btn-sm w-100"
+                (click)="addEntry()">
+          <fa-icon icon="plus" class="me-1" />Agregar otro pago parcial
+        </button>
+      }
+      }
+
+    </c-modal-body>
+
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="saving()" (click)="cancel()">Cancelar</button>
+      <button cButton color="success" [disabled]="saving() || loadingHistory() || !isValid" (click)="submit()">
+        @if (saving()) { <c-spinner size="sm" class="me-1" /> }
+        {{ isEditMode ? 'Corregir y reenviar' : 'Registrar cobro' }}
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- Lightbox -->
+@if (previewFullUrl) {
+  <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.85); z-index:2000;"
+       (click)="previewFullUrl = null">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:95vw;">
+      <img [src]="previewFullUrl" alt="Voucher"
+           style="max-width:100%; max-height:90vh; object-fit:contain; border-radius:8px;"
+           (click)="$event.stopPropagation()" />
+    </div>
+  </div>
+}

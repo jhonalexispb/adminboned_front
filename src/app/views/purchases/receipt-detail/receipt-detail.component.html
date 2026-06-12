@@ -1,0 +1,360 @@
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (receipt(); as r) {
+
+  <app-page-header [title]="r.code" subtitle="Detalle de recepción de compra">
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <c-badge [color]="r.status === 'validated' ? 'success' : 'warning'" class="fs-6">
+        {{ r.status === 'validated' ? 'Validado' : 'Pendiente' }}
+      </c-badge>
+
+      @if (canEdit) {
+        <a class="btn btn-sm btn-outline-secondary"
+           [routerLink]="['/purchases/receipts', r.id, 'edit']">
+          <fa-icon icon="pencil" class="me-1" />Editar
+        </a>
+      }
+
+      <!-- Editar datos del documento (disponible siempre) -->
+      @if (!editingDoc()) {
+        <button class="btn btn-sm btn-outline-secondary" (click)="startEditDoc()">
+          <fa-icon icon="file-alt" class="me-1" />Datos del doc.
+        </button>
+      }
+
+      @if (r.status === 'pending') {
+        <button class="btn btn-sm btn-success" (click)="showValidateConfirm.set(true)"
+                [disabled]="validating()">
+          <fa-icon icon="circle-check" class="me-1" />Validar recepción
+        </button>
+      }
+
+      @if (canDelete) {
+        <button class="btn btn-sm btn-outline-danger" (click)="showDeleteConfirm.set(true)"
+                [disabled]="changing()">
+          <fa-icon icon="trash" class="me-1" />Eliminar
+        </button>
+      }
+
+      @if (r.purchase_order_id) {
+        <button class="btn btn-sm btn-outline-secondary" (click)="openOrder()">
+          <fa-icon icon="link" class="me-1" />Ver orden vinculada
+        </button>
+      }
+
+      <button class="btn btn-sm btn-outline-secondary" (click)="downloadPdf()" [disabled]="downloading()">
+        @if (downloading()) { <c-spinner size="sm" class="me-1" />Generando... }
+        @else { <fa-icon icon="file-pdf" class="me-1" />Descargar PDF }
+      </button>
+
+      <button class="btn btn-sm btn-outline-secondary" routerLink="/purchases/receipts">
+        <fa-icon icon="arrow-left" class="me-1" />Volver
+      </button>
+    </div>
+  </app-page-header>
+
+  @if (r.status === 'pending') {
+    <div class="alert alert-warning py-2 mb-3 small">
+      <fa-icon icon="triangle-exclamation" class="me-1" />
+      Esta recepción aún no ha sido validada. Al validar, el stock se actualizará y los costos de
+      compra quedarán registrados en el historial de cada producto.
+    </div>
+  }
+
+  <!-- Editar datos del documento (inline) -->
+  @if (editingDoc()) {
+    <c-card class="mb-4 border-primary">
+      <c-card-header class="bg-primary bg-opacity-10">
+        <strong>Editar datos del documento</strong>
+        <small class="text-body-secondary ms-2">Puedes corregir estos datos sin afectar el stock.</small>
+      </c-card-header>
+      <c-card-body>
+        <form [formGroup]="docForm" (ngSubmit)="saveDoc()">
+          <div class="row g-3">
+            <div class="col-sm-3">
+              <label class="form-label small text-body-secondary mb-1">Tipo documento</label>
+              <p-select formControlName="document_type" [options]="docTypeOptions"
+                        optionLabel="label" optionValue="value"
+                        [style]="{ width: '100%' }" appendTo="body" />
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small text-body-secondary mb-1">N° documento</label>
+              <input cFormControl formControlName="document_number" type="text" placeholder="F001-00001" />
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small text-body-secondary mb-1">F. emisión</label>
+              <input cFormControl formControlName="document_date" type="date" />
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small text-body-secondary mb-1">F. vencimiento</label>
+              <input cFormControl formControlName="due_date" type="date" />
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label small text-body-secondary mb-1">Condición de pago</label>
+              <p-select formControlName="payment_condition" [options]="paymentOptions"
+                        optionLabel="label" optionValue="value"
+                        [style]="{ width: '100%' }" appendTo="body" />
+            </div>
+            <div class="col-sm-2">
+              <label class="form-label small text-body-secondary mb-1">Moneda</label>
+              <p-select formControlName="currency" [options]="currencyOptions"
+                        optionLabel="label" optionValue="value"
+                        [style]="{ width: '100%' }" appendTo="body" />
+            </div>
+            <div class="col-sm-7">
+              <label class="form-label small text-body-secondary mb-1">Notas</label>
+              <input cFormControl formControlName="notes" type="text" placeholder="Observaciones..." />
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-3 justify-content-end">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    (click)="editingDoc.set(false)">Cancelar</button>
+            <button type="submit" class="btn btn-sm btn-primary" [disabled]="savingDoc()">
+              @if (savingDoc()) { <c-spinner size="sm" class="me-1" />Guardando... }
+              @else { <fa-icon icon="save" class="me-1" />Guardar datos }
+            </button>
+          </div>
+        </form>
+      </c-card-body>
+    </c-card>
+  }
+
+  <div class="row g-4 mb-4">
+
+    <!-- Info del documento -->
+    <div class="col-md-6">
+      <c-card class="h-100">
+        <c-card-header><strong>Datos del documento</strong></c-card-header>
+        <c-card-body>
+          <dl class="row mb-0 small">
+            <dt class="col-sm-5 text-body-secondary">Proveedor</dt>
+            <dd class="col-sm-7">{{ r.supplier?.name ?? '—' }}</dd>
+
+            <dt class="col-sm-5 text-body-secondary">Tipo</dt>
+            <dd class="col-sm-7">{{ docTypeLabel[r.document_type] }}</dd>
+
+            <dt class="col-sm-5 text-body-secondary">N° documento</dt>
+            <dd class="col-sm-7 font-monospace">{{ r.document_number ?? '—' }}</dd>
+
+            <dt class="col-sm-5 text-body-secondary">F. emisión</dt>
+            <dd class="col-sm-7">{{ r.document_date ? (r.document_date | date:'dd/MM/yyyy') : '—' }}</dd>
+
+            <dt class="col-sm-5 text-body-secondary">F. vencimiento</dt>
+            <dd class="col-sm-7">{{ r.due_date ? (r.due_date | date:'dd/MM/yyyy') : '—' }}</dd>
+
+            <dt class="col-sm-5 text-body-secondary">Condición pago</dt>
+            <dd class="col-sm-7">{{ r.payment_condition ? (paymentCondLabel[r.payment_condition] ?? r.payment_condition) : '—' }}</dd>
+
+            <dt class="col-sm-5 text-body-secondary">Moneda</dt>
+            <dd class="col-sm-7">{{ r.currency }}</dd>
+
+            <dt class="col-sm-5 text-body-secondary">Creado por</dt>
+            <dd class="col-sm-7">{{ r.created_by ?? '—' }}</dd>
+
+            <dt class="col-sm-5 text-body-secondary">Fecha registro</dt>
+            <dd class="col-sm-7">{{ r.created_at | date:'dd/MM/yyyy HH:mm' }}</dd>
+
+            @if (r.purchase_order_id) {
+              <dt class="col-sm-5 text-body-secondary">Orden vinculada</dt>
+              <dd class="col-sm-7">
+                <button class="btn btn-link btn-sm p-0" (click)="openOrder()">
+                  Ver orden #{{ r.purchase_order_id }}
+                </button>
+              </dd>
+            }
+
+            @if (r.notes) {
+              <dt class="col-sm-5 text-body-secondary">Notas</dt>
+              <dd class="col-sm-7">{{ r.notes }}</dd>
+            }
+          </dl>
+        </c-card-body>
+      </c-card>
+    </div>
+
+    <!-- Resumen contable -->
+    <div class="col-md-6">
+      <c-card class="h-100">
+        <c-card-header><strong>Resumen contable</strong></c-card-header>
+        <c-card-body>
+          <div class="text-center py-2">
+            <div class="fs-1 fw-bold">{{ r.items?.length ?? 0 }}</div>
+            <div class="text-body-secondary small mb-3">producto(s) en esta recepción</div>
+          </div>
+          <dl class="row mb-0 small">
+            <dt class="col-sm-6 text-body-secondary">Base imponible</dt>
+            <dd class="col-sm-6 text-end">{{ r.currency }} {{ baseAmount | number:'1.2-2' }}</dd>
+            <dt class="col-sm-6 text-body-secondary">IGV (18%)</dt>
+            <dd class="col-sm-6 text-end">{{ r.currency }} {{ igv | number:'1.2-2' }}</dd>
+            <dt class="col-sm-6 text-body-secondary fw-semibold">Total</dt>
+            <dd class="col-sm-6 text-end fw-semibold fs-5">{{ r.currency }} {{ r.subtotal | number:'1.2-2' }}</dd>
+          </dl>
+          @if (r.status === 'validated') {
+            <div class="mt-3 text-center">
+              <c-badge color="success">Stock actualizado</c-badge>
+            </div>
+          }
+        </c-card-body>
+      </c-card>
+    </div>
+
+  </div>
+
+  <!-- Comprobante digital -->
+  <c-card class="mb-4">
+    <c-card-header class="d-flex align-items-center justify-content-between">
+      <strong>Comprobante digital</strong>
+      @if (!r.document_file_url) {
+        <label class="btn btn-sm btn-outline-primary mb-0" style="cursor:pointer">
+          @if (uploadingFile()) {
+            <c-spinner size="sm" class="me-1" />Subiendo...
+          } @else {
+            <fa-icon icon="upload" class="me-1" />Subir PDF
+          }
+          <input type="file" accept="application/pdf" class="d-none"
+                 [disabled]="uploadingFile()"
+                 (change)="onFileUpload($event)" />
+        </label>
+      }
+    </c-card-header>
+    <c-card-body>
+      @if (r.document_file_url) {
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <fa-icon icon="file-pdf" class="text-danger" style="font-size:2rem" />
+          <div class="flex-grow-1">
+            <div class="fw-medium">Factura / Comprobante adjunto</div>
+            <div class="text-body-secondary small">PDF guardado en el sistema</div>
+          </div>
+          <button class="btn btn-sm btn-outline-success" (click)="downloadFile()"
+                  [disabled]="downloadingFile()">
+            @if (downloadingFile()) { <c-spinner size="sm" class="me-1" /> }
+            @else { <fa-icon icon="download" class="me-1" /> }
+            Descargar
+          </button>
+          <label class="btn btn-sm btn-outline-primary mb-0" style="cursor:pointer">
+            @if (uploadingFile()) {
+              <c-spinner size="sm" class="me-1" />Subiendo...
+            } @else {
+              <fa-icon icon="arrow-up-from-bracket" class="me-1" />Reemplazar
+            }
+            <input type="file" accept="application/pdf" class="d-none"
+                   [disabled]="uploadingFile()"
+                   (change)="onFileUpload($event)" />
+          </label>
+          <button class="btn btn-sm btn-outline-danger" (click)="deleteFile()"
+                  [disabled]="deletingFile()">
+            @if (deletingFile()) { <c-spinner size="sm" /> }
+            @else { <fa-icon icon="trash" /> }
+          </button>
+        </div>
+      } @else {
+        <div class="text-center text-body-secondary py-3 small">
+          <fa-icon icon="file-pdf" class="d-block mb-2" style="font-size:2rem;opacity:.3" />
+          Sin comprobante digital. Sube el PDF del comprobante.
+        </div>
+      }
+    </c-card-body>
+  </c-card>
+
+  <!-- Tabla de ítems -->
+  <c-card>
+    <c-card-header><strong>Ítems recibidos</strong></c-card-header>
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table cTable hover class="mb-0">
+          <thead class="small text-body-secondary">
+            <tr>
+              <th>Producto</th>
+              <th class="text-end">Cantidad</th>
+              <th class="text-end">Bonif.</th>
+              <th class="text-end">Costo unit.</th>
+              <th class="text-end">Subtotal</th>
+              <th>Lote</th>
+              <th>Vencimiento</th>
+              <th>Notas</th>
+            </tr>
+          </thead>
+          <tbody class="small">
+            @for (item of r.items; track item.id) {
+              <tr [class.bg-success-subtle]="item.quantity === 0 && (item.bonus_quantity ?? 0) > 0">
+                <td class="fw-medium">
+                  @if (item.product_laboratory) {
+                    <span class="text-info me-1">{{ item.product_laboratory }}</span>
+                  }
+                  {{ item.product_name }}
+                </td>
+                <td class="text-end">
+                  @if (item.quantity === 0 && (item.bonus_quantity ?? 0) > 0) {
+                    <span class="text-body-secondary">—</span>
+                  } @else {
+                    {{ item.quantity }}
+                  }
+                </td>
+                <td class="text-end text-success">
+                  {{ (item.bonus_quantity ?? 0) > 0 ? '+' + item.bonus_quantity : '—' }}
+                </td>
+                <td class="text-end">
+                  @if (item.quantity === 0) {
+                    <span class="text-body-secondary">—</span>
+                  } @else {
+                    S/ {{ item.unit_cost | number:'1.2-2' }}
+                  }
+                </td>
+                <td class="text-end fw-medium">
+                  @if (item.quantity === 0) {
+                    <span class="text-success small">Bonif.</span>
+                  } @else {
+                    S/ {{ item.quantity * item.unit_cost | number:'1.2-2' }}
+                  }
+                </td>
+                <td class="font-monospace" style="font-size:.82rem">
+                  @if (item.lot_number) {
+                    {{ item.lot_number }}
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+                <td style="font-size:.82rem">
+                  @if (item.expiry_date) {
+                    {{ item.expiry_date | date:'dd/MM/yyyy' }}
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+                <td class="text-body-secondary" style="font-size:.78rem">{{ item.notes ?? '—' }}</td>
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr class="fw-semibold">
+              <td colspan="4" class="text-end">Total:</td>
+              <td class="text-end">S/ {{ r.subtotal | number:'1.2-2' }}</td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </c-card-body>
+  </c-card>
+
+}
+
+<app-confirm-modal
+  [visible]="showValidateConfirm()"
+  title="Validar recepción"
+  message="Al validar, el stock de cada producto se actualizará y los costos de compra quedarán registrados. Esta acción no se puede deshacer."
+  confirmLabel="Validar y actualizar stock"
+  confirmColor="success"
+  (confirm)="validate()"
+  (cancel)="showValidateConfirm.set(false)"
+/>
+
+<app-confirm-modal
+  [visible]="showDeleteConfirm()"
+  title="Eliminar recepción"
+  message="¿Eliminar esta recepción permanentemente? Esta acción no se puede deshacer."
+  confirmLabel="Eliminar"
+  confirmColor="danger"
+  (confirm)="deleteReceipt()"
+  (cancel)="showDeleteConfirm.set(false)"
+/>

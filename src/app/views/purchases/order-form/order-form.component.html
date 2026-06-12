@@ -1,0 +1,362 @@
+<app-page-header
+  [title]="isEdit ? 'Editar orden de compra' : 'Nueva orden de compra'"
+  subtitle="Solicitud a proveedor">
+  <button class="btn btn-outline-secondary btn-sm" routerLink="/purchases/orders">
+    <fa-icon icon="arrow-left" class="me-1" />Volver
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+<!-- ══ MOBILE: tabs ═══════════════════════════════════════════════════════ -->
+<ul class="nav nav-tabs mb-3 d-sm-none">
+  <li class="nav-item flex-grow-1">
+    <button type="button" class="nav-link w-100 d-flex flex-column align-items-center py-2"
+            [class.active]="activeTab() === 'general'"
+            (click)="activeTab.set('general')">
+      <fa-icon icon="file-lines" style="font-size:1.1rem;" />
+      <small style="font-size:.7rem;">General</small>
+    </button>
+  </li>
+  <li class="nav-item flex-grow-1">
+    <button class="nav-link w-100 d-flex flex-column align-items-center py-2 position-relative"
+            [class.active]="activeTab() === 'productos'"
+            (click)="activeTab.set('productos')">
+      <fa-icon icon="box" style="font-size:1.1rem;" />
+      <small style="font-size:.7rem;">Productos</small>
+      @if (items().length) {
+        <span class="position-absolute top-0 end-0 badge bg-secondary m-1" style="font-size:.6rem;">
+          {{ items().length }}
+        </span>
+      }
+    </button>
+  </li>
+  <li class="nav-item flex-grow-1">
+    <button class="nav-link w-100 d-flex flex-column align-items-center py-2 position-relative"
+            [class.active]="activeTab() === 'reposicion'"
+            (click)="activeTab.set('reposicion')">
+      <fa-icon icon="triangle-exclamation" style="font-size:1.1rem;" />
+      <small style="font-size:.7rem;">Alertas</small>
+      @if (lowStock().length + expiringSoon().length > 0) {
+        <span class="position-absolute top-0 end-0 badge bg-danger m-1" style="font-size:.6rem;">
+          {{ lowStock().length + expiringSoon().length }}
+        </span>
+      }
+    </button>
+  </li>
+</ul>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()">
+
+  <div class="row g-4">
+
+    <!-- ── Datos generales ─────────────────────────────────────────── col-lg-3 -->
+    <div class="col-lg-3"
+         [class.d-none]="activeTab() !== 'general'"
+         [class.d-sm-block]="true">
+      <c-card>
+        <c-card-header><strong>Datos generales</strong></c-card-header>
+        <c-card-body class="d-flex flex-column gap-3">
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">
+              Proveedor <span class="text-danger">*</span>
+            </label>
+            <div class="d-flex gap-1">
+              <div class="flex-grow-1" style="min-width:0;overflow:hidden;">
+                <p-select
+                  formControlName="supplier_id"
+                  [options]="suppliers()"
+                  optionLabel="name" optionValue="id"
+                  placeholder="Seleccionar proveedor"
+                  [filter]="true" filterPlaceholder="Buscar..."
+                  emptyMessage="Sin resultados"
+                  [style]="{ width: '100%' }" appendTo="body"
+                  [panelStyle]="{ 'max-width': '95vw', 'word-break': 'break-word', 'white-space': 'normal' }"
+                  [class.is-invalid]="form.get('supplier_id')?.invalid && form.get('supplier_id')?.touched">
+                  <ng-template #item let-s>
+                    <span style="white-space:normal;word-break:break-word;display:block;">{{ s.name }}</span>
+                  </ng-template>
+                </p-select>
+              </div>
+              <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                      title="Nuevo proveedor" (click)="openNewSupplier()">
+                <fa-icon icon="plus" />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">Fecha esperada</label>
+            <input cFormControl formControlName="expected_date" type="date" />
+          </div>
+
+          <div>
+            <label class="form-label small text-body-secondary mb-1">Notas</label>
+            <textarea cFormControl formControlName="notes" rows="3"
+                      placeholder="Observaciones para el proveedor..."></textarea>
+          </div>
+
+        </c-card-body>
+      </c-card>
+    </div>
+
+    <!-- ── Productos ───────────────────────────────────────────────── col-lg-6 -->
+    <div class="col-lg-6"
+         [class.d-none]="activeTab() !== 'productos'"
+         [class.d-sm-block]="true">
+      <c-card>
+        <c-card-header>
+          <div class="d-flex align-items-center justify-content-between">
+            <strong>Productos</strong>
+            <button type="button" class="btn btn-sm btn-primary"
+                    [disabled]="loadingProducts()"
+                    (click)="openAddItem()">
+              @if (loadingProducts()) {
+                <c-spinner size="sm" class="me-1" />Cargando...
+              } @else {
+                <fa-icon icon="plus" class="me-1" />Agregar producto
+              }
+            </button>
+          </div>
+        </c-card-header>
+        <c-card-body class="p-0">
+
+          @if (items().length === 0) {
+            <div class="text-center text-body-secondary py-5 small">
+              <fa-icon icon="box-open" class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+              Sin productos. Usa el botón para agregar.
+            </div>
+          } @else {
+
+            <!-- Desktop: tabla compacta -->
+            <div class="d-none d-sm-block table-responsive">
+              <table class="table table-sm table-hover mb-0 align-middle" style="font-size:.83rem;">
+                <thead class="text-body-secondary">
+                  <tr>
+                    <th class="ps-3">Producto</th>
+                    <th class="text-center" style="width:70px;">Cant.</th>
+                    <th class="text-center" style="width:60px;">Bon.</th>
+                    <th class="text-end" style="width:85px;">Costo</th>
+                    <th class="text-end" style="width:85px;">Subtotal</th>
+                    <th style="width:70px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (it of items(); track $index; let i = $index) {
+                    <tr>
+                      <td class="ps-3">
+                        <div class="fw-medium lh-sm">
+                          @if (it.product.laboratory?.name) {
+                            <span class="text-info me-1">{{ it.product.laboratory?.name }}</span>
+                          }
+                          {{ it.product.name }}
+                        </div>
+                        @if (it.expected_lot || it.expected_expiry_date) {
+                          <div class="text-body-secondary" style="font-size:.7rem;">
+                            @if (it.expected_lot) {
+                              <fa-icon icon="tag" class="me-1" />Lote: {{ it.expected_lot }}
+                            }
+                            @if (it.expected_expiry_date) {
+                              <span class="ms-2">
+                                <fa-icon icon="calendar" class="me-1" />Vence: {{ it.expected_expiry_date | date:'dd/MM/yyyy' }}
+                              </span>
+                            }
+                          </div>
+                        }
+                        @if (it.item_notes) {
+                          <div class="text-body-secondary fst-italic" style="font-size:.7rem;">{{ it.item_notes }}</div>
+                        }
+                      </td>
+                      <td class="text-center fw-medium">{{ it.expected_quantity }}</td>
+                      <td class="text-center">
+                        @if (it.bonus_quantity > 0) {
+                          <span class="text-success fw-medium">+{{ it.bonus_quantity }}</span>
+                        } @else {
+                          <span class="text-body-secondary">—</span>
+                        }
+                      </td>
+                      <td class="text-end">S/ {{ it.unit_cost | number:'1.2-2' }}</td>
+                      <td class="text-end fw-semibold">S/ {{ it.expected_quantity * it.unit_cost | number:'1.2-2' }}</td>
+                      <td class="text-end pe-2">
+                        <div class="d-inline-flex gap-1">
+                          <button type="button" class="btn btn-xs btn-outline-secondary"
+                                  style="padding:2px 6px;" (click)="openEditItem(i)" title="Editar">
+                            <fa-icon icon="pencil" />
+                          </button>
+                          <button type="button" class="btn btn-xs btn-outline-danger"
+                                  style="padding:2px 6px;" (click)="removeItem(i)" title="Eliminar">
+                            <fa-icon icon="trash" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Mobile: cards -->
+            <div class="d-sm-none d-flex flex-column gap-2 p-2">
+              @for (it of items(); track $index; let i = $index) {
+                <div class="border rounded p-2" style="font-size:.83rem;">
+                  <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                    <div class="flex-grow-1 overflow-hidden">
+                      <div class="fw-medium lh-sm">
+                        @if (it.product.laboratory?.name) {
+                          <span class="text-info me-1">{{ it.product.laboratory?.name }}</span>
+                        }
+                        {{ it.product.name }}
+                      </div>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0">
+                      <button type="button" class="btn btn-xs btn-outline-secondary"
+                              style="padding:2px 6px;" (click)="openEditItem(i)">
+                        <fa-icon icon="pencil" />
+                      </button>
+                      <button type="button" class="btn btn-xs btn-outline-danger"
+                              style="padding:2px 6px;" (click)="removeItem(i)">
+                        <fa-icon icon="trash" />
+                      </button>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-3" style="font-size:.78rem;">
+                    <span>Cant: <strong>{{ it.expected_quantity }}</strong></span>
+                    @if (it.bonus_quantity > 0) {
+                      <span class="text-success">Bon: +{{ it.bonus_quantity }}</span>
+                    }
+                    <span>Costo: S/{{ it.unit_cost | number:'1.2-2' }}</span>
+                    <span class="fw-semibold ms-auto">S/{{ it.expected_quantity * it.unit_cost | number:'1.2-2' }}</span>
+                  </div>
+                  @if (it.expected_lot || it.expected_expiry_date || it.item_notes) {
+                    <div class="text-body-secondary mt-1" style="font-size:.72rem;">
+                      @if (it.expected_lot) { Lote: {{ it.expected_lot }} }
+                      @if (it.expected_expiry_date) {
+                        @if (it.expected_lot) { · }
+                        Vence: {{ it.expected_expiry_date | date:'dd/MM/yyyy' }}
+                      }
+                      @if (it.item_notes) { · {{ it.item_notes }} }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- Total -->
+            <div class="text-end border-top px-3 py-2">
+              <span class="text-body-secondary me-2 small">Total orden:</span>
+              <strong class="fs-5">S/ {{ subtotal | number:'1.2-2' }}</strong>
+            </div>
+          }
+
+        </c-card-body>
+      </c-card>
+    </div>
+
+    <!-- ── Alertas de stock ────────────────────────────────────────── col-lg-3 -->
+    <div class="col-lg-3"
+         [class.d-none]="activeTab() !== 'reposicion'"
+         [class.d-sm-block]="true">
+      <c-card>
+        <c-card-header>
+          <div class="d-flex align-items-center gap-2">
+            <strong>Alertas de stock</strong>
+            @if (lowStock().length + expiringSoon().length > 0) {
+              <span class="badge bg-danger" style="font-size:.7rem;">
+                {{ lowStock().length + expiringSoon().length }}
+              </span>
+            }
+          </div>
+        </c-card-header>
+        <c-card-body class="p-2">
+
+          @if (lowStock().length === 0 && expiringSoon().length === 0) {
+            <div class="text-center text-body-secondary py-4 small">
+              <fa-icon icon="circle-check" class="d-block mb-1" style="font-size:1.5rem;opacity:.4;" />
+              Todo en orden
+            </div>
+          }
+
+          @if (lowStock().length) {
+            <div class="mb-3">
+              <div class="fw-semibold small text-danger mb-2 px-1">
+                <fa-icon icon="triangle-exclamation" class="me-1" />Stock bajo ({{ lowStock().length }})
+              </div>
+              <div class="d-flex flex-column gap-1">
+                @for (p of lowStock(); track p.id) {
+                  <div class="d-flex align-items-center justify-content-between rounded px-2 py-1"
+                       style="font-size:.78rem;border-left:3px solid var(--cui-danger);">
+                    <div class="flex-grow-1 overflow-hidden">
+                      <div class="fw-medium text-truncate">
+                        @if (p.laboratory?.name) {
+                          <span class="text-info me-1">{{ p.laboratory?.name }}</span>
+                        }
+                        {{ p.name }}
+                      </div>
+                    </div>
+                    <div class="text-end flex-shrink-0 ms-2 text-nowrap">
+                      <span class="text-danger fw-bold">{{ p.lots_info?.available_stock ?? 0 }}</span>
+                      <span class="text-body-secondary"> /{{ p.min_stock }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (expiringSoon().length) {
+            <div>
+              <div class="fw-semibold small text-warning mb-2 px-1">
+                <fa-icon icon="clock" class="me-1" />Vencen en 60 días ({{ expiringSoon().length }})
+              </div>
+              <div class="d-flex flex-column gap-1">
+                @for (p of expiringSoon(); track p.id) {
+                  <div class="d-flex align-items-center justify-content-between rounded px-2 py-1"
+                       style="font-size:.78rem;border-left:3px solid var(--cui-warning);">
+                    <div class="flex-grow-1 overflow-hidden">
+                      <div class="fw-medium text-truncate">
+                        @if (p.laboratory?.name) {
+                          <span class="text-info me-1">{{ p.laboratory?.name }}</span>
+                        }
+                        {{ p.name }}
+                      </div>
+                      <div class="text-body-secondary" style="font-size:.7rem;">
+                        Lote: {{ p.lots_info?.nearest_expiry?.lot_number ?? '—' }}
+                        · {{ p.lots_info?.nearest_expiry?.stock }} uds
+                      </div>
+                    </div>
+                    <div class="text-end flex-shrink-0 ms-2 text-nowrap">
+                      <span class="text-warning fw-bold">
+                        {{ p.lots_info?.nearest_expiry?.expiry_date | date:'dd/MM/yy' }}
+                      </span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+        </c-card-body>
+      </c-card>
+    </div>
+
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mt-3">
+    <button type="button" class="btn btn-outline-secondary" routerLink="/purchases/orders">
+      Cancelar
+    </button>
+    <button type="submit" class="btn btn-primary" [disabled]="saving()">
+      @if (saving()) {
+        <c-spinner size="sm" class="me-1" />Guardando...
+      } @else {
+        <fa-icon icon="save" class="me-1" />{{ isEdit ? 'Guardar cambios' : 'Crear orden' }}
+      }
+    </button>
+  </div>
+
+</form>
+
+}

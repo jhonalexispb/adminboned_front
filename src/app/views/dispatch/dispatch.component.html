@@ -1,0 +1,424 @@
+<app-page-header title="Despacho" subtitle="Pedidos listos para cargar y en ruta">
+  <button class="btn btn-outline-secondary btn-sm" (click)="load()">
+    <fa-icon icon="rotate" class="me-1" />Actualizar
+  </button>
+</app-page-header>
+
+<!-- ── Pestañas ──────────────────────────────────────────────────────────── -->
+<ul class="nav nav-tabs nav-fill mb-3">
+  <li class="nav-item">
+    <button class="nav-link d-flex flex-column align-items-center justify-content-center gap-1 w-100"
+            [class.active]="activeTab() === 'assembled'"
+            (click)="activeTab.set('assembled')">
+      <span class="position-relative d-inline-flex p-1">
+        <fa-icon icon="box" />
+        @if (toLoad().length) {
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark"
+                style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
+            {{ toLoad().length }}
+          </span>
+        }
+      </span>
+      <span style="font-size:.75rem;">Por cargar</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link d-flex flex-column align-items-center justify-content-center gap-1 w-100"
+            [class.active]="activeTab() === 'dispatched'"
+            (click)="activeTab.set('dispatched')">
+      <span class="position-relative d-inline-flex p-1">
+        <fa-icon icon="truck" />
+        @if (inTransit().length) {
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-info text-white"
+                style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
+            {{ inTransit().length }}
+          </span>
+        }
+      </span>
+      <span style="font-size:.75rem;">En ruta</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link d-flex flex-column align-items-center justify-content-center gap-1 w-100"
+            [class.active]="activeTab() === 'delivered'"
+            (click)="activeTab.set('delivered')">
+      <span class="position-relative d-inline-flex p-1">
+        <fa-icon icon="money-bill-wave" />
+        @if (toCollect().length) {
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success"
+                style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
+            {{ toCollect().length }}
+          </span>
+        }
+      </span>
+      <span style="font-size:.75rem;">Por cobrar</span>
+    </button>
+  </li>
+</ul>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ POR CARGAR ════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'assembled') {
+    @if (!toLoad().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        <fa-icon icon="box" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+        Sin pedidos listos para cargar.
+      </div>
+    } @else {
+      <!-- Mobile -->
+      <div class="d-md-none d-flex flex-column gap-3">
+        @for (o of toLoad(); track o.id) {
+          <c-card class="border-warning" style="border-width:2px!important;">
+            <c-card-body class="px-3 py-2">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="font-monospace fw-bold" style="font-size:.9rem;">{{ o.code }}</span>
+                <span class="text-body-secondary small">{{ o.created_at | date:'dd/MM/yy' }}</span>
+              </div>
+              <div class="fw-semibold mb-1">{{ clientName(o) }}</div>
+              @if (o.client?.phone) {
+                <a [href]="'tel:' + o.client!.phone" class="text-body-secondary small text-decoration-none d-block mb-2">
+                  <fa-icon icon="phone" class="me-1" style="font-size:.75rem;" />{{ o.client!.phone }}
+                </a>
+              }
+              @if (o.shipping?.carrier) {
+                <div class="text-body-secondary small mb-2">
+                  <fa-icon icon="truck" class="me-1" />{{ o.shipping!.carrier!.name }}
+                  @if (carrierGeo(o)) { · {{ carrierGeo(o) }} }
+                </div>
+              }
+              <div class="mt-2 pt-2 border-top">
+                <div class="fw-bold mb-2">S/ {{ o.total | number:'1.2-2' }}</div>
+                <div class="d-flex gap-2">
+                  <button cButton color="warning"
+                          class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1 text-dark"
+                          style="min-height:58px; font-size:.78rem;"
+                          (click)="askConfirm(o, 'dispatched')">
+                    <fa-icon icon="truck" /><span>Cargar</span>
+                  </button>
+                  <button cButton color="secondary" variant="ghost"
+                          class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1"
+                          style="min-height:58px; font-size:.78rem;"
+                          (click)="previewId.set(o.id)">
+                    <fa-icon icon="eye" /><span>Ver</span>
+                  </button>
+                </div>
+              </div>
+            </c-card-body>
+          </c-card>
+        }
+      </div>
+
+      <!-- Desktop -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.875rem">
+            <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3" style="width:130px">Código</th>
+                <th>Cliente</th>
+                <th>Transportista / Destino</th>
+                <th class="text-end" style="width:100px">Total</th>
+                <th style="width:160px">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of toLoad(); track o.id) {
+                <tr>
+                  <td class="ps-3">
+                    <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ o.code }}</div>
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ o.created_at | date:'dd/MM/yy' }}</div>
+                  </td>
+                  <td>
+                    <div class="fw-medium">{{ clientName(o) }}</div>
+                    @if (o.client?.phone) {
+                      <a [href]="'tel:' + o.client!.phone" class="text-body-secondary small text-decoration-none">
+                        <fa-icon icon="phone" class="me-1" style="font-size:.7rem;" />{{ o.client!.phone }}
+                      </a>
+                    }
+                  </td>
+                  <td>
+                    @if (o.shipping?.type) {
+                      <div class="d-flex align-items-center gap-1 mb-1">
+                        <fa-icon [icon]="o.shipping!.type === 'province' ? 'truck' : 'location-dot'"
+                                 class="text-warning" style="font-size:.8rem;" />
+                        <span class="fw-medium small">{{ o.shipping!.type === 'province' ? 'Provincia' : 'Local' }}</span>
+                      </div>
+                      @if (o.shipping!.carrier) {
+                        <div class="fw-medium small">{{ o.shipping!.carrier.name }}</div>
+                        @if (carrierGeo(o)) {
+                          <div class="text-body-secondary" style="font-size:.72rem;">{{ carrierGeo(o) }}</div>
+                        }
+                      }
+                      @if (o.shipping!.address) {
+                        <div class="text-body-secondary" style="font-size:.72rem;">{{ o.shipping!.address }}</div>
+                      }
+                    } @else {
+                      <span class="text-body-secondary small">—</span>
+                    }
+                  </td>
+                  <td class="text-end fw-semibold">S/ {{ o.total | number:'1.2-2' }}</td>
+                  <td>
+                    <div class="d-inline-flex gap-2">
+                      <button class="btn btn-sm btn-warning d-flex flex-column align-items-center text-dark"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="askConfirm(o, 'dispatched')">
+                        <fa-icon icon="truck" /><small>Cargar</small>
+                      </button>
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="previewId.set(o.id)">
+                        <fa-icon icon="eye" /><small>Ver</small>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
+  <!-- ══ EN RUTA ══════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'dispatched') {
+    @if (!inTransit().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        <fa-icon icon="truck" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+        Sin pedidos en camino.
+      </div>
+    } @else {
+      <!-- Mobile -->
+      <div class="d-md-none d-flex flex-column gap-3">
+        @for (o of inTransit(); track o.id) {
+          <c-card class="border-info" style="border-width:2px!important;">
+            <c-card-body class="px-3 py-2">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="font-monospace fw-bold" style="font-size:.9rem;">{{ o.code }}</span>
+                <c-badge color="info">En ruta</c-badge>
+              </div>
+              <div class="fw-semibold mb-1">{{ clientName(o) }}</div>
+              @if (o.shipping?.carrier) {
+                <div class="text-body-secondary small mb-2">
+                  <fa-icon icon="truck" class="me-1" />{{ o.shipping!.carrier!.name }}
+                </div>
+              }
+              <div class="mt-2 pt-2 border-top">
+                <div class="fw-bold mb-2">S/ {{ o.total | number:'1.2-2' }}</div>
+                <div class="d-flex gap-2 mb-2">
+                  <button cButton color="success"
+                          class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1"
+                          style="min-height:58px; font-size:.78rem;"
+                          (click)="askConfirm(o, 'delivered')">
+                    <fa-icon icon="check" /><span>Entregado</span>
+                  </button>
+                  <button cButton color="secondary" variant="ghost"
+                          class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1"
+                          style="min-height:58px; font-size:.78rem;"
+                          (click)="previewId.set(o.id)">
+                    <fa-icon icon="eye" /><span>Ver</span>
+                  </button>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                        style="font-size:.8rem;" (click)="undoDispatch(o)">
+                  <fa-icon icon="rotate-left" class="me-1" />Deshacer → volver a Por cargar
+                </button>
+              </div>
+            </c-card-body>
+          </c-card>
+        }
+      </div>
+
+      <!-- Desktop -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.875rem">
+            <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3" style="width:130px">Código</th>
+                <th>Cliente</th>
+                <th>Transportista</th>
+                <th class="text-end" style="width:100px">Total</th>
+                <th style="width:220px">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of inTransit(); track o.id) {
+                <tr>
+                  <td class="ps-3">
+                    <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ o.code }}</div>
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ o.created_at | date:'dd/MM/yy' }}</div>
+                  </td>
+                  <td>
+                    <div class="fw-medium">{{ clientName(o) }}</div>
+                    @if (o.client?.phone) {
+                      <a [href]="'tel:' + o.client!.phone" class="text-body-secondary small text-decoration-none">
+                        <fa-icon icon="phone" class="me-1" style="font-size:.7rem;" />{{ o.client!.phone }}
+                      </a>
+                    }
+                  </td>
+                  <td>
+                    @if (o.shipping?.carrier) {
+                      <div class="fw-medium small">{{ o.shipping!.carrier!.name }}</div>
+                      @if (o.shipping!.carrier!.phone) {
+                        <a [href]="'tel:' + o.shipping!.carrier!.phone"
+                           class="text-body-secondary text-decoration-none small">
+                          <fa-icon icon="phone" class="me-1" style="font-size:.7rem;" />{{ o.shipping!.carrier!.phone }}
+                        </a>
+                      }
+                      @if (carrierGeo(o)) {
+                        <div class="text-body-secondary" style="font-size:.72rem;">{{ carrierGeo(o) }}</div>
+                      }
+                    } @else {
+                      <span class="text-body-secondary small">—</span>
+                    }
+                  </td>
+                  <td class="text-end fw-semibold">S/ {{ o.total | number:'1.2-2' }}</td>
+                  <td>
+                    <div class="d-inline-flex gap-2">
+                      <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="askConfirm(o, 'delivered')">
+                        <fa-icon icon="check" /><small>Entregado</small>
+                      </button>
+                      <button class="btn btn-sm btn-warning d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="undoDispatch(o)">
+                        <fa-icon icon="rotate-left" /><small>Deshacer</small>
+                      </button>
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="previewId.set(o.id)">
+                        <fa-icon icon="eye" /><small>Ver</small>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
+  <!-- ══ POR COBRAR ════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'delivered') {
+    @if (!toCollect().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        <fa-icon icon="money-bill-wave" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+        Sin pedidos entregados pendientes de cobro.
+      </div>
+    } @else {
+      <!-- Mobile -->
+      <div class="d-md-none d-flex flex-column gap-3">
+        @for (o of toCollect(); track o.id) {
+          <c-card class="border-success" style="border-width:2px!important;">
+            <c-card-body class="px-3 py-2">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="font-monospace fw-bold" style="font-size:.9rem;">{{ o.code }}</span>
+                <c-badge color="success">Entregado</c-badge>
+              </div>
+              <div class="fw-semibold mb-1">{{ clientName(o) }}</div>
+              @if (o.client?.phone) {
+                <a [href]="'tel:' + o.client!.phone" class="text-body-secondary small text-decoration-none d-block mb-2">
+                  <fa-icon icon="phone" class="me-1" style="font-size:.75rem;" />{{ o.client!.phone }}
+                </a>
+              }
+              <div class="mt-2 pt-2 border-top">
+                <div class="fw-bold mb-2">S/ {{ o.total | number:'1.2-2' }}</div>
+                <div class="text-body-secondary mb-2" style="font-size:.78rem;">
+                  <fa-icon icon="circle-info" class="me-1 text-info" />Registra el cobro en <strong>Mis Pedidos</strong>.
+                </div>
+                <div class="d-flex gap-2 mb-2">
+                  <button cButton color="secondary" variant="ghost"
+                          class="flex-grow-1 d-flex flex-column align-items-center justify-content-center gap-1"
+                          style="min-height:58px; font-size:.78rem;"
+                          (click)="previewId.set(o.id)">
+                    <fa-icon icon="eye" /><span>Ver</span>
+                  </button>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                        style="font-size:.8rem;" (click)="undoDispatch(o)">
+                  <fa-icon icon="rotate-left" class="me-1" />Deshacer → volver a En ruta
+                </button>
+              </div>
+            </c-card-body>
+          </c-card>
+        }
+      </div>
+
+      <!-- Desktop -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.875rem">
+            <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3" style="width:130px">Código</th>
+                <th>Cliente</th>
+                <th style="width:100px">Envío</th>
+                <th class="text-end" style="width:100px">Total</th>
+                <th style="width:220px">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of toCollect(); track o.id) {
+                <tr>
+                  <td class="ps-3">
+                    <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ o.code }}</div>
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ o.created_at | date:'dd/MM/yy' }}</div>
+                  </td>
+                  <td>
+                    <div class="fw-medium">{{ clientName(o) }}</div>
+                    @if (o.client?.phone) {
+                      <a [href]="'tel:' + o.client!.phone" class="text-body-secondary small text-decoration-none">
+                        <fa-icon icon="phone" class="me-1" style="font-size:.7rem;" />{{ o.client!.phone }}
+                      </a>
+                    }
+                  </td>
+                  <td class="small text-body-secondary">
+                    {{ o.shipping?.type === 'province' ? 'Provincia' : o.shipping?.type === 'local' ? 'Local' : '—' }}
+                  </td>
+                  <td class="text-end fw-semibold">S/ {{ o.total | number:'1.2-2' }}</td>
+                  <td>
+                    <div class="d-inline-flex gap-2">
+                      <button class="btn btn-sm btn-warning d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="undoDispatch(o)">
+                        <fa-icon icon="rotate-left" /><small>Deshacer</small>
+                      </button>
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              (click)="previewId.set(o.id)">
+                        <fa-icon icon="eye" /><small>Ver</small>
+                      </button>
+                    </div>
+                    <div class="text-body-secondary mt-1" style="font-size:.7rem;">
+                      <fa-icon icon="circle-info" class="me-1 text-info" />Cobrar en Mis Pedidos
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
+} <!-- /loading -->
+
+<!-- ── Modal preview ─────────────────────────────────────────────────────── -->
+<app-order-preview-modal
+  [orderId]="previewId()"
+  (closed)="previewId.set(null)" />
+
+<app-confirm-action-modal
+  [action]="confirmAction()"
+  [confirming]="confirming()"
+  (confirmed)="onConfirmed($event)"
+  (cancelled)="confirmAction.set(null)" />
+

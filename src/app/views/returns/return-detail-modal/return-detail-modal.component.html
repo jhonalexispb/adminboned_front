@@ -1,0 +1,142 @@
+<c-modal [visible]="!!return_()" (visibleChange)="!$event && close()" alignment="center" size="lg">
+  @if (return_(); as r) {
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="rotate-left" class="me-2" />{{ r.code }}
+      </h5>
+    </c-modal-header>
+    <c-modal-body>
+
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <c-badge [textBgColor]="statusColors[r.status]" style="font-size:.85rem; padding:.4em .8em;">
+          {{ statusLabels[r.status] }}
+        </c-badge>
+        @if (r.status === 'pending') {
+          <span class="text-body-secondary small">
+            <fa-icon icon="clock" class="me-1" />Pendiente de revisión
+          </span>
+        }
+        @if (r.action_type === 'credit_note') {
+          <span class="text-success small">
+            <fa-icon icon="check" class="me-1" />Nota de Crédito emitida
+          </span>
+        }
+      </div>
+
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <div class="border rounded p-3 h-100" style="font-size:.875rem;">
+            <div class="fw-semibold mb-2 text-body-secondary small text-uppercase">Información</div>
+            <div class="mb-1"><strong>Cliente:</strong> {{ clientName(r) }}</div>
+            <div class="mb-1"><strong>Pedido:</strong> {{ r.order?.code ?? '—' }}</div>
+            @if (r.sale_document) {
+              <div class="mb-1">
+                <strong>Documento:</strong>
+                <span class="font-monospace ms-1">{{ r.sale_document.full_number }}</span>
+              </div>
+            }
+            <div class="mb-1"><strong>Tipo:</strong> {{ r.type === 'full' ? 'Total' : 'Parcial' }}</div>
+            <div><strong>Fecha:</strong> {{ r.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="border rounded p-3 h-100" style="font-size:.875rem;">
+            <div class="fw-semibold mb-2 text-body-secondary small text-uppercase">Motivo</div>
+            <p class="mb-0" style="white-space:pre-wrap;">{{ r.reason }}</p>
+          </div>
+        </div>
+
+        @if (r.items && r.items.length > 0) {
+          <div class="col-12">
+            <div class="border rounded p-3" style="font-size:.875rem;">
+              <div class="fw-semibold mb-2 text-body-secondary small text-uppercase">Productos a devolver</div>
+              <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                  <thead style="font-size:.78rem">
+                    <tr>
+                      <th>Producto</th>
+                      <th style="width:110px">Lote / Venc.</th>
+                      <th class="text-end" style="width:70px">Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of r.items; track item.id) {
+                      <tr>
+                        <td>{{ item.product_name ?? '—' }}</td>
+                        <td>
+                          @if (item.lot_number) {
+                            <span class="font-monospace small d-block">{{ item.lot_number }}</span>
+                            @if (item.expiry_date) {
+                              <span class="text-body-secondary d-block" style="font-size:.7rem;">
+                                {{ item.expiry_date | date:'dd/MM/yyyy' }}
+                              </span>
+                            }
+                          } @else {
+                            <span class="text-body-secondary small">—</span>
+                          }
+                        </td>
+                        <td class="text-end fw-semibold">{{ item.quantity }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        } @else if (loadingItems()) {
+          <div class="col-12">
+            <div class="border rounded p-3 text-center text-body-secondary" style="font-size:.875rem;">
+              <c-spinner size="sm" class="me-2" />Cargando productos...
+            </div>
+          </div>
+        }
+
+        @if (r.credit_note) {
+          <div class="col-12">
+            <div class="d-flex align-items-center gap-2 text-success small mb-2">
+              <fa-icon icon="check-circle" />
+              <span>
+                Nota de Crédito{{ r.credit_note.is_internal ? ' (interna)' : '' }}:
+                <strong class="font-monospace">{{ r.credit_note.full_number }}</strong>
+                — S/ {{ r.credit_note.total | number:'1.2-2' }}
+              </span>
+            </div>
+            <div class="d-flex gap-2">
+              @if (r.credit_note.is_internal) {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                        style="min-width:44px; font-size:.68rem;"
+                        [disabled]="downloadingPdf()" (click)="downloadInternalPdf(r)">
+                  @if (downloadingPdf()) { <c-spinner size="sm" /> } @else { <fa-icon icon="file-pdf" /> }
+                  <small>PDF</small>
+                </button>
+              } @else {
+                @if (r.credit_note.pdf_url) {
+                  <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                          style="min-width:44px; font-size:.68rem;" (click)="openNcFile(r, 'pdf')">
+                    <fa-icon icon="file-pdf" /><small>PDF</small>
+                  </button>
+                }
+                @if (r.credit_note.xml_url) {
+                  <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                          style="min-width:44px; font-size:.68rem;" (click)="openNcFile(r, 'xml')">
+                    <fa-icon icon="file-code" /><small>XML</small>
+                  </button>
+                }
+                @if (r.credit_note.cdr_url) {
+                  <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                          style="min-width:44px; font-size:.68rem;" (click)="openNcFile(r, 'zip')">
+                    <fa-icon icon="file-zipper" /><small>CDR</small>
+                  </button>
+                }
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" (click)="close()">Cerrar</button>
+    </c-modal-footer>
+  }
+</c-modal>

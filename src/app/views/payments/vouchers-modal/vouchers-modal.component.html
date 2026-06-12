@@ -1,0 +1,25 @@
+<c-modal [visible]="!!payment()" (visibleChange)="!$event && closed.emit()" alignment="center" size="lg">
+  @if (payment(); as p) {
+    <c-modal-header>
+      <h5 cModalTitle><fa-icon icon="paperclip" class="me-2" />Comprobantes — {{ p.code }}</h5>
+    </c-modal-header>
+    <c-modal-body>
+      <div class="d-flex flex-column gap-3">
+        @for (v of p.vouchers; track v.id) {
+          <div class="border rounded p-3">
+            @if (v.description) {
+              <div class="small fw-medium mb-2">{{ v.description }}</div>
+            }
+            <img [src]="v.url" alt="Comprobante" class="img-fluid rounded"
+                 style="max-height:400px; object-fit:contain;" />
+          </div>
+        } @empty {
+          <p class="text-body-secondary text-center py-3 mb-0 small">Sin comprobantes adjuntos.</p>
+        }
+      </div>
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" (click)="closed.emit()">Cerrar</button>
+    </c-modal-footer>
+  }
+</c-modal>

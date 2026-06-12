@@ -1,0 +1,448 @@
+<!-- ══════════════════════════════════════════════════════════════════════
+     MODO BULK — Seleccionar y cuantificar productos
+══════════════════════════════════════════════════════════════════════ -->
+@if (!editItem) {
+
+<div class="modal-header py-2">
+  <h5 class="modal-title d-flex align-items-center gap-2">
+    <fa-icon icon="cart-plus" class="text-primary" />
+    Agregar productos
+    @if (selectedCount > 0) {
+      <span class="badge text-bg-primary" style="font-size:.72rem;">{{ selectedCount }}</span>
+    }
+  </h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body p-0">
+
+  <!-- Barra de búsqueda -->
+  <div class="px-3 pt-3 pb-2 border-bottom">
+    <div class="input-group input-group-sm">
+      <span class="input-group-text border-end-0 bg-transparent">
+        <fa-icon icon="search" class="text-body-secondary" />
+      </span>
+      <input type="text" class="form-control border-start-0"
+             placeholder="Buscar por nombre o SKU..."
+             [(ngModel)]="search" />
+      @if (search) {
+        <button class="btn btn-outline-secondary" type="button" (click)="search = ''">
+          <fa-icon icon="xmark" />
+        </button>
+      }
+      <button class="btn btn-outline-secondary" type="button"
+              title="Crear nuevo producto" (click)="openNewProduct()">
+        <fa-icon icon="plus" />
+      </button>
+    </div>
+
+    <!-- Filtros por laboratorio (multi-select) + gestión de labs -->
+    <div class="d-flex flex-wrap gap-1 mt-2 align-items-center">
+
+      @if (labs.length > 0) {
+        <span class="text-body-secondary me-1" style="font-size:.72rem;">Lab:</span>
+        <button type="button" class="btn btn-sm py-0 px-2"
+                [class.btn-secondary]="selectedLabs.length === 0"
+                [class.btn-outline-secondary]="selectedLabs.length > 0"
+                style="font-size:.7rem;"
+                (click)="selectedLabs = []">Todos</button>
+        @for (lab of labs; track lab.id) {
+          <button type="button" class="btn btn-sm py-0 px-2"
+                  [class.btn-primary]="selectedLabs.includes(lab.id)"
+                  [class.btn-outline-secondary]="!selectedLabs.includes(lab.id)"
+                  style="font-size:.7rem;"
+                  (click)="selectedLabs = selectedLabs.includes(lab.id)
+                    ? selectedLabs.filter(id => id !== lab.id)
+                    : [...selectedLabs, lab.id]">
+            {{ lab.name }}
+          </button>
+        }
+      }
+
+      <!-- Botón para gestionar labs del proveedor -->
+      @if (supplier) {
+        <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 ms-auto"
+                style="font-size:.7rem;"
+                [disabled]="loadingNewProducts()"
+                (click)="openManageLabs()">
+          @if (loadingNewProducts()) {
+            <c-spinner size="sm" class="me-1" />Actualizando...
+          } @else {
+            <fa-icon icon="flask" class="me-1" />+ Laboratorio
+          }
+        </button>
+      }
+
+    </div>
+  </div>
+
+  <!-- Lista de productos -->
+  <div style="max-height:62vh; overflow-y:auto;">
+
+    @if (filteredProducts.length === 0) {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="box-open" class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+        <div>Sin productos disponibles.</div>
+        @if (search) { <div class="small mt-1">Intenta con otro término.</div> }
+      </div>
+    }
+
+    @for (p of filteredProducts; track p.id) {
+
+      <!-- Borde izquierdo verde cuando qty>0, transparente cuando no — sin cambio de fondo -->
+      <div class="border-bottom px-3 py-2"
+           style="border-left: 3px solid transparent; transition: border-color .2s;"
+           [style.border-left-color]="getState(p.id).quantity > 0 ? 'var(--cui-success)' : 'transparent'">
+
+        <!-- ── Fila principal ──────────────────────────────────────────── -->
+        <div class="d-flex align-items-center gap-3">
+
+          <!-- Info del producto — clic para expandir/cerrar detalle -->
+          <div class="flex-grow-1 overflow-hidden"
+               [style.cursor]="getState(p.id).quantity > 0 ? 'pointer' : 'default'"
+               (click)="toggleExpanded(p.id)">
+            <div class="fw-semibold lh-sm" style="font-size:.87rem;" [title]="p.name">
+              @if (p.laboratory) {
+                <span class="text-info me-1">{{ p.laboratory.name }}</span>
+              }
+              {{ p.name }}
+            </div>
+            <div class="d-flex align-items-center flex-wrap gap-2 mt-1" style="font-size:.73rem;">
+              @if (p.lots_info) {
+                @let stock = p.lots_info.available_stock;
+                @let minStock = p.min_stock;
+                @if (stock === 0) {
+                  <span class="badge text-bg-danger" style="font-size:.62rem;">AGOTADO</span>
+                } @else if (minStock > 0 && stock <= minStock) {
+                  <span class="badge text-bg-warning text-dark" style="font-size:.62rem;">BAJO</span>
+                  <span class="text-warning fw-semibold">Stock: {{ stock }} / mín {{ minStock }}</span>
+                } @else {
+                  <span class="text-success">Stock: <strong>{{ stock }}</strong></span>
+                }
+              } @else {
+                <span class="badge text-bg-danger" style="font-size:.62rem;">AGOTADO</span>
+              }
+              @if (p.cost_price) {
+                <span class="text-body-secondary">S/ {{ +p.cost_price | number:'1.2-2' }}</span>
+              }
+              <!-- Subtotal + señal de precio inline -->
+              @if (getState(p.id).quantity > 0) {
+                <span class="fw-semibold text-success">
+                  = S/ {{ getState(p.id).quantity * getState(p.id).unit_cost | number:'1.2-2' }}
+                </span>
+                @switch (priceSignal(p.id)) {
+                  @case ('good') {
+                    <span class="text-success fw-semibold" style="font-size:.68rem;" title="Precio igual o menor al mínimo histórico">
+                      <fa-icon icon="arrow-down" /> buen precio
+                    </span>
+                  }
+                  @case ('warn') {
+                    <span class="text-warning fw-semibold" style="font-size:.68rem;" title="Precio similar al mínimo histórico (menos del 10% más caro)">
+                      ≈ precio similar al mínimo
+                    </span>
+                  }
+                  @case ('bad') {
+                    <span class="text-danger fw-semibold" style="font-size:.68rem;" title="Más caro que el mínimo histórico">
+                      <fa-icon icon="arrow-up" /> S/ {{ priceData[p.id]?.globalMin | number:'1.2-2' }} fue el mínimo
+                    </span>
+                  }
+                }
+                <fa-icon [icon]="getState(p.id).expanded ? 'chevron-up' : 'chevron-down'"
+                         class="text-body-secondary" style="font-size:.62rem;" />
+              }
+            </div>
+          </div>
+
+          <!-- +/− solos, sin nada al lado -->
+          <div class="d-flex align-items-center gap-1 flex-shrink-0">
+            <button type="button"
+                    class="btn btn-sm"
+                    [class.btn-outline-danger]="getState(p.id).quantity > 0"
+                    [class.btn-outline-secondary]="getState(p.id).quantity === 0"
+                    style="width:32px;height:32px;padding:0;font-size:1.1rem;line-height:1;"
+                    (click)="decrement(p.id)">−</button>
+            <input type="number" min="0"
+                   class="form-control form-control-sm text-center fw-bold p-0"
+                   style="width:52px;font-size:.95rem;"
+                   [class.text-success]="getState(p.id).quantity > 0"
+                   [ngModel]="getState(p.id).quantity"
+                   (ngModelChange)="setQuantity(p, $event)" />
+            <button type="button" class="btn btn-sm btn-outline-primary"
+                    style="width:32px;height:32px;padding:0;font-size:1.1rem;line-height:1;"
+                    (click)="increment(p)">+</button>
+          </div>
+
+        </div>
+
+        <!-- ── Detalle expandible ──────────────────────────────────────── -->
+        @if (getState(p.id).quantity > 0) {
+          <div class="mt-2 pt-2 border-top" [hidden]="!getState(p.id).expanded">
+
+            <!-- Fila de campos numéricos/texto cortos -->
+            <div class="d-flex flex-wrap gap-2 align-items-end">
+
+              <div>
+                <label class="form-label mb-1 text-body-secondary" style="font-size:.7rem;">Costo (S/)</label>
+                <input type="number" class="form-control form-control-sm"
+                       style="width:82px;" step="0.01" min="0"
+                       [(ngModel)]="getState(p.id).unit_cost"
+                       (ngModelChange)="push()" />
+              </div>
+
+              <div>
+                <label class="form-label mb-1 text-success" style="font-size:.7rem;">Bonif.</label>
+                <input type="number" class="form-control form-control-sm"
+                       style="width:62px;" min="0"
+                       [(ngModel)]="getState(p.id).bonus"
+                       (ngModelChange)="push()" />
+              </div>
+
+              @if (p.tracks_lot) {
+                <div>
+                  <label class="form-label mb-1 text-body-secondary" style="font-size:.7rem;">Lote esperado</label>
+                  <input type="text" class="form-control form-control-sm"
+                         style="width:110px;" placeholder="Ej: L2025"
+                         [(ngModel)]="getState(p.id).lot"
+                         (ngModelChange)="push()" />
+                </div>
+              }
+
+              @if (p.tracks_expiry) {
+                <div class="flex-grow-1" style="min-width:140px;">
+                  <label class="form-label mb-1 text-body-secondary" style="font-size:.7rem;">Vencimiento</label>
+                  <input type="date" class="form-control form-control-sm w-100"
+                         [(ngModel)]="getState(p.id).expiry"
+                         (ngModelChange)="push()" />
+                </div>
+              }
+
+            </div>
+
+            <!-- Notas siempre full-width -->
+            <div class="mt-2">
+              <input type="text" class="form-control form-control-sm w-100"
+                     placeholder="Notas del ítem (opcional)"
+                     [(ngModel)]="getState(p.id).notes"
+                     (ngModelChange)="push()" />
+            </div>
+
+            <!-- Historial de precios del producto (cargado una sola vez, cacheado) -->
+            @if (priceData[p.id]; as pd) {
+              @if (pd.rows.length > 0) {
+                <div class="mt-2 pt-2 border-top">
+                  <div class="text-body-secondary mb-1" style="font-size:.7rem;">
+                    Historial de precios
+                    @if (pd.globalMin != null) {
+                      <span class="text-success ms-1">· mínimo histórico S/ {{ pd.globalMin | number:'1.2-2' }}</span>
+                    }
+                  </div>
+                  <div class="table-responsive">
+                    <table class="table table-sm mb-0" style="font-size:.72rem;">
+                      <thead>
+                        <tr class="text-body-secondary">
+                          <th>Proveedor</th>
+                          <th>Origen</th>
+                          <th class="text-end">Últ. precio</th>
+                          <th class="text-end">Mínimo</th>
+                          <th class="text-end">Fecha</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (row of pd.rows; track row.supplier + row.source) {
+                          <tr>
+                            <td>{{ row.supplier }}</td>
+                            <td>{{ row.source }}</td>
+                            <td class="text-end">S/ {{ row.lastPrice | number:'1.2-2' }}</td>
+                            <td class="text-end fw-semibold"
+                                [class.text-success]="pd.globalMin != null && row.minPrice <= pd.globalMin">
+                              S/ {{ row.minPrice | number:'1.2-2' }}
+                            </td>
+                            <td class="text-end">{{ row.lastDate | date:'dd/MM/yyyy' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+            } @else if (priceData[p.id] === undefined) {
+              <div class="text-body-secondary mt-2 pt-2 border-top" style="font-size:.7rem;">
+                <c-spinner size="sm" class="me-1" />Cargando historial de precios...
+              </div>
+            }
+
+          </div>
+        }
+
+      </div>
+    }
+
+  </div>
+</div>
+
+<!-- Footer solo con Cerrar — ya no hay "Agregar" -->
+<div class="modal-footer py-2">
+  <span class="me-auto text-body-secondary small">
+    @if (selectedCount === 0) {
+      Usa + para agregar productos
+    } @else {
+      <strong class="text-success">{{ selectedCount }}</strong>
+      producto{{ selectedCount !== 1 ? 's' : '' }} en la orden
+    }
+  </span>
+  <button type="button" class="btn btn-primary btn-sm" (click)="modal.dismiss()">
+    <fa-icon icon="check" class="me-1" />Listo
+  </button>
+</div>
+
+} <!-- /bulk mode -->
+
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     MODO EDICIÓN — Editar ítem existente
+══════════════════════════════════════════════════════════════════════ -->
+@if (editItem && form) {
+
+<div class="modal-header">
+  <div class="overflow-hidden flex-grow-1 me-2">
+    <h5 class="modal-title text-truncate mb-0">
+      @if (editItem.product.laboratory?.name) {
+        <span class="text-info me-1">{{ editItem.product.laboratory?.name }}</span>
+      }
+      {{ editItem.product.name }}
+    </h5>
+  </div>
+  <button type="button" class="btn-close flex-shrink-0" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="border-bottom px-3 pt-2">
+  <ul class="nav nav-tabs border-0">
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="activeSection() === 'agregar'"
+              (click)="activeSection.set('agregar')">
+        <fa-icon icon="pencil" class="me-1" />Editar
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="activeSection() === 'historial'"
+              (click)="activeSection.set('historial')">
+        <fa-icon icon="chart-line" class="me-1" />Historial
+      </button>
+    </li>
+  </ul>
+</div>
+
+<div class="modal-body" [formGroup]="form">
+
+  @if (activeSection() === 'agregar') {
+
+    <div class="border rounded p-2 mb-3" style="font-size:.82rem;background:var(--cui-tertiary-bg)">
+      @if (editItem.product.sku) {
+        <div class="text-body-secondary mb-1" style="font-size:.72rem;">SKU: {{ editItem.product.sku }}</div>
+      }
+      @if (editItem.product.lots_info) {
+        <div class="d-flex flex-wrap gap-3">
+          <div class="text-center">
+            <div class="fw-bold text-success" style="font-size:1rem;">{{ editItem.product.lots_info.total_stock }}</div>
+            <div class="text-body-secondary" style="font-size:.68rem;">Físico</div>
+          </div>
+          <div class="text-center">
+            <div class="fw-bold text-info" style="font-size:1rem;">
+              {{ editItem.product.lots_info.total_stock - editItem.product.lots_info.available_stock }}
+            </div>
+            <div class="text-body-secondary" style="font-size:.68rem;">Reservado</div>
+          </div>
+          <div class="text-center">
+            <div class="fw-bold" style="font-size:1rem;"
+                 [class.text-danger]="editItem.product.lots_info.available_stock <= editItem.product.min_stock && editItem.product.min_stock > 0"
+                 [class.text-success]="editItem.product.lots_info.available_stock > editItem.product.min_stock">
+              {{ editItem.product.lots_info.available_stock }}
+            </div>
+            <div class="text-body-secondary" style="font-size:.68rem;">Disponible</div>
+          </div>
+          @if (editItem.product.min_stock > 0) {
+            <div class="text-center">
+              <div class="fw-bold text-body-secondary" style="font-size:1rem;">{{ editItem.product.min_stock }}</div>
+              <div class="text-body-secondary" style="font-size:.68rem;">Mínimo</div>
+            </div>
+          }
+        </div>
+        @if (editItem.product.lots_info.nearest_expiry) {
+          <div class="d-flex align-items-center gap-1 text-warning mt-1" style="font-size:.72rem;">
+            <fa-icon icon="clock" />
+            Próx. venc.: <strong>{{ editItem.product.lots_info.nearest_expiry.expiry_date | date:'dd/MM/yyyy' }}</strong>
+            · Lote {{ editItem.product.lots_info.nearest_expiry.lot_number }}
+          </div>
+        }
+      } @else {
+        <span class="text-body-secondary small">Sin datos de stock.</span>
+      }
+    </div>
+
+    <div class="row g-2">
+      <div class="col-4">
+        <label class="form-label small text-body-secondary mb-1">Cantidad <span class="text-danger">*</span></label>
+        <input cFormControl formControlName="expected_quantity" type="number" min="1"
+               [class.is-invalid]="form.get('expected_quantity')?.invalid && form.get('expected_quantity')?.touched" />
+      </div>
+      <div class="col-4">
+        <label class="form-label small text-body-secondary mb-1"><span class="text-success">Bonificación</span></label>
+        <input cFormControl formControlName="bonus_quantity" type="number" min="0" />
+      </div>
+      <div class="col-4">
+        <label class="form-label small text-body-secondary mb-1">Costo (S/) <span class="text-danger">*</span></label>
+        <input cFormControl formControlName="unit_cost" type="number" step="0.01" min="0"
+               [class.is-invalid]="form.get('unit_cost')?.invalid && form.get('unit_cost')?.touched" />
+      </div>
+      @if (tracksLot()) {
+        <div class="col-6">
+          <label class="form-label small text-body-secondary mb-1">Lote esperado</label>
+          <input cFormControl formControlName="expected_lot" type="text" placeholder="Ej: L2025" />
+        </div>
+      }
+      @if (tracksExpiry()) {
+        <div class="col-6">
+          <label class="form-label small text-body-secondary mb-1">Vencimiento esperado</label>
+          <input cFormControl formControlName="expected_expiry_date" type="date" />
+        </div>
+      }
+      <div class="col-12">
+        <input cFormControl formControlName="item_notes" type="text"
+               placeholder="Notas del ítem (opcional)" style="font-size:.82rem;" />
+      </div>
+    </div>
+
+    @if (form.get('expected_quantity')?.value || form.get('unit_cost')?.value) {
+      <div class="text-end mt-2 small text-body-secondary border-top pt-2">
+        Subtotal:
+        <strong class="text-body-emphasis">
+          S/ {{ (form.get('expected_quantity')?.value || 0) * (form.get('unit_cost')?.value || 0) | number:'1.2-2' }}
+        </strong>
+        @if ((form.get('bonus_quantity')?.value || 0) > 0) {
+          <span class="text-success ms-2">+ {{ form.get('bonus_quantity')?.value }} bon.</span>
+        }
+      </div>
+    }
+
+  }
+
+  @if (activeSection() === 'historial') {
+    @if (selectedProductId()) {
+      <app-product-cost-panel
+        [productId]="selectedProductId()"
+        [enteredPrice]="form.get('unit_cost')?.value"
+        [salePrice]="selectedProduct()?.base_price ? +selectedProduct()!.base_price : null">
+      </app-product-cost-panel>
+    }
+  }
+
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="button" class="btn btn-primary" [disabled]="form.invalid" (click)="confirmEdit()">
+    <fa-icon icon="check" class="me-1" />Guardar cambios
+  </button>
+</div>
+
+} <!-- /edit mode -->

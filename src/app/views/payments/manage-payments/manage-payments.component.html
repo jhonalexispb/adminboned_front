@@ -1,0 +1,799 @@
+<app-page-header title="Gestionar Pagos" subtitle="Validar depósitos y transferencias de repartidores">
+  <button class="btn btn-outline-secondary btn-sm" (click)="loadAll()">
+    <fa-icon icon="rotate" class="me-1" />Actualizar
+  </button>
+</app-page-header>
+
+<!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
+<ul class="nav nav-tabs nav-fill mb-3">
+  <li class="nav-item">
+    <button class="nav-link w-100 d-flex flex-column flex-sm-row align-items-center justify-content-center gap-1 gap-sm-2"
+            [class.active]="activeTab() === 'deposits'"
+            (click)="selectTab('deposits')">
+      <span class="position-relative d-inline-flex p-1">
+        <fa-icon icon="building-columns" />
+        @if (pendingDeposits().length) {
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
+            {{ pendingDeposits().length }}
+          </span>
+        }
+      </span>
+      <span style="font-size:.75rem;">Depósitos</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link w-100 d-flex flex-column flex-sm-row align-items-center justify-content-center gap-1 gap-sm-2"
+            [class.active]="activeTab() === 'transfers'"
+            (click)="selectTab('transfers')">
+      <span class="position-relative d-inline-flex p-1">
+        <fa-icon icon="right-left" />
+        @if (pendingTransfers().length) {
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
+            {{ pendingTransfers().length }}
+          </span>
+        }
+      </span>
+      <span style="font-size:.75rem;">Transferencias</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link w-100 d-flex flex-column flex-sm-row align-items-center justify-content-center gap-1 gap-sm-2"
+            [class.active]="activeTab() === 'cash'"
+            (click)="selectTab('cash')">
+      <span class="position-relative d-inline-flex p-1">
+        <fa-icon icon="money-bill-wave" />
+      </span>
+      <span style="font-size:.75rem;">Efectivo</span>
+    </button>
+  </li>
+</ul>
+
+<!-- ── Filtros ────────────────────────────────────────────────────────────── -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+      @if (activeTab() !== 'cash') {
+        <div class="col-6 col-md-3">
+          <label class="form-label small mb-1">Estado</label>
+          <select class="form-select form-select-sm" [ngModel]="filters().status" (ngModelChange)="setFilter('status', $event)">
+            <option value="">Todos</option>
+            <option value="pending">Pendiente</option>
+            <option value="validated">Validado</option>
+            <option value="rejected">Rechazado</option>
+          </select>
+        </div>
+      }
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Usuario</label>
+        <select class="form-select form-select-sm" [ngModel]="filters().person" (ngModelChange)="setFilter('person', $event)">
+          <option [ngValue]="null">Todos</option>
+          @for (p of people(); track p.id) {
+            <option [ngValue]="p.id">{{ p.name }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">N° Operación</label>
+        <input type="text" class="form-control form-control-sm" placeholder="Buscar..."
+               [ngModel]="filters().operation_number" (ngModelChange)="setFilter('operation_number', $event)"
+               (keyup.enter)="applyFilters()" />
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Desde</label>
+        <input type="date" class="form-control form-control-sm" [ngModel]="filters().date_from" (ngModelChange)="setFilter('date_from', $event)" />
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Hasta</label>
+        <input type="date" class="form-control form-control-sm" [ngModel]="filters().date_to" (ngModelChange)="setFilter('date_to', $event)" />
+      </div>
+      <div class="col-12 d-flex flex-wrap gap-2">
+        <button class="btn btn-primary btn-sm" (click)="applyFilters()">
+          <fa-icon icon="magnifying-glass" class="me-1" />Buscar
+        </button>
+        @if (hasActiveFilters()) {
+          <button class="btn btn-outline-secondary btn-sm" (click)="clearFilters()">
+            <fa-icon icon="xmark" class="me-1" />Limpiar filtros
+          </button>
+        }
+        <button class="btn btn-outline-primary btn-sm ms-md-auto" [disabled]="downloadingPdf()" (click)="downloadPdf()">
+          @if (downloadingPdf()) {
+            <c-spinner size="sm" class="me-1" />Generando...
+          } @else {
+            <fa-icon icon="file-pdf" class="me-1" />Generar PDF
+          }
+        </button>
+      </div>
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ DEPÓSITOS ══════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'deposits') {
+    @if (!deposits().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        @if (hasActiveFilters()) {
+          <fa-icon icon="filter-circle-xmark" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+          Sin resultados con estos filtros.
+        } @else {
+          <fa-icon icon="building-columns" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+          Sin depósitos registrados.
+        }
+      </div>
+    } @else {
+
+      <!-- Mobile -->
+      <div class="d-md-none d-flex flex-column gap-2">
+        @for (d of deposits(); track d.id) {
+          <div class="card shadow-sm"
+               [class.border-danger]="d.status === 'rejected'"
+               [class.border-success]="d.status === 'validated'"
+               [class.border-warning]="d.status === 'pending'"
+               style="border-width:2px!important; border-radius:12px; overflow:hidden;">
+            <div class="p-3">
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="font-monospace fw-bold" style="font-size:.82rem;">{{ d.code }}</span>
+                <div class="d-flex align-items-center gap-2">
+                  <c-badge [color]="depStatusColor[d.status]" style="font-size:.65rem;">{{ depStatusLabel[d.status] }}</c-badge>
+                  <span class="text-body-secondary" style="font-size:.7rem;">{{ d.deposit_date | date:'dd/MM/yy' }}</span>
+                </div>
+              </div>
+              <div class="fw-semibold" style="font-size:.9rem;">{{ d.deposited_by_name ?? '—' }}</div>
+              <div class="text-body-secondary mt-1" style="font-size:.8rem;">
+                @if (d.payment_method?.bank?.name) {
+                  {{ d.payment_method!.bank!.name }} — {{ d.payment_method?.name }}
+                }
+                · Op. <span class="font-monospace">{{ d.operation_number }}</span>
+                @if (d.has_cross_duplicate) {
+                  <span class="badge text-bg-warning ms-1" style="font-size:.62rem;">⚠ Duplicado</span>
+                }
+              </div>
+              <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="fw-bold" style="font-size:1rem;">S/ {{ d.amount | number:'1.2-2' }}</span>
+                  @if (d.voucher_url) {
+                    @if (isImage(d.voucher_url)) {
+                      <img [src]="d.voucher_url" alt="Voucher"
+                           class="rounded border flex-shrink-0"
+                           style="width:36px; height:36px; object-fit:cover; cursor:zoom-in;"
+                           (click)="openVoucher(d.voucher_url)" />
+                    } @else {
+                      <button type="button" class="btn btn-sm btn-outline-danger p-1 flex-shrink-0"
+                              title="Ver PDF" (click)="openVoucher(d.voucher_url)">
+                        <fa-icon icon="file-pdf" style="font-size:1rem;" />
+                      </button>
+                    }
+                  }
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                  @if (d.status === 'pending') {
+                    <button class="btn btn-warning btn-sm fw-semibold"
+                            style="border-radius:8px;"
+                            (click)="openValidate(d, 'deposit')">
+                      <fa-icon icon="magnifying-glass" class="me-1" />Revisar
+                    </button>
+                  }
+                  @if (d.status !== 'validated') {
+                    <button class="btn btn-outline-danger btn-sm"
+                            style="border-radius:8px;"
+                            title="Eliminar"
+                            (click)="deletingDeposit.set(d)">
+                      <fa-icon icon="trash" />
+                    </button>
+                  }
+                </div>
+              </div>
+              @if (d.notes) {
+                <div class="mt-2 small text-danger">
+                  <fa-icon icon="triangle-exclamation" class="me-1" />{{ d.notes }}
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Desktop -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.85rem;">
+            <thead style="font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3">Código</th>
+                <th>Repartidor</th>
+                <th>Banco / N° Op.</th>
+                <th>Fecha</th>
+                <th class="text-end">Monto</th>
+                <th>Estado</th>
+                <th class="text-center" style="width:70px;">Voucher</th>
+                <th style="width:100px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (d of deposits(); track d.id) {
+                <tr>
+                  <td class="ps-3 font-monospace small">{{ d.code }}</td>
+                  <td class="small fw-medium">{{ d.deposited_by_name ?? '—' }}</td>
+                  <td class="small text-body-secondary">
+                    <div>{{ d.payment_method?.bank?.name }} · {{ d.payment_method?.name }}</div>
+                    <div class="font-monospace d-flex align-items-center gap-1">
+                      {{ d.operation_number }}
+                      @if (d.has_cross_duplicate) {
+                        <span class="badge text-bg-warning ms-1" style="font-size:.65rem;"
+                              title="N° duplicado — verificar">⚠</span>
+                      }
+                    </div>
+                    @if (d.deposit_time) { <div>{{ d.deposit_time.slice(0,5) }}</div> }
+                  </td>
+                  <td class="small text-body-secondary">{{ d.deposit_date | date:'dd/MM/yy' }}</td>
+                  <td class="text-end fw-semibold">S/ {{ d.amount | number:'1.2-2' }}</td>
+                  <td>
+                    <c-badge [color]="depStatusColor[d.status]" style="font-size:.7rem;">
+                      {{ depStatusLabel[d.status] }}
+                    </c-badge>
+                    @if (d.notes) {
+                      <div class="text-danger mt-1" style="font-size:.7rem;">{{ d.notes }}</div>
+                    }
+                  </td>
+                  <td class="text-center">
+                    @if (d.voucher_url) {
+                      @if (isImage(d.voucher_url)) {
+                        <img [src]="d.voucher_url" alt="Voucher"
+                             class="rounded border"
+                             style="width:40px; height:40px; object-fit:cover; cursor:zoom-in;"
+                             (click)="openVoucher(d.voucher_url)" />
+                      } @else {
+                        <button type="button" class="btn btn-sm btn-outline-danger p-1"
+                                title="Ver PDF" (click)="openVoucher(d.voucher_url)">
+                          <fa-icon icon="file-pdf" />
+                        </button>
+                      }
+                    } @else {
+                      <span class="text-body-secondary">—</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      @if (d.status === 'pending') {
+                        <button class="btn btn-sm btn-warning fw-semibold"
+                                (click)="openValidate(d, 'deposit')">
+                          <fa-icon icon="magnifying-glass" class="me-1" />Revisar
+                        </button>
+                      }
+                      @if (d.status !== 'validated') {
+                        <button class="btn btn-sm btn-outline-danger"
+                                title="Eliminar"
+                                (click)="deletingDeposit.set(d)">
+                          <fa-icon icon="trash" />
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
+  <!-- ══ TRANSFERENCIAS ════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'transfers') {
+    @if (!transfers().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        @if (hasActiveFilters()) {
+          <fa-icon icon="filter-circle-xmark" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+          Sin resultados con estos filtros.
+        } @else {
+          <fa-icon icon="right-left" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+          Sin transferencias registradas.
+        }
+      </div>
+    } @else {
+
+      <!-- Mobile -->
+      <div class="d-md-none d-flex flex-column gap-2">
+        @for (c of transfers(); track c.id) {
+          <div class="card shadow-sm"
+               [class.border-danger]="c.status === 'rejected'"
+               [class.border-success]="c.status === 'validated'"
+               [class.border-warning]="c.status === 'pending'"
+               style="border-width:2px!important; border-radius:12px; overflow:hidden;">
+            <div class="p-3">
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="font-monospace fw-bold" style="font-size:.82rem;">{{ c.code }}</span>
+                <c-badge [color]="colStatusColor[c.status]" style="font-size:.65rem;">{{ colStatusLabel[c.status] }}</c-badge>
+              </div>
+              <div class="fw-semibold" style="font-size:.9rem;">{{ c.registered_by_name ?? '—' }}</div>
+              <div class="text-body-secondary" style="font-size:.78rem;">
+                {{ clientName(c) }}
+                @if (c.order?.code) { · <span class="font-monospace">{{ c.order!.code }}</span> }
+              </div>
+              <div class="text-body-secondary mt-1" style="font-size:.8rem;">
+                @if (c.bank?.name) {
+                  {{ c.bank!.name }} — {{ c.payment_method?.name }}
+                }
+                · Op. <span class="font-monospace">{{ c.operation_number }}</span>
+                @if (c.has_cross_duplicate) {
+                  <span class="badge text-bg-warning ms-1" style="font-size:.62rem;">⚠ Duplicado</span>
+                }
+              </div>
+              <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="fw-bold" style="font-size:1rem;">S/ {{ c.amount | number:'1.2-2' }}</span>
+                  @if (c.voucher_url) {
+                    @if (isImage(c.voucher_url)) {
+                      <img [src]="c.voucher_url" alt="Voucher"
+                           class="rounded border flex-shrink-0"
+                           style="width:36px; height:36px; object-fit:cover; cursor:zoom-in;"
+                           (click)="openVoucher(c.voucher_url)" />
+                    } @else {
+                      <button type="button" class="btn btn-sm btn-outline-danger p-1 flex-shrink-0"
+                              title="Ver PDF" (click)="openVoucher(c.voucher_url)">
+                        <fa-icon icon="file-pdf" style="font-size:1rem;" />
+                      </button>
+                    }
+                  }
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                  @if (c.status === 'pending') {
+                    <button class="btn btn-warning btn-sm fw-semibold"
+                            style="border-radius:8px;"
+                            (click)="openValidate(c, 'transfer')">
+                      <fa-icon icon="magnifying-glass" class="me-1" />Revisar
+                    </button>
+                  }
+                  @if (c.status !== 'validated') {
+                    <button class="btn btn-outline-danger btn-sm"
+                            style="border-radius:8px;"
+                            title="Eliminar"
+                            (click)="deletingCollection.set(c)">
+                      <fa-icon icon="trash" />
+                    </button>
+                  }
+                </div>
+              </div>
+              @if (c.notes) {
+                <div class="mt-2 small text-danger">
+                  <fa-icon icon="triangle-exclamation" class="me-1" />{{ c.notes }}
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Desktop -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.85rem;">
+            <thead style="font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3">Código</th>
+                <th>Repartidor</th>
+                <th>Pedido / Cliente</th>
+                <th>Banco / N° Op.</th>
+                <th>Fecha</th>
+                <th class="text-end">Monto</th>
+                <th>Estado</th>
+                <th class="text-center" style="width:70px;">Voucher</th>
+                <th style="width:100px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of transfers(); track c.id) {
+                <tr>
+                  <td class="ps-3 font-monospace small">{{ c.code }}</td>
+                  <td class="small fw-medium">{{ c.registered_by_name ?? '—' }}</td>
+                  <td class="small">
+                    <div class="fw-medium">{{ clientName(c) }}</div>
+                    <div class="text-body-secondary">{{ c.order?.code }}</div>
+                  </td>
+                  <td class="small text-body-secondary">
+                    @if (c.bank?.name) {
+                      <div>{{ c.bank!.name }} · {{ c.payment_method?.name }}</div>
+                    }
+                    <div class="font-monospace d-flex align-items-center gap-1">
+                      {{ c.operation_number }}
+                      @if (c.has_cross_duplicate) {
+                        <span class="badge text-bg-warning ms-1" style="font-size:.65rem;"
+                              title="N° duplicado — verificar">⚠</span>
+                      }
+                    </div>
+                  </td>
+                  <td class="small text-body-secondary">
+                    {{ c.operation_date | date:'dd/MM/yy' }}
+                    @if (c.operation_time) { <div>{{ c.operation_time.slice(0,5) }}</div> }
+                  </td>
+                  <td class="text-end fw-semibold">S/ {{ c.amount | number:'1.2-2' }}</td>
+                  <td>
+                    <c-badge [color]="colStatusColor[c.status]" style="font-size:.7rem;">
+                      {{ colStatusLabel[c.status] }}
+                    </c-badge>
+                    @if (c.notes) {
+                      <div class="text-danger mt-1" style="font-size:.7rem;">{{ c.notes }}</div>
+                    }
+                  </td>
+                  <td class="text-center">
+                    @if (c.voucher_url) {
+                      @if (isImage(c.voucher_url)) {
+                        <img [src]="c.voucher_url" alt="Voucher"
+                             class="rounded border"
+                             style="width:40px; height:40px; object-fit:cover; cursor:zoom-in;"
+                             (click)="openVoucher(c.voucher_url)" />
+                      } @else {
+                        <button type="button" class="btn btn-sm btn-outline-danger p-1"
+                                title="Ver PDF" (click)="openVoucher(c.voucher_url)">
+                          <fa-icon icon="file-pdf" />
+                        </button>
+                      }
+                    } @else {
+                      <span class="text-body-secondary">—</span>
+                    }
+                  </td>
+                  <td>
+                    <div class="d-flex gap-1">
+                      @if (c.status === 'pending') {
+                        <button class="btn btn-sm btn-warning fw-semibold"
+                                (click)="openValidate(c, 'transfer')">
+                          <fa-icon icon="magnifying-glass" class="me-1" />Revisar
+                        </button>
+                      }
+                      @if (c.status !== 'validated') {
+                        <button class="btn btn-sm btn-outline-danger"
+                                title="Eliminar"
+                                (click)="deletingCollection.set(c)">
+                          <fa-icon icon="trash" />
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
+  <!-- ══ EFECTIVO ═══════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'cash') {
+    @if (!cash().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        @if (hasActiveFilters()) {
+          <fa-icon icon="filter-circle-xmark" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+          Sin resultados con estos filtros.
+        } @else {
+          <fa-icon icon="money-bill-wave" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+          Sin cobros en efectivo registrados.
+        }
+      </div>
+    } @else {
+
+      <!-- Mobile -->
+      <div class="d-md-none d-flex flex-column gap-2">
+        @for (c of cash(); track c.id) {
+          <div class="card shadow-sm" style="border-radius:12px; overflow:hidden;">
+            <div class="p-3">
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="font-monospace fw-bold" style="font-size:.82rem;">{{ c.code }}</span>
+                <c-badge [color]="colStatusColor[c.status]" style="font-size:.65rem;">{{ colStatusLabel[c.status] }}</c-badge>
+              </div>
+              <div class="fw-semibold" style="font-size:.9rem;">{{ c.registered_by_name ?? '—' }}</div>
+              <div class="text-body-secondary" style="font-size:.78rem;">
+                {{ clientName(c) }}
+                @if (c.order?.code) { · <span class="font-monospace">{{ c.order!.code }}</span> }
+              </div>
+              <div class="mt-2 pt-2 border-top d-flex align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="fw-bold" style="font-size:1rem;">S/ {{ c.amount | number:'1.2-2' }}</span>
+                  <span class="text-body-secondary" style="font-size:.7rem;">{{ c.created_at | date:'dd/MM/yy' }}</span>
+                </div>
+                @if (c.status !== 'validated') {
+                  <button class="btn btn-outline-danger btn-sm"
+                          style="border-radius:8px;"
+                          title="Eliminar"
+                          (click)="deletingCollection.set(c)">
+                    <fa-icon icon="trash" />
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Desktop -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.85rem;">
+            <thead style="font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3">Código</th>
+                <th>Cobrador</th>
+                <th>Pedido / Cliente</th>
+                <th>Fecha</th>
+                <th class="text-end">Monto</th>
+                <th>Estado</th>
+                <th style="width:60px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of cash(); track c.id) {
+                <tr>
+                  <td class="ps-3 font-monospace small">{{ c.code }}</td>
+                  <td class="small fw-medium">{{ c.registered_by_name ?? '—' }}</td>
+                  <td class="small">
+                    <div class="fw-medium">{{ clientName(c) }}</div>
+                    <div class="text-body-secondary">{{ c.order?.code }}</div>
+                  </td>
+                  <td class="small text-body-secondary">{{ c.created_at | date:'dd/MM/yy' }}</td>
+                  <td class="text-end fw-semibold">S/ {{ c.amount | number:'1.2-2' }}</td>
+                  <td>
+                    <c-badge [color]="colStatusColor[c.status]" style="font-size:.7rem;">
+                      {{ colStatusLabel[c.status] }}
+                    </c-badge>
+                  </td>
+                  <td>
+                    @if (c.status !== 'validated') {
+                      <button class="btn btn-sm btn-outline-danger"
+                              title="Eliminar"
+                              (click)="deletingCollection.set(c)">
+                        <fa-icon icon="trash" />
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
+} <!-- /loading -->
+
+<!-- ── Lightbox de imagen ──────────────────────────────────────────────────── -->
+@if (voucherPreviewUrl()) {
+  <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+       style="z-index:9999; background:rgba(0,0,0,.88); cursor:zoom-out;"
+       (click)="voucherPreviewUrl.set(null)">
+    <img [src]="voucherPreviewUrl()!" alt="Comprobante"
+         style="max-width:95vw; max-height:88vh; border-radius:6px; object-fit:contain; box-shadow:0 8px 32px rgba(0,0,0,.5); cursor:default;"
+         (click)="$event.stopPropagation()" />
+    <button type="button"
+            class="btn btn-sm btn-outline-light position-absolute"
+            style="top:16px; right:16px; opacity:.85;"
+            (click)="voucherPreviewUrl.set(null)">
+      <fa-icon icon="xmark" />
+    </button>
+    <a [href]="voucherPreviewUrl()!" target="_blank" rel="noopener"
+       class="btn btn-sm btn-outline-light position-absolute d-flex align-items-center gap-1"
+       style="top:16px; right:76px; opacity:.85;"
+       (click)="$event.stopPropagation()">
+      <fa-icon icon="download" class="me-1" />Descargar
+    </a>
+  </div>
+}
+
+<!-- ══ MODAL DE REVISIÓN / VALIDACIÓN ═══════════════════════════════════════ -->
+@if (validatingItem(); as vi) {
+  <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.6);">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down"
+         style="margin:0 auto;">
+      <div class="modal-content" style="border-radius:0; border-radius: clamp(0px, (100vw - 576px) * 9999, 8px);">
+
+        <!-- Header -->
+        <div class="modal-header py-2 px-3">
+          <div>
+            <div class="fw-bold" style="font-size:.9rem;">
+              {{ vi.kind === 'deposit' ? 'Depósito' : 'Transferencia' }}
+              <span class="font-monospace text-body-secondary ms-1" style="font-size:.82rem;">{{ vi.data.code }}</span>
+            </div>
+            <div class="text-body-secondary" style="font-size:.75rem;">
+              @if (vDeposit(); as vd) { {{ vd.deposited_by_name ?? '—' }} · {{ vd.deposit_date | date:'dd/MM/yyyy' }} }
+              @if (vTransfer(); as vt) { {{ vt.registered_by_name ?? '—' }} · {{ clientName(vt) }} }
+            </div>
+          </div>
+          <button type="button" class="btn-close ms-auto" (click)="closeValidate()"></button>
+        </div>
+
+        <!-- Comprobante -->
+        @if (vi.data.voucher_url) {
+          @if (isImage(vi.data.voucher_url)) {
+            <!-- Imagen: mostrar inline con botones flotantes -->
+            <div class="position-relative" style="background:#111;">
+              <div class="d-flex align-items-center justify-content-center"
+                   style="min-height:220px; max-height:62vh; overflow:hidden;">
+                <img [src]="vi.data.voucher_url" alt="Comprobante"
+                     style="max-width:100%; max-height:62vh; object-fit:contain; display:block;" />
+              </div>
+              <!-- Botones sobre la imagen -->
+              <div class="position-absolute bottom-0 end-0 p-2 d-flex gap-2">
+                <a [href]="vi.data.voucher_url" target="_blank" rel="noopener"
+                   class="btn btn-sm btn-dark fw-semibold"
+                   style="opacity:.85; backdrop-filter:blur(4px);">
+                  <fa-icon icon="arrow-up-right-from-square" class="me-1" />Ver completo
+                </a>
+                <a [href]="vi.data.voucher_url" download
+                   class="btn btn-sm btn-dark fw-semibold"
+                   style="opacity:.85; backdrop-filter:blur(4px);">
+                  <fa-icon icon="download" class="me-1" />Descargar
+                </a>
+              </div>
+            </div>
+          } @else {
+            <!-- PDF: ver en navegador + descargar -->
+            <div class="d-flex flex-column align-items-center justify-content-center gap-3 py-5"
+                 style="background:var(--bs-tertiary-bg);">
+              <fa-icon icon="file-pdf" style="font-size:4rem; color:#dc3545; opacity:.85;" />
+              <div class="d-flex flex-wrap justify-content-center gap-2">
+                <a [href]="vi.data.voucher_url" target="_blank" rel="noopener"
+                   class="btn btn-outline-secondary fw-semibold px-4">
+                  <fa-icon icon="arrow-up-right-from-square" class="me-2" />Ver PDF
+                </a>
+                <a [href]="vi.data.voucher_url" download
+                   class="btn btn-danger fw-semibold px-4">
+                  <fa-icon icon="download" class="me-2" />Descargar PDF
+                </a>
+              </div>
+              <span class="text-body-secondary" style="font-size:.78rem;">
+                "Ver PDF" abre en el navegador · "Descargar" guarda el archivo
+              </span>
+            </div>
+          }
+        } @else {
+          <div class="text-center py-4 text-body-secondary" style="background:var(--bs-tertiary-bg);">
+            <fa-icon icon="image" class="d-block mb-1" style="font-size:2rem; opacity:.25;" />
+            <span style="font-size:.82rem;">Sin comprobante adjunto</span>
+          </div>
+        }
+
+        <!-- Detalles del movimiento -->
+        <div class="px-3 pt-3 pb-2" style="font-size:.83rem;">
+          @if (vDeposit(); as vd) {
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Repartidor</div>
+                <div class="fw-semibold">{{ vd.deposited_by_name ?? '—' }}</div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Monto</div>
+                <div class="fw-bold text-success" style="font-size:1.1rem;">S/ {{ vd.amount | number:'1.2-2' }}</div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Banco / Método</div>
+                <div>{{ vd.payment_method?.bank?.name }}</div>
+                <div class="text-body-secondary small">{{ vd.payment_method?.name }}</div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">N° Operación</div>
+                <div class="font-monospace d-flex align-items-center gap-1">
+                  {{ vd.operation_number }}
+                  @if (vd.has_cross_duplicate) {
+                    <span class="badge text-bg-warning" style="font-size:.6rem;" title="N° duplicado">⚠</span>
+                  }
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Fecha</div>
+                <div>{{ vd.deposit_date | date:'dd/MM/yyyy' }}</div>
+              </div>
+              @if (vd.deposit_time) {
+                <div class="col-6">
+                  <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Hora</div>
+                  <div>{{ vd.deposit_time.slice(0,5) }}</div>
+                </div>
+              }
+            </div>
+          }
+          @if (vTransfer(); as vt) {
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Cobrador</div>
+                <div class="fw-semibold">{{ vt.registered_by_name ?? '—' }}</div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Monto</div>
+                <div class="fw-bold text-success" style="font-size:1.1rem;">S/ {{ vt.amount | number:'1.2-2' }}</div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Pedido / Cliente</div>
+                <div>{{ clientName(vt) }}</div>
+                <div class="text-body-secondary font-monospace small">{{ vt.order?.code }}</div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Banco / Método</div>
+                <div>{{ vt.bank?.name }}</div>
+                <div class="text-body-secondary small">{{ vt.payment_method?.name }}</div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">N° Operación</div>
+                <div class="font-monospace d-flex align-items-center gap-1">
+                  {{ vt.operation_number }}
+                  @if (vt.has_cross_duplicate) {
+                    <span class="badge text-bg-warning" style="font-size:.6rem;" title="N° duplicado">⚠</span>
+                  }
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Fecha / Hora</div>
+                <div>
+                  {{ vt.operation_date | date:'dd/MM/yyyy' }}
+                  @if (vt.operation_time) { {{ vt.operation_time.slice(0,5) }} }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Acciones -->
+        <div class="px-3 pb-3">
+          @if (!isRejectMode()) {
+            <div class="d-flex gap-2">
+              <button class="btn btn-success flex-grow-1 fw-semibold py-2"
+                      [disabled]="actingId() !== null"
+                      (click)="confirmValidate()">
+                @if (actingId() !== null) { <c-spinner size="sm" class="me-1" /> }
+                @else { <fa-icon icon="check" class="me-1" /> }
+                Validar
+              </button>
+              <button class="btn btn-outline-danger flex-grow-1 fw-semibold py-2"
+                      [disabled]="actingId() !== null"
+                      (click)="isRejectMode.set(true)">
+                <fa-icon icon="xmark" class="me-1" />Rechazar
+              </button>
+            </div>
+          } @else {
+            <div class="border rounded-2 p-3" style="background:var(--bs-danger-bg-subtle); border-color:var(--bs-danger-border-subtle)!important;">
+              <label class="form-label fw-semibold text-danger mb-1" style="font-size:.85rem;">
+                <fa-icon icon="triangle-exclamation" class="me-1" />Motivo del rechazo
+                <span class="text-body-secondary fw-normal">(opcional)</span>
+              </label>
+              <textarea class="form-control mb-2" rows="2" [(ngModel)]="rejectNote"
+                        placeholder="Ej: Voucher ilegible, monto incorrecto, N° de operación no coincide..."></textarea>
+              <div class="d-flex gap-2">
+                <button class="btn btn-secondary btn-sm flex-grow-1"
+                        [disabled]="actingId() !== null"
+                        (click)="isRejectMode.set(false); rejectNote = ''">
+                  Cancelar
+                </button>
+                <button class="btn btn-danger btn-sm flex-grow-1 fw-semibold"
+                        [disabled]="actingId() !== null"
+                        (click)="confirmReject()">
+                  @if (actingId() !== null) { <c-spinner size="sm" class="me-1" /> }
+                  Confirmar rechazo
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+      </div>
+    </div>
+  </div>
+}
+
+<app-confirm-modal
+  [visible]="!!deletingCollection()"
+  title="Eliminar cobro"
+  [message]="'¿Eliminar el cobro ' + (deletingCollection()?.code ?? '') + ' por S/ ' + (deletingCollection()?.amount ?? '') + '? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  (confirm)="confirmDeleteCollection()"
+  (cancel)="deletingCollection.set(null)" />
+
+<app-confirm-modal
+  [visible]="!!deletingDeposit()"
+  title="Eliminar depósito"
+  [message]="'¿Eliminar el depósito ' + (deletingDeposit()?.code ?? '') + ' por S/ ' + (deletingDeposit()?.amount ?? '') + '? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  (confirm)="confirmDeleteDeposit()"
+  (cancel)="deletingDeposit.set(null)" />

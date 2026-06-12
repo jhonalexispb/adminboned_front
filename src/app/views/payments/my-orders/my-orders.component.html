@@ -1,0 +1,572 @@
+<app-page-header title="Cobranza" subtitle="Pedidos por cobrar y historial de cobros">
+  <button class="btn btn-outline-secondary btn-sm" (click)="refreshActive()">
+    <fa-icon icon="rotate" class="me-1" />Actualizar
+  </button>
+</app-page-header>
+
+<!-- ── Pestañas ────────────────────────────────────────────────────────────── -->
+<ul class="nav nav-tabs nav-fill mb-3">
+  <li class="nav-item">
+    <button class="nav-link d-flex flex-column align-items-center justify-content-center gap-1 w-100"
+            [class.active]="activeTab() === 'delivered'"
+            (click)="switchTab('delivered')">
+      <span class="position-relative d-inline-flex p-1">
+        <fa-icon icon="hand-holding-dollar" />
+        @if (deliveredOrders().length) {
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-success"
+                style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
+            {{ deliveredOrders().length }}
+          </span>
+        }
+      </span>
+      <span style="font-size:.75rem;">Por cobrar</span>
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link d-flex flex-column align-items-center justify-content-center gap-1 w-100"
+            [class.active]="activeTab() === 'paid'"
+            (click)="switchTab('paid')">
+      <span class="d-inline-flex p-1">
+        <fa-icon icon="circle-check" />
+      </span>
+      <span style="font-size:.75rem;">Cobrados</span>
+    </button>
+  </li>
+</ul>
+
+<!-- ══ POR COBRAR ═══════════════════════════════════════════════════════════ -->
+@if (activeTab() === 'delivered') {
+  @if (loadingDelivered()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (!deliveredOrders().length) {
+    <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+      <fa-icon icon="circle-check" class="d-block mb-2 text-success" style="font-size:2rem; opacity:.5;" />
+      Sin pedidos pendientes de cobro. ¡Todo al día!
+    </div>
+  } @else {
+    <!-- Resumen -->
+    <div class="rounded border bg-body-secondary px-3 py-2 mb-3 d-flex align-items-center gap-3"
+         style="font-size:.85rem;">
+      <div><span class="text-body-secondary">Pedidos: </span><strong>{{ deliveredOrders().length }}</strong></div>
+      <div class="ms-auto text-end">
+        <span class="text-body-secondary">Por cobrar: </span>
+        <strong class="text-success">S/ {{ totalPending() | number:'1.2-2' }}</strong>
+      </div>
+    </div>
+
+    <!-- ── Mobile ──────────────────────────────────────────────────────── -->
+    <div class="d-md-none d-flex flex-column gap-3">
+      @for (o of deliveredOrders(); track o.id) {
+        <div class="card shadow-sm" style="border-radius:12px; overflow:hidden;">
+          <!-- Header: código + fecha -->
+          <div class="px-3 pt-3 d-flex align-items-center justify-content-between">
+            <span class="font-monospace fw-bold" style="font-size:.92rem;">{{ o.code }}</span>
+            <div class="d-flex align-items-center gap-2">
+              @if (pendingBadge(o); as pb) {
+                <c-badge [color]="pb.color" style="font-size:.65rem;">{{ pb.label }}</c-badge>
+              }
+              @if ((o.rejected_count ?? 0) > 0) {
+                <span class="text-danger" style="font-size:.7rem;" title="Hay un movimiento rechazado, debe corregirse">
+                  <fa-icon icon="triangle-exclamation" />
+                </span>
+              }
+              <span class="text-body-secondary" style="font-size:.72rem;">{{ o.created_at | date:'dd/MM/yy' }}</span>
+            </div>
+          </div>
+
+          <!-- Cliente -->
+          <div class="px-3 pt-1 pb-2">
+            <div class="fw-semibold text-truncate" style="font-size:.92rem;">{{ clientName(o) }}</div>
+            @if (o.client?.phone) {
+              <a [href]="'tel:' + o.client!.phone"
+                 class="text-body-secondary text-decoration-none"
+                 style="font-size:.78rem;">
+                <fa-icon icon="phone" class="me-1" style="font-size:.7rem;" />{{ o.client!.phone }}
+              </a>
+            }
+          </div>
+
+          <!-- Montos -->
+          <div class="mx-3 mb-2 rounded-2 border px-3 py-2 d-flex gap-3"
+               style="font-size:.8rem; background:var(--bs-tertiary-bg);">
+            <div>
+              <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase; letter-spacing:.04em;">Total</div>
+              <div class="fw-bold">S/ {{ o.total | number:'1.2-2' }}</div>
+            </div>
+            @if ((o.paid_amount ?? 0) > 0) {
+              <div>
+                <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase; letter-spacing:.04em;">Cobrado</div>
+                <div class="fw-bold text-success">S/ {{ o.paid_amount! | number:'1.2-2' }}</div>
+              </div>
+            }
+            @if ((o.pending_amount ?? 0) > 0) {
+              <div>
+                <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase; letter-spacing:.04em;">Por validar</div>
+                <div class="fw-bold text-info">S/ {{ o.pending_amount! | number:'1.2-2' }}</div>
+              </div>
+            }
+            @if (remaining(o) > 0) {
+              <div class="ms-auto text-end">
+                <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase; letter-spacing:.04em;">Falta</div>
+                <div class="fw-bold text-warning">S/ {{ remaining(o) | number:'1.2-2' }}</div>
+              </div>
+            }
+          </div>
+
+          <!-- Barra de progreso (pagos parciales) -->
+          @if ((o.paid_amount ?? 0) > 0 && remaining(o) > 0) {
+            <div class="mx-3 mb-2">
+              <div class="progress" style="height:5px; border-radius:3px;">
+                <div class="progress-bar bg-success"
+                     [style.width.%]="paidPercent(o)"></div>
+              </div>
+            </div>
+          }
+
+          <!-- Botones de acción -->
+          <div class="px-3 pb-3 d-flex gap-2">
+            @if (needsCollection(o)) {
+              <button type="button"
+                      class="btn btn-success fw-semibold flex-grow-1"
+                      style="font-size:.82rem; border-radius:8px; padding:.5rem;"
+                      (click)="registerFor.set(o)">
+                <fa-icon icon="money-bill-wave" class="me-1" />Cobrar
+              </button>
+            }
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    style="font-size:.82rem; border-radius:8px; padding:.5rem .9rem;"
+                    (click)="openMovements(o)">
+              <fa-icon icon="list" class="me-1" />Movim.
+            </button>
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    style="font-size:.82rem; border-radius:8px; padding:.5rem .75rem;"
+                    title="Ver pedido"
+                    (click)="previewId.set(o.id)">
+              <fa-icon icon="eye" />
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- ── Desktop ─────────────────────────────────────────────────────── -->
+    <c-card class="d-none d-md-block">
+      <c-card-body class="p-0">
+        <table class="table mb-0 align-middle" style="font-size:.875rem">
+          <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+            <tr>
+              <th class="ps-3" style="width:130px">Código</th>
+              <th>Cliente</th>
+              <th class="text-end" style="width:110px">Total</th>
+              <th class="text-end" style="width:110px">Cobrado</th>
+              <th class="text-end" style="width:110px">Falta</th>
+              <th style="width:200px">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (o of deliveredOrders(); track o.id) {
+              <tr>
+                <td class="ps-3">
+                  <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ o.code }}</div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ o.created_at | date:'dd/MM/yy' }}</div>
+                </td>
+                <td>
+                  <div class="fw-medium">{{ clientName(o) }}</div>
+                  @if (o.client?.phone) {
+                    <a [href]="'tel:' + o.client!.phone" class="text-body-secondary small text-decoration-none">
+                      <fa-icon icon="phone" class="me-1" style="font-size:.7rem;" />{{ o.client!.phone }}
+                    </a>
+                  }
+                </td>
+                <td class="text-end fw-semibold">S/ {{ o.total | number:'1.2-2' }}</td>
+                <td class="text-end text-success fw-semibold">
+                  @if ((o.paid_amount ?? 0) > 0) {
+                    S/ {{ o.paid_amount! | number:'1.2-2' }}
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+                <td class="text-end fw-semibold"
+                    [class.text-warning]="remaining(o) > 0"
+                    [class.text-success]="remaining(o) === 0">
+                  S/ {{ remaining(o) | number:'1.2-2' }}
+                  @if ((o.pending_amount ?? 0) > 0) {
+                    <div class="text-info fw-normal" style="font-size:.68rem;">
+                      + S/ {{ o.pending_amount! | number:'1.2-2' }} por validar
+                    </div>
+                  }
+                  <div class="d-flex justify-content-end align-items-center gap-1 mt-1">
+                    @if (pendingBadge(o); as pb) {
+                      <c-badge [color]="pb.color" style="font-size:.6rem;">{{ pb.label }}</c-badge>
+                    }
+                    @if ((o.rejected_count ?? 0) > 0) {
+                      <span class="text-danger" style="font-size:.7rem;" title="Hay un movimiento rechazado, debe corregirse">
+                        <fa-icon icon="triangle-exclamation" />
+                      </span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <div class="d-inline-flex gap-1">
+                    @if (needsCollection(o)) {
+                      <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                              style="min-width:48px; font-size:.7rem;"
+                              (click)="registerFor.set(o)">
+                        <fa-icon icon="money-bill-wave" /><small>Cobrar</small>
+                      </button>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center"
+                            style="min-width:48px; font-size:.7rem;"
+                            (click)="openMovements(o)">
+                      <fa-icon icon="list" /><small>Movim.</small>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center"
+                            style="min-width:48px; font-size:.7rem;"
+                            (click)="previewId.set(o.id)">
+                      <fa-icon icon="eye" /><small>Ver</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </c-card-body>
+    </c-card>
+  }
+}
+
+<!-- ══ COBRADOS ══════════════════════════════════════════════════════════════ -->
+@if (activeTab() === 'paid') {
+  @if (loadingPaid()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (!paidOrders().length) {
+    <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+      <fa-icon icon="receipt" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+      Aún no hay pedidos cobrados.
+    </div>
+  } @else {
+    <!-- ── Mobile ──────────────────────────────────────────────────────── -->
+    <div class="d-md-none d-flex flex-column gap-3">
+      @for (o of paidOrders(); track o.id) {
+        <div class="card shadow-sm border-success"
+             style="border-width:2px!important; border-radius:12px; overflow:hidden;">
+          <div class="px-3 pt-3 d-flex align-items-start justify-content-between">
+            <div class="flex-grow-1 min-w-0 me-2">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="font-monospace fw-bold" style="font-size:.92rem;">{{ o.code }}</span>
+                <c-badge color="success" style="font-size:.65rem;">Cobrado</c-badge>
+              </div>
+              <div class="fw-semibold text-truncate" style="font-size:.92rem;">{{ clientName(o) }}</div>
+              <div class="text-body-secondary" style="font-size:.75rem;">{{ o.created_at | date:'dd/MM/yy' }}</div>
+            </div>
+            <div class="text-end flex-shrink-0">
+              <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase; letter-spacing:.04em;">Total cobrado</div>
+              <div class="fw-bold text-success" style="font-size:.95rem;">
+                S/ {{ (o.paid_amount ?? 0) | number:'1.2-2' }}
+              </div>
+            </div>
+          </div>
+          <div class="px-3 pt-2 pb-3 d-flex gap-2">
+            <button type="button"
+                    class="btn btn-outline-secondary flex-grow-1"
+                    style="font-size:.82rem; border-radius:8px;"
+                    (click)="openMovements(o)">
+              <fa-icon icon="list" class="me-1" />Ver movimientos
+            </button>
+            <button type="button"
+                    class="btn btn-outline-secondary"
+                    style="font-size:.82rem; border-radius:8px; padding:.45rem .75rem;"
+                    title="Ver pedido"
+                    (click)="previewId.set(o.id)">
+              <fa-icon icon="eye" />
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- ── Desktop ─────────────────────────────────────────────────────── -->
+    <c-card class="d-none d-md-block">
+      <c-card-body class="p-0">
+        <table class="table mb-0 align-middle" style="font-size:.875rem">
+          <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+            <tr>
+              <th class="ps-3" style="width:130px">Código</th>
+              <th>Cliente</th>
+              <th class="text-end" style="width:110px">Total pedido</th>
+              <th class="text-end" style="width:110px">Cobrado</th>
+              <th style="width:80px">Estado</th>
+              <th style="width:150px">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (o of paidOrders(); track o.id) {
+              <tr>
+                <td class="ps-3">
+                  <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ o.code }}</div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ o.created_at | date:'dd/MM/yy' }}</div>
+                </td>
+                <td>
+                  <div class="fw-medium">{{ clientName(o) }}</div>
+                  @if (o.client?.phone) {
+                    <a [href]="'tel:' + o.client!.phone" class="text-body-secondary small text-decoration-none">
+                      <fa-icon icon="phone" class="me-1" style="font-size:.7rem;" />{{ o.client!.phone }}
+                    </a>
+                  }
+                </td>
+                <td class="text-end fw-semibold">S/ {{ o.total | number:'1.2-2' }}</td>
+                <td class="text-end text-success fw-semibold">
+                  S/ {{ (o.paid_amount ?? 0) | number:'1.2-2' }}
+                </td>
+                <td>
+                  <c-badge color="success">Cobrado</c-badge>
+                </td>
+                <td>
+                  <div class="d-inline-flex gap-1">
+                    <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center"
+                            style="min-width:48px; font-size:.7rem;"
+                            (click)="openMovements(o)">
+                      <fa-icon icon="list" /><small>Movim.</small>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center"
+                            style="min-width:48px; font-size:.7rem;"
+                            (click)="previewId.set(o.id)">
+                      <fa-icon icon="eye" /><small>Ver</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </c-card-body>
+    </c-card>
+  }
+}
+
+<!-- ── Modal de movimientos ────────────────────────────────────────────────── -->
+@if (movementsOrder(); as mo) {
+  <c-modal [visible]="true" alignment="center" size="lg" (visibleChange)="!$event && movementsOrder.set(null)">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="list" class="me-2 text-secondary" />
+        Movimientos — <span class="font-monospace">{{ mo.code }}</span>
+      </h5>
+    </c-modal-header>
+    <c-modal-body>
+      <!-- Cabecera resumen del pedido -->
+      <div class="rounded-2 border px-3 py-2 mb-3" style="font-size:.85rem; background:var(--bs-tertiary-bg);">
+        <div class="fw-semibold">{{ clientName(mo) }}</div>
+        <div class="text-body-secondary d-flex flex-wrap gap-3 mt-1">
+          <span>Total <strong class="text-body">S/ {{ mo.total | number:'1.2-2' }}</strong></span>
+          @if ((mo.paid_amount ?? 0) > 0) {
+            <span>Cobrado <strong class="text-success">S/ {{ mo.paid_amount! | number:'1.2-2' }}</strong></span>
+          }
+          @if ((mo.pending_amount ?? 0) > 0) {
+            <span>Por validar <strong class="text-info">S/ {{ mo.pending_amount! | number:'1.2-2' }}</strong></span>
+          }
+          @if (remaining(mo) > 0) {
+            <span>Falta <strong class="text-warning">S/ {{ remaining(mo) | number:'1.2-2' }}</strong></span>
+          }
+        </div>
+      </div>
+
+      <!-- Movimientos -->
+      @if (isLoadingCollections(mo.id)) {
+        <div class="text-center py-4"><c-spinner color="primary" /></div>
+      } @else if (getCollections(mo.id).length === 0) {
+        <div class="text-center text-body-secondary py-3" style="font-size:.9rem;">
+          <fa-icon icon="inbox" class="d-block mb-1" style="font-size:1.5rem; opacity:.3;" />
+          Sin movimientos registrados.
+        </div>
+      } @else {
+
+        <!-- ── Mobile: tarjetas ───────────────────────────────────────── -->
+        <div class="d-md-none d-flex flex-column gap-2">
+          @for (col of getCollections(mo.id); track col.id) {
+            <div class="rounded-2 border p-3">
+              <!-- Monto + estado -->
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div>
+                  <div class="fw-bold" style="font-size:1.05rem;">
+                    <fa-icon [icon]="col.collection_form === 'cash' ? 'money-bill-wave' : 'building-columns'"
+                             class="me-1 text-body-secondary" style="font-size:.85rem;" />
+                    S/ {{ col.amount | number:'1.2-2' }}
+                  </div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">
+                    {{ col.created_at | date:'dd/MM/yy, HH:mm' }}
+                    @if (col.registered_by_name) { · {{ col.registered_by_name }} }
+                  </div>
+                </div>
+                <c-badge [color]="statusColor[col.status]">{{ statusLabel[col.status] }}</c-badge>
+              </div>
+
+              <!-- Detalles transferencia + voucher -->
+              @if (col.collection_form === 'transfer') {
+                <div class="d-flex align-items-start gap-3">
+                  <div class="flex-grow-1" style="font-size:.8rem;">
+                    @if (col.bank?.name) {
+                      <div class="text-body-secondary mb-1">
+                        <fa-icon icon="building-columns" class="me-1" />
+                        <strong class="text-body">{{ col.bank!.name }}</strong>
+                        @if (col.payment_method?.name) { — {{ col.payment_method!.name }} }
+                      </div>
+                    }
+                    @if (col.operation_number) {
+                      <div class="text-body-secondary">
+                        N° Op. <span class="font-monospace text-body">{{ col.operation_number }}</span>
+                      </div>
+                    }
+                    @if (col.operation_date) {
+                      <div class="text-body-secondary">
+                        Fecha {{ col.operation_date | date:'dd/MM/yyyy' }}
+                        @if (col.operation_time) { {{ col.operation_time.slice(0, 5) }} }
+                      </div>
+                    }
+                  </div>
+                  <!-- Miniatura o botón voucher -->
+                  @if (col.voucher_url) {
+                    @if (isImage(col.voucher_url)) {
+                      <img [src]="col.voucher_url" alt="Comprobante"
+                           class="rounded border flex-shrink-0"
+                           style="width:64px; height:64px; object-fit:cover; cursor:zoom-in;"
+                           (click)="openVoucher(col.voucher_url)" />
+                    } @else {
+                      <button type="button"
+                              class="btn btn-outline-danger btn-sm flex-shrink-0 d-flex flex-column align-items-center gap-1"
+                              style="padding:.4rem .6rem; font-size:.7rem; border-radius:8px;"
+                              (click)="openVoucher(col.voucher_url)">
+                        <fa-icon icon="file-pdf" style="font-size:1.4rem;" />
+                        <span>Abrir</span>
+                      </button>
+                    }
+                  }
+                </div>
+              }
+
+              @if (col.notes) {
+                <div class="mt-2 small text-danger">
+                  <fa-icon icon="triangle-exclamation" class="me-1" />{{ col.notes }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- ── Desktop: tabla ─────────────────────────────────────────── -->
+        <table class="table table-sm mb-0 d-none d-md-table" style="font-size:.82rem;">
+          <thead>
+            <tr>
+              <th>Forma</th>
+              <th>Banco / Método</th>
+              <th>N° Operación</th>
+              <th>Fecha op.</th>
+              <th class="text-end">Monto</th>
+              <th>Estado</th>
+              <th class="text-center" style="width:70px;">Voucher</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (col of getCollections(mo.id); track col.id) {
+              <tr>
+                <td>
+                  <fa-icon [icon]="col.collection_form === 'cash' ? 'money-bill-wave' : 'building-columns'"
+                           class="me-1 text-body-secondary" />
+                  {{ col.collection_form === 'cash' ? 'Efectivo' : 'Transferencia' }}
+                  <div class="text-body-secondary" style="font-size:.72rem;">
+                    {{ col.created_at | date:'dd/MM HH:mm' }}
+                  </div>
+                </td>
+                <td>
+                  @if (col.bank?.name) {
+                    <div>{{ col.bank!.name }}</div>
+                    @if (col.payment_method?.name) {
+                      <div class="text-body-secondary" style="font-size:.75rem;">{{ col.payment_method!.name }}</div>
+                    }
+                  } @else { — }
+                </td>
+                <td class="font-monospace">{{ col.operation_number || '—' }}</td>
+                <td>
+                  {{ col.operation_date ? (col.operation_date | date:'dd/MM/yy') : '—' }}
+                  @if (col.operation_time) {
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ col.operation_time.slice(0,5) }}</div>
+                  }
+                </td>
+                <td class="text-end fw-semibold">S/ {{ col.amount | number:'1.2-2' }}</td>
+                <td><c-badge [color]="statusColor[col.status]">{{ statusLabel[col.status] }}</c-badge></td>
+                <td class="text-center">
+                  @if (col.voucher_url) {
+                    @if (isImage(col.voucher_url)) {
+                      <img [src]="col.voucher_url" alt="Voucher"
+                           class="rounded border"
+                           style="width:42px; height:42px; object-fit:cover; cursor:zoom-in;"
+                           (click)="openVoucher(col.voucher_url)" />
+                    } @else {
+                      <button type="button"
+                              class="btn btn-sm btn-outline-danger p-1"
+                              style="line-height:1; font-size:.75rem;"
+                              title="Abrir PDF"
+                              (click)="openVoucher(col.voucher_url)">
+                        <fa-icon icon="file-pdf" />
+                      </button>
+                    }
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+              </tr>
+              @if (col.notes) {
+                <tr>
+                  <td colspan="7" class="pt-0 pb-2" style="font-size:.75rem;">
+                    <fa-icon icon="triangle-exclamation" class="me-1 text-danger" />{{ col.notes }}
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      }
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" (click)="movementsOrder.set(null)">Cerrar</button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- ── Lightbox de imagen ──────────────────────────────────────────────────── -->
+@if (voucherPreviewUrl()) {
+  <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+       style="z-index:9999; background:rgba(0,0,0,.88); cursor:zoom-out;"
+       (click)="voucherPreviewUrl.set(null)">
+    <img [src]="voucherPreviewUrl()!" alt="Comprobante"
+         style="max-width:95vw; max-height:88vh; border-radius:6px; object-fit:contain; box-shadow:0 8px 32px rgba(0,0,0,.5); cursor:default;"
+         (click)="$event.stopPropagation()" />
+    <!-- Botón cerrar -->
+    <button type="button"
+            class="btn btn-sm btn-outline-light position-absolute d-flex align-items-center gap-1"
+            style="top:16px; right:16px; opacity:.85;"
+            (click)="voucherPreviewUrl.set(null)">
+      <fa-icon icon="xmark" />
+    </button>
+    <!-- Botón descargar -->
+    <a [href]="voucherPreviewUrl()!" target="_blank" rel="noopener"
+       class="btn btn-sm btn-outline-light position-absolute d-flex align-items-center gap-1"
+       style="top:16px; right:76px; opacity:.85;"
+       (click)="$event.stopPropagation()">
+      <fa-icon icon="download" class="me-1" />Descargar
+    </a>
+  </div>
+}
+
+<!-- ── Otros modales ───────────────────────────────────────────────────────── -->
+<app-register-payment-modal
+  [order]="registerFor()"
+  (registered)="onPaymentRegistered($event)"
+  (cancelled)="registerFor.set(null)" />
+
+<app-order-preview-modal
+  [orderId]="previewId()"
+  (closed)="previewId.set(null)" />

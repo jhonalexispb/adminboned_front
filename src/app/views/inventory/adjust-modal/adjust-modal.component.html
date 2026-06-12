@@ -1,0 +1,217 @@
+<div class="modal-header border-0 pb-1">
+  <h5 class="modal-title fw-semibold d-flex align-items-center gap-2">
+    @if (isAdjust) {
+      <span class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0"
+            style="width:32px;height:32px;background:var(--cui-primary-bg-subtle)">
+        <fa-icon icon="sliders" class="text-primary" style="font-size:.9rem" />
+      </span>
+      Ajuste manual de stock
+    } @else {
+      <span class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0"
+            style="width:32px;height:32px;background:var(--cui-warning-bg-subtle)">
+        <fa-icon icon="calculator" class="text-warning" style="font-size:.9rem" />
+      </span>
+      Conteo físico
+    }
+  </h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()">
+  <div class="modal-body pt-2">
+
+    <!-- Producto / Lote info -->
+    <div class="rounded-3 p-3 mb-4 d-flex align-items-start gap-3"
+         style="background:var(--cui-tertiary-bg)">
+      <div class="d-flex align-items-center justify-content-center rounded-2 flex-shrink-0"
+           style="width:36px;height:36px;background:var(--cui-primary-bg-subtle)">
+        <fa-icon icon="box" class="text-primary" />
+      </div>
+      <div class="flex-grow-1 min-w-0">
+        <div class="fw-semibold text-truncate">{{ target.product_name }}</div>
+        <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+          @if (target.lot_number) {
+            <span class="badge bg-secondary-subtle text-secondary-emphasis font-monospace fw-normal border">
+              {{ target.lot_number }}
+            </span>
+          } @else {
+            <span class="badge bg-secondary font-monospace fw-normal">SIN-LOTE</span>
+          }
+          <span class="text-body-secondary small">·</span>
+          <span class="fw-semibold text-primary small">{{ target.current_stock }} uds actuales</span>
+        </div>
+      </div>
+    </div>
+
+    @if (error) {
+      <div class="alert alert-danger py-2 mb-3 small">{{ error }}</div>
+    }
+
+    <!-- Alerta de sobreventa tras ajuste exitoso -->
+    @if (stockAlert()) {
+      <div class="alert alert-warning mb-0 small">
+        <div class="fw-semibold mb-2 d-flex align-items-center gap-2">
+          <fa-icon icon="triangle-exclamation" />
+          Ajuste registrado — stock insuficiente para pedidos activos
+        </div>
+        <div class="mb-2">
+          Stock actual: <strong>{{ stockAlert()!.current_stock }}</strong> ·
+          Reservado: <strong>{{ stockAlert()!.reserved_stock }}</strong> ·
+          Disponible: <strong class="text-danger">{{ stockAlert()!.available_stock }}</strong>
+        </div>
+        <div class="fw-medium mb-1">Pedidos afectados:</div>
+        <ul class="mb-0 ps-3">
+          @for (r of stockAlert()!.affected_reservations; track r.id) {
+            <li>
+              <strong>{{ r.code }}</strong>
+              ({{ r.type === 'quotation' ? 'Cotización' : 'Pedido' }}) —
+              {{ r.seller }} · {{ r.quantity }} uds · hace {{ r.age_days }} día(s)
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
+    <!-- Formulario — oculto cuando hay alerta -->
+    @if (!stockAlert()) {
+      @if (isAdjust) {
+
+        <!-- Dirección -->
+        <div class="mb-4">
+          <label class="form-label fw-medium small text-body-secondary text-uppercase mb-2"
+                 style="letter-spacing:.05em">Dirección</label>
+          <div class="d-flex gap-2">
+            <label class="flex-fill" style="cursor:pointer">
+              <input type="radio" formControlName="direction" value="in" class="d-none" />
+              <div class="border rounded-3 p-3 text-center"
+                   [class.border-success]="direction === 'in'"
+                   [class.border-2]="direction === 'in'"
+                   [class.bg-success-subtle]="direction === 'in'"
+                   style="transition:all .15s">
+                <fa-icon icon="arrow-up" class="d-block mb-1" style="font-size:1.1rem"
+                         [class.text-success]="direction === 'in'"
+                         [class.text-body-secondary]="direction !== 'in'" />
+                <div class="fw-semibold small" [class.text-success]="direction === 'in'">Entrada</div>
+                <div class="text-body-secondary" style="font-size:.72rem">Agregar uds.</div>
+              </div>
+            </label>
+            <label class="flex-fill" style="cursor:pointer">
+              <input type="radio" formControlName="direction" value="out" class="d-none" />
+              <div class="border rounded-3 p-3 text-center"
+                   [class.border-danger]="direction === 'out'"
+                   [class.border-2]="direction === 'out'"
+                   [class.bg-danger-subtle]="direction === 'out'"
+                   style="transition:all .15s">
+                <fa-icon icon="arrow-down" class="d-block mb-1" style="font-size:1.1rem"
+                         [class.text-danger]="direction === 'out'"
+                         [class.text-body-secondary]="direction !== 'out'" />
+                <div class="fw-semibold small" [class.text-danger]="direction === 'out'">Salida</div>
+                <div class="text-body-secondary" style="font-size:.72rem">Retirar uds.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Motivo -->
+        <div class="mb-3">
+          <label class="form-label fw-medium" for="reason">Motivo</label>
+          <select cFormControl id="reason" formControlName="reason">
+            @for (r of reasons; track r.value) {
+              <option [value]="r.value">{{ r.label }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Cantidad -->
+        <div class="mb-3">
+          <label class="form-label fw-medium" for="quantity">Cantidad</label>
+          <input cFormControl id="quantity" formControlName="quantity"
+                 type="number" min="1" placeholder="1"
+                 [class.is-invalid]="form.get('quantity')?.invalid && form.get('quantity')?.touched" />
+          @if (form.get('quantity')?.invalid && form.get('quantity')?.touched) {
+            <div class="invalid-feedback">Ingrese una cantidad válida (mínimo 1).</div>
+          }
+        </div>
+
+      } @else {
+
+        <!-- Nota de reconciliación de inventario -->
+        <div class="alert alert-info py-2 mb-3 small d-flex gap-2 align-items-start">
+          <fa-icon icon="circle-info" class="flex-shrink-0 mt-1" />
+          <div>
+            El stock del sistema incluye unidades <strong>reservadas en pedidos activos</strong>
+            que aún no han salido del almacén físicamente. Si hay pedidos en preparación
+            (<em>Preparando</em> o <em>Armado</em>), sus unidades siguen en el almacén —
+            <strong>inclúyelas en tu conteo</strong>.
+          </div>
+        </div>
+
+        <!-- Cantidad contada -->
+        <div class="mb-3">
+          <label class="form-label fw-medium" for="counted_quantity">Cantidad contada</label>
+          <input cFormControl id="counted_quantity" formControlName="counted_quantity"
+                 type="number" min="0"
+                 [class.is-invalid]="form.get('counted_quantity')?.invalid && form.get('counted_quantity')?.touched" />
+          @if (form.get('counted_quantity')?.invalid && form.get('counted_quantity')?.touched) {
+            <div class="invalid-feedback">Ingrese una cantidad válida.</div>
+          }
+        </div>
+
+        <!-- Preview de diferencia -->
+        @if (countDiff !== 0) {
+          <div class="rounded-3 p-3 mb-3 d-flex align-items-center gap-2"
+               [class.bg-success-subtle]="countDiff > 0"
+               [class.bg-danger-subtle]="countDiff < 0">
+            <fa-icon [icon]="countDiff > 0 ? 'arrow-up' : 'arrow-down'"
+                     [class.text-success]="countDiff > 0"
+                     [class.text-danger]="countDiff < 0" />
+            <span class="fw-semibold"
+                  [class.text-success]="countDiff > 0"
+                  [class.text-danger]="countDiff < 0">
+              {{ countDiff > 0 ? '+' : '' }}{{ countDiff }} uds
+            </span>
+            <span class="text-body-secondary small">
+              se {{ countDiff > 0 ? 'agregarán' : 'retirarán' }} del inventario
+            </span>
+          </div>
+        } @else {
+          <div class="rounded-3 p-3 mb-3 d-flex align-items-center gap-2"
+               style="background:var(--cui-tertiary-bg)">
+            <fa-icon icon="check" class="text-success" />
+            <span class="text-body-secondary small">El stock ya coincide con el conteo. Sin cambios.</span>
+          </div>
+        }
+
+      }
+
+      <!-- Notas -->
+      <div class="mb-0">
+        <label class="form-label fw-medium" for="notes">
+          Notas <span class="fw-normal text-body-secondary small">(opcional)</span>
+        </label>
+        <textarea cFormControl id="notes" formControlName="notes"
+                  rows="2" placeholder="Observaciones opcionales..."></textarea>
+      </div>
+    }
+
+  </div>
+
+  <div class="modal-footer border-0 pt-0">
+    @if (stockAlert()) {
+      <button type="button" class="btn btn-warning px-4" (click)="modal.close(true)">
+        Entendido, cerrar
+      </button>
+    } @else {
+      <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">
+        Cancelar
+      </button>
+      <button type="submit" class="btn btn-primary px-4" [disabled]="saving()">
+        @if (saving()) {
+          <c-spinner size="sm" class="me-1" />Guardando...
+        } @else {
+          Confirmar ajuste
+        }
+      </button>
+    }
+  </div>
+</form>

@@ -1,181 +1,194 @@
-<!--<c-header class="mb-4 d-print-none" position="sticky">-->
 <ng-container>
-  <c-container [fluid]="true" class="border-bottom px-4">
-    <button
-      [cSidebarToggle]="sidebarId()"
-      cHeaderToggler
-      class="btn"
-      toggle="visible"
-      style="margin-inline-start: -14px;"
-      aria-label="Toggle sidebar navigation"
-    >
+  <c-container [fluid]="true" class="border-bottom px-2 px-sm-4">
+
+    <!-- Sidebar toggle -->
+    <button [cSidebarToggle]="sidebarId()" cHeaderToggler class="btn"
+            toggle="visible" style="margin-inline-start: -14px;" aria-label="Abrir/cerrar sidebar">
       <svg cIcon name="cilMenu" size="lg"></svg>
     </button>
-    <c-header-nav class="d-none d-md-flex">
-      <c-nav-item>
-        <a cNavLink routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-      </c-nav-item>
-      <c-nav-item>
-        <a cNavLink routerLink="/users" routerLinkActive="active">Users</a>
-      </c-nav-item>
-      <c-nav-item>
-        <a cNavLink routerLink="/settings" routerLinkActive="active">Settings</a>
-      </c-nav-item>
-    </c-header-nav>
 
-    <c-header-nav class="d-none d-md-flex ms-auto ">
-      <a cNavLink>
-        <svg cIcon class="my-1" name="cilBell" size="lg"></svg>
-      </a>
-      <a cNavLink>
-        <svg cIcon class="my-1" name="cilList" size="lg"></svg>
-      </a>
-      <a cNavLink>
-        <svg cIcon class="my-1" name="cilEnvelopeOpen" size="lg"></svg>
-      </a>
-    </c-header-nav>
-
-    <c-header-nav class="ms-auto ms-md-0">
-      <div class="nav-item py-1">
-        <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
+    <!-- Deuda pendiente con la empresa -->
+    @if (debt() > 0) {
+      <div class="d-flex align-items-center gap-1 gap-sm-2 ms-1 ms-sm-2 flex-shrink-0">
+        <a routerLink="/payments/my-collections" class="text-decoration-none"
+           title="Tienes una deuda pendiente con la empresa">
+          <c-badge color="danger" shape="rounded-pill" class="d-flex align-items-center gap-1 px-2 py-1 text-nowrap">
+            <svg cIcon name="cilWallet" size="sm"></svg>
+            <span class="fw-semibold"><span class="d-none d-sm-inline">Debes </span>S/ {{ debt() | number:'1.2-2' }}</span>
+          </c-badge>
+        </a>
+        <button cButton color="success" variant="outline" size="sm"
+                class="d-flex align-items-center py-1 px-2"
+                title="Registrar depósito"
+                (click)="openNewDeposit()">
+          <svg cIcon name="cilInstitution" size="sm"></svg>
+        </button>
       </div>
+    }
+
+    <!-- Acciones lado derecho -->
+    <c-header-nav class="ms-auto">
+
+      <!-- Campana de notificaciones -->
+      <ng-container *ngTemplateOutlet="notificationsDropdown" />
+
+      <!-- Separador -->
+      <div class="nav-item py-1">
+        <div class="vr h-100 mx-1 mx-sm-2 text-body text-opacity-75"></div>
+      </div>
+
+      <!-- Tema -->
       <ng-container *ngTemplateOutlet="themeDropdown" />
+
+      <!-- Separador -->
       <div class="nav-item py-1">
-        <div class="vr h-100 mx-2 text-body text-opacity-75"></div>
+        <div class="vr h-100 mx-1 mx-sm-2 text-body text-opacity-75"></div>
       </div>
-    </c-header-nav>
 
-    <c-header-nav class="mx-0">
+      <!-- Usuario -->
       <ng-container *ngTemplateOutlet="userDropdown" />
-    </c-header-nav>
 
+    </c-header-nav>
   </c-container>
+
+  <!-- Breadcrumb -->
   <c-container [fluid]="true" class="px-4">
     <c-breadcrumb-router />
   </c-container>
 </ng-container>
-<!--</c-header>-->
 
-<ng-template #userDropdown>
-  <c-dropdown [popperOptions]="{ placement: 'bottom-start' }" variant="nav-item">
-    <button [caret]="false" cDropdownToggle class="py-0 pe-0" aria-label="Open user menu">
-      <c-avatar
-        shape="rounded-1"
-        size="md"
-        src="./assets/images/avatars/8.jpg"
-        status="success"
-        textColor="primary"
-        alt="User avatar"
-      />
+<!-- ── Notificaciones ──────────────────────────────────────────────────── -->
+<ng-template #notificationsDropdown>
+  <c-dropdown alignment="end" variant="nav-item">
+    <button [caret]="false" cDropdownToggle class="position-relative px-2"
+            aria-label="Notificaciones">
+      <svg cIcon name="cilBell" size="lg"></svg>
+      @if (alerts().total > 0) {
+        <c-badge color="danger" shape="rounded-pill"
+                 class="position-absolute top-0 start-75 translate-middle p-1"
+                 style="font-size:0.6rem">
+          {{ alerts().total > 9 ? '9+' : alerts().total }}
+        </c-badge>
+      }
     </button>
-    <ul cDropdownMenu class="pt-0 w-auto">
-      <li>
-        <h6 cDropdownHeader class="bg-body-secondary text-body-secondary fw-semibold py-2 rounded-top">
-          Account
-        </h6>
-      </li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilBell"></svg>
-          Updates
-          <c-badge class="ms-2 float-end" color="info"> 42</c-badge>
-        </a>
-      </li>
-      <li>
-        <a cDropdownItem routerLink="/apps/email/inbox">
-          <svg cIcon class="me-2" name="cilEnvelopeOpen"></svg>
-          Messages
-          <c-badge class="ms-2 float-end" color="success">
-            42
+
+    <div cDropdownMenu class="p-0" style="min-width: 320px; max-width: 360px">
+      <div class="d-flex align-items-center justify-content-between px-3 py-2 bg-body-secondary rounded-top">
+        <span class="fw-semibold d-flex align-items-center gap-2">
+          <svg cIcon name="cilBell" size="sm"></svg>
+          Notificaciones
+        </span>
+        @if (alerts().total > 0) {
+          <c-badge color="danger" shape="rounded-pill">
+            {{ alerts().total }} pendiente{{ alerts().total !== 1 ? 's' : '' }}
           </c-badge>
-        </a>
-      </li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilTask"></svg>
-          Tasks
-          <c-badge class="ms-2 float-end" color="danger"> 42</c-badge>
-        </a>
-      </li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilCommentSquare"></svg>
-          Comments
-          <c-badge class="ms-auto" color="warning"> 42</c-badge>
-        </a>
-      </li>
-      <li>
-        <h6 cDropdownHeader class="bg-body-secondary text-body-secondary fw-semibold py-2">
-          Settings
-        </h6>
-      </li>
-      <li></li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilUser"></svg>
-          Profile
-        </a>
-      </li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilSettings"></svg>
-          Settings
-        </a>
-      </li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilCreditCard"></svg>
-          Payments
-          <c-badge class="ms-2 float-end" color="secondary">
-            42
-          </c-badge>
-        </a>
-      </li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilFile"></svg>
-          Projects
-          <c-badge class="ms-2 float-end" color="primary">
-            42
-          </c-badge>
-        </a>
-      </li>
-      <li>
-        <hr cDropdownDivider />
-      </li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilLockLocked"></svg>
-          Lock Account
-        </a>
-      </li>
-      <li>
-        <a cDropdownItem routerLink="">
-          <svg cIcon class="me-2" name="cilAccountLogout"></svg>
-          Logout
-        </a>
-      </li>
-    </ul>
+        }
+      </div>
+
+      <div style="max-height: 360px; overflow-y: auto">
+        @for (item of notificationItems(); track item.route) {
+          <a cDropdownItem [routerLink]="item.route"
+             class="d-flex align-items-center gap-3 py-2">
+            <span class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                  [class]="'bg-' + item.color + '-subtle text-' + item.color + '-emphasis'"
+                  style="width:36px;height:36px">
+              <svg cIcon [name]="item.icon" size="lg"></svg>
+            </span>
+            <span class="flex-grow-1">
+              <span class="small d-block">{{ item.label }}</span>
+              <span class="text-body-secondary" style="font-size:0.7rem">
+                @if (item.count > 0) {
+                  {{ item.count }} {{ item.count === 1 ? 'pendiente' : 'pendientes' }}
+                } @else {
+                  Sin pendientes
+                }
+              </span>
+            </span>
+            @if (item.count > 0) {
+              <c-badge [color]="item.color" shape="rounded-pill" class="flex-shrink-0">
+                {{ item.count > 99 ? '99+' : item.count }}
+              </c-badge>
+            } @else {
+              <svg cIcon name="cilCheckCircle" class="text-success flex-shrink-0" size="lg"></svg>
+            }
+          </a>
+        } @empty {
+          <div class="text-center text-body-secondary py-4 px-3">
+            <svg cIcon name="cilCheckCircle" size="xl" class="text-success mb-2"></svg>
+            <div class="small">No hay notificaciones disponibles</div>
+          </div>
+        }
+      </div>
+
+      <hr cDropdownDivider class="my-0" />
+      <button cDropdownItem
+              class="small text-body-secondary text-center d-flex align-items-center justify-content-center gap-2 py-2"
+              (click)="alertsService.load()">
+        <svg cIcon name="cilLoopCircular" size="sm"></svg>
+        Actualizar
+      </button>
+    </div>
   </c-dropdown>
 </ng-template>
 
+<!-- ── Tema ────────────────────────────────────────────────────────────── -->
 <ng-template #themeDropdown>
   <c-dropdown alignment="end" variant="nav-item">
-    <button [caret]="false" cDropdownToggle aria-label="Open theme picker">
-      <svg cIcon [name]="icons()" size="lg"></svg>
+    <button [caret]="false" cDropdownToggle aria-label="Cambiar tema">
+      <svg cIcon [name]="themeIcon()" size="lg"></svg>
     </button>
     <div cDropdownMenu>
       @for (mode of colorModes; track mode.name) {
-        <button
-          (click)="colorMode.set(mode.name)"
-          [active]="colorMode()===mode.name"
-          cDropdownItem
-          class="d-flex align-items-center"
-        >
+        <button cDropdownItem (click)="colorMode.set(mode.name)"
+                [active]="colorMode() === mode.name"
+                class="d-flex align-items-center">
           <svg cIcon class="me-2" [name]="mode.icon" size="lg"></svg>
           {{ mode.text }}
         </button>
       }
     </div>
+  </c-dropdown>
+</ng-template>
+
+<!-- ── Usuario ─────────────────────────────────────────────────────────── -->
+<ng-template #userDropdown>
+  <c-dropdown alignment="end" variant="nav-item">
+    <button [caret]="false" cDropdownToggle class="py-0 pe-0"
+            aria-label="Menú de usuario">
+      <div class="d-flex align-items-center gap-2 px-1">
+        <div class="d-flex flex-column align-items-end d-none d-md-flex">
+          <span class="small fw-semibold lh-1">{{ auth.user()?.name }}</span>
+          <span class="text-muted" style="font-size:0.7rem">{{ auth.user()?.roles?.[0] ?? 'usuario' }}</span>
+        </div>
+        <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold"
+             style="width:34px;height:34px;font-size:0.85rem">
+          {{ (auth.user()?.name ?? 'U')[0].toUpperCase() }}
+        </div>
+      </div>
+    </button>
+
+    <ul cDropdownMenu class="pt-0" style="min-width:200px">
+      <li>
+        <div class="bg-body-secondary px-3 py-2 rounded-top">
+          <div class="fw-semibold small">{{ auth.user()?.name }}</div>
+          <div class="text-muted" style="font-size:0.75rem">{{ auth.user()?.email }}</div>
+        </div>
+      </li>
+      <li><hr cDropdownDivider /></li>
+      <li>
+        <a cDropdownItem routerLink="/settings/empresa" class="d-flex align-items-center gap-2">
+          <svg cIcon name="cilSettings" size="sm"></svg>
+          Mi Empresa
+        </a>
+      </li>
+      <li><hr cDropdownDivider /></li>
+      <li>
+        <button cDropdownItem (click)="logout()"
+                class="d-flex align-items-center gap-2 text-danger">
+          <svg cIcon name="cilAccountLogout" size="sm"></svg>
+          Cerrar sesión
+        </button>
+      </li>
+    </ul>
   </c-dropdown>
 </ng-template>

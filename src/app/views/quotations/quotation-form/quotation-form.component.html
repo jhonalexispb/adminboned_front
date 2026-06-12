@@ -1,0 +1,1422 @@
+<style>
+  .catalog-card { display: flex; flex-direction: column; }
+  .catalog-card-img { width: 100%; aspect-ratio: 1.7/1; position: relative; flex-shrink: 0; background: var(--cui-tertiary-bg); }
+  .catalog-card-info { display: flex; flex-direction: column; flex-grow: 1; padding: .5rem; min-width: 0; }
+  .catalog-name { font-weight: 600; font-size: .8rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .catalog-price { font-weight: 700; font-size: .9rem; margin-top: .15rem; }
+  .catalog-badges { display: flex; flex-wrap: wrap; gap: .2rem; min-width: 0; margin-top: .25rem; }
+  .catalog-actions { display: flex; flex-direction: row; gap: .25rem; align-items: stretch; margin-top: auto; padding-top: .35rem; }
+  .catalog-stepper { flex: 1 1 50%; min-width: 0; }
+  .catalog-stepper .btn { padding: .4rem .7rem; font-size: 1rem; }
+  .catalog-stepper input { font-size: .9rem; }
+  .catalog-add-btn { flex: 1 1 50%; min-width: 0; font-size: .75rem; padding: .25rem .5rem; white-space: nowrap; }
+  .catalog-modal-add-btn { min-width: 0; }
+
+  .catalog-tiers { display: flex; align-items: stretch; flex-wrap: wrap; margin-top: .25rem; font-size: .65rem; border: 1px solid var(--cui-border-color); border-radius: .375rem; overflow: hidden; }
+  .catalog-tiers-label { display: flex; align-items: center; padding: .2rem .4rem; background: var(--cui-tertiary-bg); color: var(--cui-secondary-color); flex-shrink: 0; }
+  .catalog-tier { display: flex; align-items: baseline; gap: .2rem; padding: .2rem .45rem; border-left: 1px solid var(--cui-border-color); transition: background-color .2s, color .2s; }
+  .catalog-tier-qty { color: var(--cui-secondary-color); font-size: .6rem; }
+  .catalog-tier-price { font-weight: 700; }
+  .catalog-tier.active { background: var(--cui-success); color: #fff; animation: catalog-tier-glow 1.6s ease-in-out infinite; }
+  .catalog-tier.active .catalog-tier-qty { color: rgba(255,255,255,.85); }
+
+  @keyframes catalog-tier-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(var(--cui-success-rgb), .55); }
+    50% { box-shadow: 0 0 0 4px rgba(var(--cui-success-rgb), 0); }
+  }
+
+  @media (min-width: 576px) {
+    .catalog-card { flex-direction: row; }
+    .catalog-card-img { width: 70%; aspect-ratio: 1.4/1; }
+    .catalog-card-info { width: 30%; padding: .5rem; }
+    .catalog-name { font-size: .8rem; -webkit-line-clamp: 2; }
+    .catalog-price { font-size: .85rem; }
+    .catalog-actions { flex-direction: column; margin-top: 0; padding-top: .5rem; gap: .4rem; }
+    .catalog-stepper, .catalog-add-btn { width: 100%; flex: none; }
+    .catalog-stepper .btn { padding: .55rem .75rem; font-size: 1.15rem; }
+    .catalog-add-btn { font-size: .8rem; padding: .4rem; }
+    .catalog-modal-add-btn { min-width: 110px; }
+  }
+</style>
+
+<app-page-header
+  [title]="editMode() ? ('Editar ' + (quotation()?.code ?? 'cotización')) : 'Nueva cotización'">
+  <div class="d-none d-md-flex align-items-center gap-2">
+    <a routerLink="/quotations" class="btn btn-secondary btn-sm">Volver</a>
+    @if (quotationId() && activeTab() === 'datos') {
+      <button class="btn btn-primary btn-sm" (click)="save()" [disabled]="savingShipping()">
+        @if (savingShipping()) { <c-spinner size="sm" class="me-1" /> } @else { <fa-icon icon="floppy-disk" class="me-1" /> }
+        Guardar
+      </button>
+    }
+    @if (quotationId() && items().length > 0) {
+      <button class="btn btn-success btn-sm" (click)="approveQuotation()" [disabled]="approvingQuotation()">
+        @if (approvingQuotation()) { <c-spinner size="sm" class="me-1" /> } @else { <fa-icon icon="check" class="me-1" /> }
+        Aprobar
+      </button>
+    }
+  </div>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+<!-- ══ TABS ════════════════════════════════════════════════════════════════════ -->
+<div class="mb-3">
+  <div class="btn-group w-100" role="group">
+    <button type="button" class="btn btn-outline-primary py-2 fw-semibold"
+            [class.active]="activeTab() === 'datos'"
+            (click)="activeTab.set('datos')">
+      <fa-icon icon="user" class="me-2" />Datos del pedido
+      @if (canGoToProducts) {
+        <fa-icon icon="check" class="ms-2"
+                 [class.text-white]="activeTab() === 'datos'"
+                 [class.text-success]="activeTab() !== 'datos'" />
+      }
+    </button>
+    <button type="button" class="btn btn-outline-primary py-2 fw-semibold"
+            [class.active]="activeTab() === 'productos'"
+            [disabled]="!canGoToProducts"
+            (click)="canGoToProducts && activeTab.set('productos')">
+      <fa-icon icon="box" class="me-2" />Productos
+      @if (uniqueProductIds().size) {
+        <span class="badge ms-1"
+              [class.bg-white]="activeTab() === 'productos'"
+              [class.text-primary]="activeTab() === 'productos'"
+              [class.bg-primary]="activeTab() !== 'productos'">
+          {{ uniqueProductIds().size }}
+        </span>
+      }
+    </button>
+  </div>
+</div>
+
+<!-- ══ TAB: DATOS DEL PEDIDO ══════════════════════════════════════════════════ -->
+@if (activeTab() === 'datos') {
+
+  <!-- Cliente + Tipo de documento -->
+  <c-card class="mb-3">
+    <c-card-header class="d-flex align-items-center justify-content-between py-2">
+      <strong>Cliente</strong>
+      <button cButton color="success" size="sm" variant="outline" (click)="openNewClientModal()">
+        <fa-icon icon="plus" class="me-1" />Nuevo
+      </button>
+    </c-card-header>
+    <c-card-body>
+      <app-client-select
+        [value]="selectedClient"
+        (valueChange)="onClientChange($event)"
+        [disabled]="!!quotationId() && !editMode()" />
+      @if (form.get('client_id')?.invalid && form.get('client_id')?.touched) {
+        <div class="text-danger small mt-1">Selecciona un cliente.</div>
+      }
+
+      <!-- Tipo de documento -->
+      <div class="mt-3">
+        <label class="form-label fw-semibold mb-2">
+          <fa-icon icon="file-invoice" class="me-1 text-body-secondary" />Tipo de documento
+        </label>
+        <div class="d-flex gap-2 flex-wrap">
+          @for (opt of docTypeOptions; track opt.value) {
+            <label class="d-flex align-items-center gap-2 px-3 py-2 rounded border"
+                   style="cursor:pointer;"
+                   [style.border-color]="form.get('document_type')?.value === opt.value ? 'var(--cui-primary)' : 'var(--cui-border-color)'"
+                   [style.background]="form.get('document_type')?.value === opt.value ? 'var(--cui-primary-bg-subtle)' : 'transparent'">
+              <input type="radio" class="form-check-input m-0"
+                     [value]="opt.value"
+                     [formControl]="$any(form.get('document_type'))" />
+              <span class="fw-medium" style="font-size:.9rem;">{{ opt.label }}</span>
+              @if (opt.req) {
+                <span class="badge bg-secondary" style="font-size:.65rem;">{{ opt.req }}</span>
+              } @else {
+                <span class="badge bg-info" style="font-size:.65rem;">Interno</span>
+              }
+            </label>
+          }
+        </div>
+
+        @if (docBlocker) {
+          <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mt-2 mb-0">
+            <fa-icon icon="triangle-exclamation" class="flex-shrink-0" />
+            <div class="flex-grow-1 small">
+              <strong>{{ selectedClient?.business_name || selectedClient?.name }}</strong> no tiene
+              {{ docBlocker.label }} registrado. No se puede emitir este documento sin él.
+            </div>
+            <button type="button" class="btn btn-sm btn-danger fw-semibold text-nowrap"
+                    (click)="openEditIdModal()">
+              <fa-icon icon="pen" class="me-1" />Agregar {{ docBlocker.label }}
+            </button>
+          </div>
+        }
+        @if (form.get('document_type')?.value === 'receipt') {
+          <div class="text-body-secondary small mt-2 d-flex align-items-center gap-1">
+            <fa-icon icon="circle-info" />
+            Boleta: se emite a personas naturales. SUNAT requiere DNI para montos ≥ S/700.
+          </div>
+        }
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- Envío y notas -->
+  <c-card class="mb-3" [class.border-danger]="shippingRequired">
+    <c-card-header class="py-2">
+      <div class="d-flex align-items-center gap-2">
+        <strong>Envío y notas</strong>
+        @if (shippingRequired) {
+          <span class="badge bg-danger" style="font-size:.7rem;">Requerido</span>
+        }
+      </div>
+    </c-card-header>
+    <c-card-body>
+
+      <!-- Tipo de envío -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">
+          Tipo de envío <span class="text-danger">*</span>
+        </label>
+        <p-select
+          [formControl]="$any(form.get('shipping_type'))"
+          [options]="shippingTypeOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Sin especificar"
+          [showClear]="true"
+          styleClass="w-100"
+          appendTo="body" />
+      </div>
+
+      <!-- Transportista (solo provincia) -->
+      @if (isProvince) {
+        <div class="mb-3">
+          <div class="d-flex align-items-center justify-content-between mb-1">
+            <label class="form-label fw-semibold mb-0">Transportista</label>
+            <button type="button" cButton color="primary" size="sm" variant="ghost"
+                    class="p-0" (click)="openNewCarrierModal()">
+              <fa-icon icon="plus" class="me-1" />Nuevo
+            </button>
+          </div>
+          <p-select
+            [formControl]="$any(form.get('carrier_id'))"
+            [options]="carriers()"
+            optionLabel="name"
+            optionValue="id"
+            placeholder="Seleccionar transportista"
+            [showClear]="true"
+            styleClass="w-100"
+            appendTo="body" />
+        </div>
+      }
+
+      <!-- Notas generales -->
+      <div class="mb-0">
+        <label class="form-label fw-semibold">Notas generales</label>
+        <textarea [formControl]="$any(form.get('notes'))" class="form-control" rows="3"
+                  placeholder="Notas internas o para el cliente..."></textarea>
+      </div>
+
+      @if (!quotationId()) {
+        <div class="text-body-secondary small mt-3 d-flex align-items-start gap-2">
+          <fa-icon icon="circle-info" class="mt-1 flex-shrink-0" />
+          <span>Los datos se guardarán automáticamente al agregar el primer producto.</span>
+        </div>
+      }
+
+    </c-card-body>
+  </c-card>
+
+  <!-- Botón continuar -->
+  <div class="d-flex flex-column gap-2 mb-3">
+    @if (!canGoToProducts) {
+      <div class="d-flex flex-column gap-1 small text-body-secondary">
+        @if (!form.get('client_id')?.value) {
+          <span><fa-icon icon="circle-xmark" class="text-danger me-1" />Selecciona un cliente</span>
+        }
+        @if (!form.get('document_type')?.value) {
+          <span><fa-icon icon="circle-xmark" class="text-danger me-1" />Selecciona el tipo de documento</span>
+        }
+        @if (docBlocker) {
+          <span><fa-icon icon="circle-xmark" class="text-danger me-1" />Agrega el {{ docBlocker.label }} del cliente</span>
+        }
+        @if (!form.get('shipping_type')?.value) {
+          <span><fa-icon icon="circle-xmark" class="text-danger me-1" />Selecciona el tipo de envío</span>
+        }
+        @if (form.get('shipping_type')?.value === 'province' && !form.get('carrier_id')?.value) {
+          <span><fa-icon icon="circle-xmark" class="text-danger me-1" />Selecciona el transportista</span>
+        }
+      </div>
+    }
+    <button type="button" class="btn btn-primary w-100 py-2 fw-semibold"
+            [disabled]="!canGoToProducts"
+            (click)="activeTab.set('productos')">
+      <fa-icon icon="arrow-right" class="me-2" />Continuar a productos
+    </button>
+  </div>
+
+}
+
+<!-- ══ TAB: PRODUCTOS ═════════════════════════════════════════════════════════ -->
+@if (activeTab() === 'productos') {
+
+  <!-- Buscar producto / Catálogo -->
+  <c-card class="mb-3">
+    <c-card-body class="p-3">
+      <div class="d-flex flex-column flex-sm-row gap-2">
+        <button
+          type="button"
+          class="btn btn-outline-primary flex-grow-1 d-flex align-items-center gap-3 text-start"
+          style="min-height:56px; border-radius:10px; border-width:2px;"
+          (click)="openProductSearch()">
+          <fa-icon icon="search" style="font-size:1.2rem;" />
+          <span class="flex-grow-1" style="font-size:1rem;">Buscar y agregar producto...</span>
+          @if (uniqueProductIds().size) {
+            <span class="badge bg-primary rounded-pill" style="font-size:.8rem;">
+              {{ uniqueProductIds().size }}
+            </span>
+          }
+        </button>
+        <button
+          type="button"
+          class="btn btn-success d-flex align-items-center justify-content-center gap-2"
+          style="min-height:56px; border-radius:10px;"
+          (click)="openCatalog()">
+          <fa-icon icon="table-cells" style="font-size:1.2rem;" />
+          <span style="font-size:1rem;">Catálogo</span>
+        </button>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- Ítems -->
+  @if (groupedItems().length) {
+    <c-card class="mb-3">
+      <c-card-header><strong>Ítems de la cotización</strong></c-card-header>
+      <c-card-body class="p-0">
+
+        <!-- Móvil: tarjetas -->
+        <div class="d-md-none">
+          @for (group of groupedItems(); track group.productId) {
+            <div class="border-bottom px-3 py-3">
+              <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                <div style="min-width:0;">
+                  <div class="d-flex align-items-center gap-2 flex-wrap lh-sm">
+                    @if (group.productLaboratory) {
+                      <span class="text-info me-1" style="font-size:.8rem;">{{ group.productLaboratory }}</span>
+                    }
+                    <span class="fw-semibold">{{ group.productName }}</span>
+                    @let groupTotalQtyM = group.lots.reduce((s, l) => s + l.quantity, 0);
+                    <span class="badge bg-primary-subtle text-primary-emphasis" style="font-size:.72rem;">{{ groupTotalQtyM }} uds</span>
+                  </div>
+                  @let tierLabel = appliedTierLabel(group.productId, group.lots[0].unit_price);
+                  @if (tierLabel) {
+                    <span class="badge bg-success mt-1" style="font-size:.65rem;">{{ tierLabel }}</span>
+                  }
+                </div>
+                <div class="d-flex gap-2 flex-shrink-0">
+                  <button type="button" class="btn btn-sm btn-primary"
+                          style="min-width:40px; min-height:40px;"
+                          (click)="openModalForProduct(group.productId)">
+                    <fa-icon icon="pen" />
+                  </button>
+                  <button type="button" class="btn btn-sm btn-danger"
+                          style="min-width:40px; min-height:40px;"
+                          [disabled]="removingId() === group.productId"
+                          (click)="removeProduct(group.productId)">
+                    @if (removingId() === group.productId) {
+                      <c-spinner size="sm" />
+                    } @else {
+                      <fa-icon icon="trash" />
+                    }
+                  </button>
+                </div>
+              </div>
+              @for (lot of group.lots; track lot.id) {
+                <div class="ps-2 mb-1" style="border-left:3px solid var(--cui-border-color);">
+                  @if (isRealLot(lot.lot_number)) {
+                    <div class="d-flex align-items-center gap-1 flex-wrap" style="font-size:.76rem;">
+                      <span class="text-body-secondary fw-medium">Lote {{ lot.lot_number }}</span>
+                      @if (lot.expiry_date) {
+                        <span class="badge {{ expiryBadgeClass(lot.expiry_date) }}" style="font-size:.65rem;">
+                          {{ expiryLabel(lot.expiry_date) }}
+                        </span>
+                      }
+                    </div>
+                  }
+                  <div class="d-flex align-items-center justify-content-between mt-1">
+                    <span class="text-body-secondary" style="font-size:.8rem;">
+                      {{ lot.quantity }} u. × S/ {{ lot.unit_price | number:'1.2-2' }}
+                    </span>
+                    <span class="fw-semibold" style="font-size:.88rem; white-space:nowrap;">
+                      S/ {{ lot.total | number:'1.2-2' }}
+                    </span>
+                  </div>
+                </div>
+              }
+              <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                <span class="text-body-secondary small">Subtotal</span>
+                <span class="fw-bold">S/ {{ groupTotal(group.lots) | number:'1.2-2' }}</span>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Escritorio: tabla -->
+        <div class="d-none d-md-block table-responsive">
+          <table class="table table-sm mb-0" style="font-size:.875rem;">
+            <thead>
+              <tr>
+                <th class="ps-3">Producto / Lote</th>
+                <th class="text-end">Cant.</th>
+                <th class="text-end">P. Unit.</th>
+                <th class="text-end">Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (group of groupedItems(); track group.productId) {
+                @for (lot of group.lots; track lot.id; let isFirst = $first; let isLast = $last) {
+                  <tr>
+                    <td class="ps-3">
+                      @if (isFirst) {
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                          @if (group.productLaboratory) {
+                            <span class="text-info me-1" style="font-size:.78rem;">{{ group.productLaboratory }}</span>
+                          }
+                          <span class="fw-semibold">{{ group.productName }}</span>
+                          @let groupTotalQty = group.lots.reduce((s, l) => s + l.quantity, 0);
+                          <span class="badge bg-primary-subtle text-primary-emphasis" style="font-size:.65rem;">{{ groupTotalQty }} uds</span>
+                          @let tierLabel = appliedTierLabel(group.productId, lot.unit_price);
+                          @if (tierLabel) {
+                            <span class="badge bg-success" style="font-size:.65rem;">{{ tierLabel }}</span>
+                          }
+                        </div>
+                      }
+                      @if (isRealLot(lot.lot_number)) {
+                        <small class="text-muted">
+                          Lote {{ lot.lot_number }}
+                          @if (lot.expiry_date) {
+                            <span class="badge {{ expiryBadgeClass(lot.expiry_date) }} ms-1" style="font-size:.65rem;">
+                              {{ expiryLabel(lot.expiry_date) }}
+                            </span>
+                          }
+                        </small>
+                      }
+                    </td>
+                    <td class="text-end">{{ lot.quantity }}</td>
+                    <td class="text-end">S/ {{ lot.unit_price | number:'1.2-2' }}</td>
+                    <td class="text-end fw-semibold">S/ {{ lot.total | number:'1.2-2' }}</td>
+                    <td class="text-center" style="width:90px;">
+                      @if (isLast) {
+                        <div class="d-flex gap-1 justify-content-center">
+                          <button type="button"
+                                  class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                                  style="min-width:36px;font-size:.7rem;"
+                                  (click)="openModalForProduct(group.productId)">
+                            <fa-icon icon="pen" /><small>Editar</small>
+                          </button>
+                          <button type="button"
+                                  class="btn btn-sm btn-danger d-flex flex-column align-items-center"
+                                  style="min-width:36px;font-size:.7rem;"
+                                  [disabled]="removingId() === group.productId"
+                                  (click)="removeProduct(group.productId)">
+                            @if (removingId() === group.productId) {
+                              <c-spinner size="sm" />
+                            } @else {
+                              <fa-icon icon="trash" /><small>Quitar</small>
+                            }
+                          </button>
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+            <tfoot>
+              <tr class="fw-bold">
+                <td colspan="3" class="text-end ps-3">Total</td>
+                <td class="text-end">S/ {{ total | number:'1.2-2' }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- Error -->
+  @if (error()) {
+    <div class="alert alert-danger alert-dismissible">
+      {{ error() }}
+      <button type="button" class="btn-close" (click)="error.set('')"></button>
+    </div>
+  }
+
+  <!-- Espaciado sticky footer móvil -->
+  @if (quotationId()) {
+    <div class="d-md-none" style="height:88px;"></div>
+  }
+
+}
+
+} <!-- /loading -->
+
+<!-- ══ MODAL EDITAR DNI / RUC DEL CLIENTE ════════════════════════════════════ -->
+@if (editIdModal(); as m) {
+  <c-modal [visible]="true" (visibleChange)="!$event && closeEditIdModal()" alignment="center">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="id-card" class="me-2 text-primary" />
+        Agregar {{ m.label }} al cliente
+      </h5>
+    </c-modal-header>
+    <c-modal-body>
+      <p class="small text-body-secondary mb-3">
+        El documento seleccionado requiere el <strong>{{ m.label }}</strong> del cliente.
+        Ingrésalo para continuar.
+      </p>
+      <label class="form-label fw-semibold">{{ m.label }} <span class="text-danger">*</span></label>
+      <div class="input-group">
+        <input type="text" class="form-control font-monospace"
+               [placeholder]="m.field === 'ruc' ? '20xxxxxxxxx (11 dígitos)' : '8 dígitos'"
+               [maxlength]="m.field === 'ruc' ? 11 : 8"
+               [(ngModel)]="m.value"
+               [ngModelOptions]="{standalone: true}"
+               (input)="consultIdResult.set(null); consultIdError.set('')"
+               (keyup.enter)="consultId()" />
+        <button type="button" class="btn btn-outline-secondary"
+                [disabled]="consultingId() || (m.field === 'ruc' ? m.value.length !== 11 : m.value.length !== 8)"
+                (click)="consultId()">
+          @if (consultingId()) { <c-spinner size="sm" /> }
+          @else { <fa-icon icon="search" /> }
+        </button>
+      </div>
+
+      @if (consultIdError()) {
+        <div class="text-danger small mt-2">{{ consultIdError() }}</div>
+        <div class="mt-3">
+          <label class="form-label fw-semibold">
+            {{ m.field === 'dni' ? 'Nombre completo' : 'Razón social' }}
+            <span class="text-danger">*</span>
+          </label>
+          <input type="text" class="form-control"
+                 [placeholder]="m.field === 'dni' ? 'Ej: Juan Pérez García' : 'Ej: EMPRESA SAC'"
+                 [ngModel]="manualClientName()"
+                 (ngModelChange)="manualClientName.set($event)"
+                 [ngModelOptions]="{standalone: true}" />
+          <div class="form-text">No se encontró en el registro. Ingresa el nombre manualmente.</div>
+        </div>
+      }
+
+      @if (consultIdResult(); as res) {
+        <div class="mt-3 p-2 rounded bg-body-tertiary">
+          @if (m.field === 'dni') {
+            <div class="fw-semibold">{{ $any(res).nombre_completo }}</div>
+            <div class="text-body-secondary small">DNI: {{ $any(res).dni }}</div>
+          } @else {
+            <div class="fw-semibold">{{ $any(res).razon_social }}</div>
+            @if ($any(res).nombre_comercial) {
+              <div class="text-body-secondary small">{{ $any(res).nombre_comercial }}</div>
+            }
+            <div class="d-flex gap-2 mt-1 flex-wrap" style="font-size:.78rem;">
+              <span [class]="$any(res).estado === 'ACTIVO' ? 'text-success' : 'text-danger'">
+                {{ $any(res).estado }}
+              </span>
+              <span class="text-body-secondary">·</span>
+              <span [class]="$any(res).condicion === 'HABIDO' ? 'text-success' : 'text-warning'">
+                {{ $any(res).condicion }}
+              </span>
+              @if (!$any(res).puede_facturar) {
+                <span class="text-danger fw-semibold">· No puede facturar</span>
+              }
+            </div>
+          }
+        </div>
+      }
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="savingClientId()" (click)="closeEditIdModal()">Cancelar</button>
+      <button cButton color="primary" [disabled]="!m.value.trim() || savingClientId()" (click)="saveClientId()" title="Guarda el {{ m.label }} y actualiza el cliente">
+        @if (savingClientId()) { <c-spinner size="sm" class="me-1" /> }
+        Guardar {{ m.label }}
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- ══ MODAL NUEVO TRANSPORTISTA ═════════════════════════════════════════════ -->
+<c-modal [visible]="showNewCarrierModal()" (visibleChange)="!$event && closeNewCarrierModal()" size="lg" [scrollable]="true">
+  <c-modal-header>
+    <h5 cModalTitle><fa-icon icon="truck" class="me-2" />Nuevo transportista</h5>
+  </c-modal-header>
+
+  <c-modal-body>
+    <div class="row g-3">
+
+      <!-- Col izquierda: datos del transportista -->
+      <div class="col-12 col-md-6">
+
+        <!-- Nombre -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" placeholder="Ej: Olva Courier"
+                 [(ngModel)]="newCarrierName" [ngModelOptions]="{standalone: true}">
+        </div>
+
+        <!-- RUC + Teléfono -->
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label fw-semibold">RUC</label>
+            <input type="text" class="form-control font-monospace"
+                   placeholder="20xxxxxxxxx" maxlength="11"
+                   [(ngModel)]="newCarrierRuc" [ngModelOptions]="{standalone: true}">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold">Teléfono</label>
+            <input type="text" class="form-control"
+                   placeholder="9xx xxx xxx"
+                   [(ngModel)]="newCarrierPhone" [ngModelOptions]="{standalone: true}">
+          </div>
+        </div>
+
+        <!-- Dirección -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">
+            <fa-icon icon="location-dot" class="me-1 text-body-secondary" />Dirección
+          </label>
+          <input type="text" class="form-control"
+                 placeholder="Ej: Calle Los Prados 123, Lima"
+                 [(ngModel)]="newCarrierAddress" [ngModelOptions]="{standalone: true}">
+        </div>
+
+        <!-- Departamento / Provincia / Distrito -->
+        <div class="mb-2">
+          <label class="form-label fw-semibold">Departamento</label>
+          <p-select
+            [options]="newCarrierDepartments()"
+            optionLabel="name"
+            optionValue="id"
+            [ngModel]="newCarrierDeptId()"
+            (ngModelChange)="onNewCarrierDept($event)"
+            [ngModelOptions]="{standalone: true}"
+            placeholder="Seleccionar departamento"
+            [showClear]="true"
+            [filter]="true"
+            filterBy="name"
+            [style]="{ width: '100%' }"
+            appendTo="body" />
+        </div>
+        <div class="mb-2">
+          <label class="form-label fw-semibold">Provincia</label>
+          <p-select
+            [options]="newCarrierProvinces()"
+            optionLabel="name"
+            optionValue="id"
+            [ngModel]="newCarrierProvId()"
+            (ngModelChange)="onNewCarrierProv($event)"
+            [ngModelOptions]="{standalone: true}"
+            placeholder="Seleccionar provincia"
+            [showClear]="true"
+            [filter]="true"
+            filterBy="name"
+            [disabled]="!newCarrierDeptId()"
+            [style]="{ width: '100%' }"
+            appendTo="body" />
+        </div>
+        <div class="mb-0">
+          <label class="form-label fw-semibold">Distrito</label>
+          <p-select
+            [options]="newCarrierDistricts()"
+            optionLabel="name"
+            optionValue="id"
+            [ngModel]="newCarrierDistId()"
+            (ngModelChange)="newCarrierDistId.set($event)"
+            [ngModelOptions]="{standalone: true}"
+            placeholder="Seleccionar distrito"
+            [showClear]="true"
+            [filter]="true"
+            filterBy="name"
+            [disabled]="!newCarrierProvId()"
+            [style]="{ width: '100%' }"
+            appendTo="body" />
+        </div>
+      </div>
+
+      <!-- Col derecha: mapa GPS -->
+      <div class="col-12 col-md-6">
+        <label class="form-label fw-semibold">
+          <fa-icon icon="map-location-dot" class="me-1 text-body-secondary" />Coordenadas GPS
+        </label>
+
+        @if (newCarrierLat() !== null && newCarrierLng() !== null) {
+          <div class="d-flex align-items-center gap-2 mb-2 p-2 alert alert-success rounded">
+            <fa-icon icon="location-dot" class="text-success flex-shrink-0" />
+            <span class="font-monospace small flex-grow-1">
+              {{ newCarrierLat()! | number:'1.5-5' }}, {{ newCarrierLng()! | number:'1.5-5' }}
+            </span>
+            <button type="button" cButton color="danger" size="sm" variant="ghost"
+                    class="p-0 ms-1" (click)="clearCarrierCoords()">
+              <fa-icon icon="xmark" />
+            </button>
+          </div>
+        }
+
+        <button type="button" cButton color="secondary" size="sm" class="w-100 mb-2"
+                [disabled]="gettingCarrierLocation()"
+                (click)="useCarrierLocation()">
+          @if (gettingCarrierLocation()) {
+            <c-spinner size="sm" class="me-1" />Obteniendo ubicación...
+          } @else {
+            <fa-icon icon="location-crosshairs" class="me-1" />Usar mi ubicación actual
+          }
+        </button>
+
+        @if (carrierLocationError) {
+          <div class="text-danger small mb-2">{{ carrierLocationError }}</div>
+        }
+
+        <div class="text-body-secondary small mb-1">Clic en el mapa para marcar la posición</div>
+        <div #carrierMapEl style="height:260px; border-radius:8px; overflow:hidden;"
+             class="border"></div>
+      </div>
+
+    </div>
+  </c-modal-body>
+
+  <c-modal-footer>
+    <button cButton color="secondary" (click)="closeNewCarrierModal()">Cancelar</button>
+    <button cButton color="primary"
+            [disabled]="!newCarrierName.trim() || savingCarrier()"
+            (click)="createCarrierInline()">
+      @if (savingCarrier()) {
+        <c-spinner size="sm" class="me-1" />Guardando...
+      } @else {
+        <fa-icon icon="floppy-disk" class="me-1" />Guardar y seleccionar
+      }
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- ══ BARRA INFERIOR STICKY (solo móvil) ════════════════════════════════════ -->
+@if (!loading() && quotationId()) {
+  <div class="d-md-none position-fixed bottom-0 start-0 end-0 border-top shadow bg-body p-3"
+       style="z-index:1040;">
+    <div class="d-flex align-items-center justify-content-between gap-2">
+      <a routerLink="/quotations" class="btn btn-secondary btn-sm">Ir al listado</a>
+      <div class="text-center">
+        <div class="text-body-secondary" style="font-size:.72rem;line-height:1;">Total</div>
+        <div class="fw-bold fs-5 lh-sm">S/ {{ total | number:'1.2-2' }}</div>
+      </div>
+      @if (activeTab() === 'datos') {
+        <button class="btn btn-primary btn-sm" (click)="save()" [disabled]="savingShipping()">
+          @if (savingShipping()) { <c-spinner size="sm" /> }
+          @else { <fa-icon icon="floppy-disk" class="me-1" /> }
+          Guardar
+        </button>
+      } @else if (items().length > 0) {
+        <button class="btn btn-success btn-sm" (click)="approveQuotation()" [disabled]="approvingQuotation()">
+          @if (approvingQuotation()) { <c-spinner size="sm" /> }
+          @else { <fa-icon icon="check" class="me-1" /> }
+          Aprobar
+        </button>
+      } @else {
+        <div style="width:80px;"></div>
+      }
+    </div>
+  </div>
+}
+
+<!-- Overlay de carga al consultar stock de un producto -->
+@if (loadingProduct() && !showProductSearch()) {
+  <div class="position-fixed d-flex flex-column align-items-center justify-content-center gap-3"
+       style="inset:0; background:rgba(0,0,0,.55); z-index:1070;">
+    <c-spinner color="light" style="width:3rem;height:3rem;" />
+    <span class="text-white fw-semibold" style="font-size:.95rem;">Consultando stock...</span>
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     BÚSQUEDA DE PRODUCTOS — Bottom sheet flotante
+     ══════════════════════════════════════════════════════════════════════════ -->
+@if (showProductSearch()) {
+  <!-- Backdrop -->
+  <div class="position-fixed"
+       style="inset:0; background:rgba(0,0,0,.6); z-index:1060;"
+       (click)="closeProductSearch()">
+  </div>
+
+  <!-- Sheet flotante — anclado al TOP con márgenes en todos lados -->
+  <div class="position-fixed d-flex flex-column"
+       style="top:10px; left:10px; right:10px;
+              max-width:600px; margin-inline:auto;
+              height:88dvh;
+              border-radius:16px;
+              background:var(--cui-body-bg);
+              box-shadow:0 8px 40px rgba(0,0,0,.35);
+              z-index:1061; overflow:hidden;"
+       (click)="$event.stopPropagation()">
+
+    <!-- Header fijo -->
+    <div class="flex-shrink-0 pt-3 pb-0">
+
+      <!-- Buscador -->
+      <div class="px-3 pb-2 d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 rounded-pill px-3 flex-grow-1"
+             style="background:var(--cui-tertiary-bg); border:1.5px solid var(--cui-border-color); min-height:48px;">
+          <fa-icon icon="search" class="text-body-secondary flex-shrink-0" />
+          <input
+            id="product-search-input"
+            type="search"
+            class="form-control border-0 bg-transparent ps-1"
+            style="font-size:1rem; height:44px;"
+            placeholder="Nombre o código del producto..."
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+            autocomplete="off">
+          @if (searchQuery()) {
+            <button class="btn btn-sm btn-link text-body-secondary p-0 flex-shrink-0"
+                    type="button" (click)="searchQuery.set('')">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+        </div>
+        <button class="btn-close flex-shrink-0" type="button"
+                (click)="closeProductSearch()"></button>
+      </div>
+
+      <!-- Contador -->
+      <div class="px-4 pb-2 d-flex justify-content-between align-items-center">
+        <span class="text-body-secondary" style="font-size:.8rem;">
+          {{ filteredProducts().length }} resultado{{ filteredProducts().length !== 1 ? 's' : '' }}
+        </span>
+        @if (uniqueProductIds().size) {
+          <span class="fw-semibold text-success" style="font-size:.8rem;">
+            <fa-icon icon="check" class="me-1" />{{ uniqueProductIds().size }} en cotización
+          </span>
+        }
+      </div>
+
+      <div style="height:1px; background:var(--cui-border-color);"></div>
+    </div>
+
+    <!-- Cargando producto seleccionado -->
+    @if (loadingProduct()) {
+      <div class="position-absolute d-flex align-items-center justify-content-center"
+           style="inset:0; background:rgba(0,0,0,.35); z-index:10; border-radius:16px;">
+        <c-spinner color="light" />
+      </div>
+    }
+
+    <!-- Lista scrollable -->
+    <div style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;">
+      @for (product of filteredProducts(); track product.id) {
+        @let added = uniqueProductIds().has(product.id);
+        @let avail = (product.lots_info?.available_stock ?? 0);
+
+        <div class="d-flex align-items-stretch border-bottom"
+             style="cursor:pointer; min-height:84px; position:relative;"
+             [style.background]="added ? 'color-mix(in srgb, var(--cui-success) 8%, transparent)' : ''"
+             (click)="selectProductFromSearch(product)">
+
+          <!-- Franja lateral -->
+          <div style="width:4px; flex-shrink:0;"
+               [style.background]="added ? 'var(--cui-success)' : 'transparent'"></div>
+
+          <div class="d-flex align-items-center gap-3 px-3 py-3 flex-grow-1" style="min-width:0;">
+
+            <!-- Dot de stock -->
+            <div style="width:12px; height:12px; border-radius:50%; flex-shrink:0; align-self:center;"
+                 [style.background-color]="stockDotColor(product)"></div>
+
+            <!-- Información del producto -->
+            <div style="flex:1; min-width:0;">
+              <div class="fw-semibold" style="font-size:.97rem; line-height:1.3; word-break:break-word;">
+                {{ product.name }}
+              </div>
+              <div class="text-body-secondary mt-1" style="font-size:.73rem;">
+                @if (product.sku) { <span>{{ product.sku }}</span> }
+                @if (product.laboratory) { <span class="ms-1">· {{ product.laboratory.name }}</span> }
+              </div>
+              <div class="d-flex flex-wrap gap-1 mt-2">
+                <!-- Disponible -->
+                <span class="badge rounded-pill px-2 py-1"
+                      style="font-size:.7rem;"
+                      [style.background]="avail <= 5 ? 'var(--cui-danger)' : avail <= 20 ? 'var(--cui-warning)' : 'var(--cui-success)'"
+                      [style.color]="avail > 5 && avail <= 20 ? '#000' : '#fff'">
+                  {{ avail }} disp.
+                </span>
+                <!-- Vencimiento próximo -->
+                @if (product.lots_info?.nearest_expiry) {
+                  <span class="badge rounded-pill px-2 py-1 {{ expiryBadgeClass(product.lots_info!.nearest_expiry!.expiry_date) }}"
+                        style="font-size:.7rem;">
+                    vence {{ expiryLabel(product.lots_info!.nearest_expiry!.expiry_date) }}
+                  </span>
+                }
+                <!-- Escalas de precio -->
+                @for (tier of product.price_tiers; track tier.id) {
+                  @if (tier.active) {
+                    <span class="badge rounded-pill border px-2 py-1"
+                          style="font-size:.68rem; background:transparent;
+                                 color:var(--cui-body-color); border-color:var(--cui-border-color)!important;">
+                      {{ tier.min_quantity }}+ → S/{{ tier.price | number:'1.2-2' }}
+                    </span>
+                  }
+                }
+              </div>
+            </div>
+
+            <!-- Precio + acción -->
+            <div class="d-flex flex-column align-items-end justify-content-between flex-shrink-0"
+                 style="min-width:80px; align-self:stretch; padding:2px 0;">
+              <div class="text-end">
+                <div class="fw-bold lh-1" style="font-size:1.05rem;">
+                  S/&nbsp;{{ product.base_price | number:'1.2-2' }}
+                </div>
+                <div class="text-body-secondary" style="font-size:.68rem;">c/u</div>
+              </div>
+              @if (added) {
+                <span class="badge bg-success px-2 py-1" style="font-size:.7rem; border-radius:20px;">
+                  ✓ en cot.
+                </span>
+              } @else {
+                <div class="d-flex align-items-center justify-content-center rounded-circle text-primary"
+                     style="width:28px; height:28px; border:2px solid var(--cui-primary); font-size:1.1rem; font-weight:700; line-height:1;">
+                  +
+                </div>
+              }
+            </div>
+
+          </div>
+        </div>
+
+      } @empty {
+        <div class="text-center text-body-secondary py-5">
+          <fa-icon icon="box-open" class="d-block mb-3" style="font-size:2.5rem; opacity:.25;" />
+          <div style="font-size:.95rem;">Sin resultados</div>
+          @if (searchQuery()) {
+            <button class="btn btn-link btn-sm mt-2" (click)="searchQuery.set('')">
+              Limpiar búsqueda
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Espacio extra al final para no tapar el último item con la barra del sistema -->
+      <div style="height:env(safe-area-inset-bottom, 16px);"></div>
+    </div>
+
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     CATÁLOGO INTERACTIVO — venta por catálogo
+     ══════════════════════════════════════════════════════════════════════════ -->
+@if (showCatalog()) {
+  <!-- Backdrop (sin cierre al hacer clic, para evitar cierres accidentales) -->
+  <div class="position-fixed"
+       style="inset:0; background:rgba(0,0,0,.6); z-index:1060;">
+  </div>
+
+  <!-- Sheet flotante — casi pantalla completa -->
+  <div class="position-fixed d-flex flex-column"
+       style="top:10px; left:10px; right:10px; bottom:10px;
+              max-width:1100px; margin-inline:auto;
+              border-radius:16px;
+              background:var(--cui-body-bg);
+              box-shadow:0 8px 40px rgba(0,0,0,.35);
+              z-index:1061; overflow:hidden;"
+       (click)="$event.stopPropagation()">
+
+    <!-- Header fijo -->
+    <div class="flex-shrink-0 pt-3 pb-0">
+
+      <!-- Buscador -->
+      <div class="px-3 pb-2 d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 rounded-pill px-3 flex-grow-1"
+             style="background:var(--cui-tertiary-bg); border:1.5px solid var(--cui-border-color); min-height:48px;">
+          <fa-icon icon="search" class="text-body-secondary flex-shrink-0" />
+          <input
+            type="search"
+            class="form-control border-0 bg-transparent ps-1"
+            style="font-size:1rem; height:44px;"
+            placeholder="Buscar en el catálogo..."
+            [value]="searchQuery()"
+            (input)="searchQuery.set($any($event.target).value)"
+            autocomplete="off">
+          @if (searchQuery()) {
+            <button class="btn btn-sm btn-link text-body-secondary p-0 flex-shrink-0"
+                    type="button" (click)="searchQuery.set('')">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+        </div>
+        <button class="btn-close flex-shrink-0" type="button"
+                title="Cerrar catálogo"
+                (click)="closeCatalog()"></button>
+      </div>
+
+      <!-- Contador -->
+      <div class="px-3 pb-2 d-flex justify-content-between align-items-center">
+        <span class="text-body-secondary" style="font-size:.8rem;">
+          {{ filteredProducts().length }} producto{{ filteredProducts().length !== 1 ? 's' : '' }}
+        </span>
+        @if (uniqueProductIds().size) {
+          <span class="fw-semibold text-success" style="font-size:.8rem;">
+            <fa-icon icon="cart-shopping" class="me-1" />{{ uniqueProductIds().size }} en cotización · S/ {{ total | number:'1.2-2' }}
+          </span>
+        }
+      </div>
+
+      <div style="height:1px; background:var(--cui-border-color);"></div>
+    </div>
+
+    <!-- Grid scrollable, agrupado por laboratorio y categoría -->
+    <div class="p-2" style="overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;">
+      @for (labGroup of groupedCatalog(); track labGroup.laboratory) {
+        <!-- Banner de laboratorio -->
+        @if (labGroup.labBannerUrl) {
+          <div class="rounded-2 overflow-hidden mb-2" style="aspect-ratio:4/1; background:var(--cui-tertiary-bg);">
+            <img [src]="labGroup.labBannerUrl" [alt]="labGroup.laboratory"
+                 style="width:100%; height:100%; object-fit:cover;" loading="lazy">
+          </div>
+        } @else {
+          <div class="rounded-2 mb-2 d-flex align-items-center justify-content-center fw-bold text-uppercase text-truncate px-3 text-center"
+               style="aspect-ratio:4/1; background:var(--cui-primary); color:#fff; font-size:1rem; letter-spacing:.05em;">
+            {{ labGroup.laboratory }}
+          </div>
+        }
+
+        @for (catGroup of labGroup.categories; track catGroup.category) {
+          <div class="mb-3">
+            <!-- Cinta de categoría -->
+            <div class="px-3 py-2 mb-2 rounded-2 fw-semibold text-uppercase text-truncate"
+                 style="font-size:.75rem; letter-spacing:.04em;"
+                 [style.background-color]="catGroup.catColor || 'var(--cui-tertiary-bg)'"
+                 [style.color]="readableTextColor(catGroup.catColor)">
+              {{ catGroup.category }}
+            </div>
+
+            <div class="row g-2">
+              @for (product of catGroup.items; track product.id) {
+                @let qty = catalogQty(product.id);
+                @let avail = availableStock(product);
+                @let draft = catalogDraft(product.id);
+                @let updating = catalogUpdating().has(product.id);
+                @let hasTiers = hasActiveTiers(product);
+                @let expiringLots = (product.lots_info?.lots ?? []).filter(l => l.available_stock > 0 && l.expiry_date);
+                @let activeTiers = product.price_tiers.filter(t => t.active).sort((a, b) => a.min_quantity - b.min_quantity);
+                @let displayPrice = catalogDisplayPrice(product);
+                @let tierLabel = appliedTierLabel(product.id, displayPrice);
+                @let appliedTier = activeTiers.filter(t => draft >= t.min_quantity).pop();
+
+                <div class="col-12 col-lg-6">
+                  <div class="catalog-card rounded-3 overflow-hidden h-100"
+                       style="border:1px solid var(--cui-border-color); transition:border-color .15s; cursor:pointer;"
+                       [style.border-color]="qty > 0 ? 'var(--cui-success)' : 'var(--cui-border-color)'"
+                       [style.border-width]="qty > 0 ? '2px' : '1px'"
+                       (click)="openCatalogDetail(product)">
+
+                    <!-- Imagen -->
+                    <div class="catalog-card-img">
+                      @if (product.primary_image_url) {
+                        <img [src]="product.primary_image_url" [alt]="product.name"
+                             style="width:100%; height:100%; object-fit:cover;" loading="lazy">
+                      } @else {
+                        <div class="d-flex align-items-center justify-content-center h-100 text-body-secondary">
+                          <fa-icon icon="box-open" style="font-size:2.2rem; opacity:.25;" />
+                        </div>
+                      }
+
+                      <!-- Marca de agua: logo del laboratorio -->
+                      @if (labGroup.labLogoUrl) {
+                        <img [src]="labGroup.labLogoUrl" alt=""
+                             class="position-absolute bottom-0 end-0 m-2"
+                             style="width:30%; max-width:48px; opacity:.35; object-fit:contain; pointer-events:none;">
+                      }
+
+                      <!-- Esquina superior izquierda: en pedido / escala -->
+                      <div class="position-absolute top-0 start-0 m-2 d-flex flex-column align-items-start gap-1">
+                        @if (qty > 0) {
+                          <span class="badge bg-success rounded-pill" style="font-size:.7rem;">
+                            {{ qty }} en pedido
+                          </span>
+                        }
+                        @if (hasTiers) {
+                          <span class="badge rounded-pill bg-warning text-dark fw-bold" style="font-size:.7rem;">
+                            <fa-icon icon="tags" class="me-1" />Escala
+                          </span>
+                        }
+                      </div>
+
+                      <!-- Esquina superior derecha: stock -->
+                      <div class="position-absolute top-0 end-0 m-2 d-flex flex-column align-items-end gap-1">
+                        <div style="width:10px; height:10px; border-radius:50%; align-self:flex-end;"
+                             [style.background-color]="stockDotColor(product)"></div>
+                      </div>
+                    </div>
+
+                    <!-- Información -->
+                    <div class="catalog-card-info">
+                      <div class="catalog-name">{{ product.name }}</div>
+
+                      <div class="catalog-price" [class.text-success]="!!tierLabel">
+                        S/ {{ displayPrice | number:'1.2-2' }}
+                        <span class="text-body-secondary fw-normal" style="font-size:.65rem;">{{ avail }} disp.</span>
+                        @if (tierLabel) {
+                          <div class="text-success fw-semibold" style="font-size:.65rem;">{{ tierLabel }}</div>
+                        }
+                      </div>
+
+                      <!-- Fechas de vencimiento -->
+                      @if (expiringLots.length) {
+                        <div class="catalog-badges">
+                          @for (lot of expiringLots; track lot.id) {
+                            <span class="badge rounded-pill {{ expiryBadgeClass(lot.expiry_date) }}" style="font-size:.62rem;"
+                                  [title]="lot.available_stock + ' disp.'">
+                              <fa-icon icon="clock" class="me-1" />{{ expiryLabel(lot.expiry_date) }}
+                            </span>
+                          }
+                        </div>
+                      }
+
+                      <!-- Escalas de precio -->
+                      @if (hasTiers) {
+                        <div class="catalog-tiers">
+                          <span class="catalog-tiers-label"><fa-icon icon="tags" /></span>
+                          @for (tier of activeTiers; track tier.id) {
+                            <span class="catalog-tier" [class.active]="appliedTier?.id === tier.id">
+                              <span class="catalog-tier-qty">{{ tier.min_quantity }}+</span>
+                              <span class="catalog-tier-price">S/{{ tier.price | number:'1.2-2' }}</span>
+                            </span>
+                          }
+                        </div>
+                      }
+
+                      <!-- Acción: cantidad + agregar -->
+                      <div class="catalog-actions">
+                        <div class="input-group catalog-stepper">
+                          <button type="button" class="btn btn-outline-secondary"
+                                  [disabled]="updating || draft <= 0"
+                                  (click)="$event.stopPropagation(); catalogDraftDecrement(product)">
+                            <fa-icon icon="minus" />
+                          </button>
+                          <input type="number" class="form-control text-center fw-bold p-0"
+                                 style="min-width:0;"
+                                 [value]="draft"
+                                 (click)="$event.stopPropagation()"
+                                 (input)="catalogDraftInput(product, $any($event.target).value)">
+                          <button type="button" class="btn btn-outline-secondary"
+                                  [disabled]="updating || draft >= avail"
+                                  (click)="$event.stopPropagation(); catalogDraftIncrement(product)">
+                            <fa-icon icon="plus" />
+                          </button>
+                        </div>
+                        <button type="button" class="btn fw-semibold catalog-add-btn"
+                                [class.btn-primary]="qty === 0"
+                                [class.btn-success]="qty > 0 && draft > 0"
+                                [class.btn-outline-danger]="qty > 0 && draft === 0"
+                                [disabled]="updating || draft === qty || (qty === 0 && avail <= 0)"
+                                (click)="$event.stopPropagation(); catalogConfirm(product)">
+                          @if (updating) {
+                            <c-spinner size="sm" />
+                          } @else if (qty > 0 && draft === 0) {
+                            <fa-icon icon="xmark" class="me-1" />Quitar
+                          } @else if (qty > 0) {
+                            <fa-icon icon="check" class="me-1" />Actualizar
+                          } @else if (avail <= 0) {
+                            Sin stock
+                          } @else {
+                            <fa-icon icon="plus" class="me-1" />Agregar
+                          }
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        }
+      } @empty {
+        <div class="col-12 text-center text-body-secondary py-5">
+          <fa-icon icon="box-open" class="d-block mb-3" style="font-size:2.5rem; opacity:.25;" />
+          <div style="font-size:.95rem;">Sin resultados</div>
+          @if (searchQuery()) {
+            <button class="btn btn-link btn-sm mt-2" (click)="searchQuery.set('')">
+              Limpiar búsqueda
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Espacio extra al final para no tapar el último item con la barra del sistema -->
+      <div style="height:env(safe-area-inset-bottom, 16px);"></div>
+    </div>
+
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODAL DE PRODUCTO — selección de cantidad
+     ══════════════════════════════════════════════════════════════════════════ -->
+@if (modalProduct()) {
+  @let p = modalProduct()!;
+  @let avail = availableStock(p);
+  @let shortfall = fefoShortfall(p, modalQty());
+  @let alloc = fefoAllocationMap(p, modalQty());
+  @let lots = (p.lots_info?.lots ?? []).filter(l => l.available_stock > 0);
+  @let activeTiers = p.price_tiers.filter(t => t.active);
+
+  <style>
+    .catalog-modal-sheet { max-height: 92dvh; }
+    .catalog-modal-body { display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    .catalog-modal-gallery { flex-shrink:0; display:flex; flex-direction:column; gap:.5rem; }
+    .catalog-modal-image { aspect-ratio:4/3; background:var(--cui-tertiary-bg); }
+    @media (min-width: 992px) {
+      .catalog-modal-sheet { height:min(88dvh,760px); max-height:88dvh; }
+      .catalog-modal-body { flex-direction:row; overflow:hidden; }
+      .catalog-modal-gallery { flex:0 0 42%; height:100%; overflow:hidden; }
+      .catalog-modal-info { flex:1 1 0; min-width:0; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+      .catalog-modal-image { aspect-ratio:auto; flex:1; min-height:0; }
+    }
+  </style>
+
+  <!-- Backdrop -->
+  <div class="position-fixed" style="inset:0; background:rgba(0,0,0,.6); z-index:1062;"
+       (click)="closeModal()"></div>
+
+  <!-- Sheet — centrado en pantalla -->
+  <div class="position-fixed d-flex flex-column catalog-modal-sheet"
+       style="top:50%; left:50%; transform:translate(-50%,-50%);
+              width:calc(100% - 20px); max-width:960px;
+              border-radius:16px;
+              background:var(--cui-body-bg);
+              box-shadow:0 8px 40px rgba(0,0,0,.35);
+              z-index:1063; overflow:hidden;"
+       (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="px-3 px-md-4 py-3 flex-shrink-0 d-flex align-items-start justify-content-between gap-3"
+         style="border-bottom:1px solid var(--cui-border-color);">
+      <div style="min-width:0;">
+        <h5 class="fw-bold mb-1 lh-sm" style="font-size:1.05rem;">{{ p.name }}</h5>
+        <div class="d-flex align-items-center gap-2 flex-wrap" style="font-size:.78rem;">
+          @if (p.sku) {
+            <span class="text-body-secondary font-monospace">{{ p.sku }}</span>
+          }
+          @if (p.laboratory) {
+            <span class="badge bg-info-subtle text-info-emphasis">{{ p.laboratory.name }}</span>
+          }
+          @if (p.category) {
+            <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ p.category.name }}</span>
+          }
+          <span class="fw-semibold"
+                [class.text-success]="avail > 20"
+                [class.text-warning]="avail > 0 && avail <= 20"
+                [class.text-danger]="avail <= 0">
+            {{ avail }} disponible{{ avail !== 1 ? 's' : '' }}
+          </span>
+        </div>
+      </div>
+      <button class="btn-close flex-shrink-0 mt-1" (click)="closeModal()"></button>
+    </div>
+
+    <!-- Cuerpo: galería + información, 2 columnas en desktop -->
+    <div class="catalog-modal-body">
+
+      <!-- Galería de imágenes (solo en venta por catálogo) -->
+      @if (modalOrigin() === 'catalog') {
+        <div class="catalog-modal-gallery p-3">
+          @if (p.images.length) {
+            <div class="rounded-3 overflow-hidden catalog-modal-image">
+              <img [src]="p.images[selectedImageIndex()]?.url ?? p.images[0].url" [alt]="p.name"
+                   style="width:100%; height:100%; object-fit:contain;">
+            </div>
+            @if (p.images.length > 1) {
+              <div class="d-flex gap-2 flex-shrink-0" style="overflow-x:auto;">
+                @for (img of p.images; track img.id; let i = $index) {
+                  <button type="button" class="p-0 border-0 bg-transparent flex-shrink-0 rounded-2 overflow-hidden"
+                          style="width:52px; height:52px;"
+                          [style.outline]="(i === selectedImageIndex() ? 'var(--cui-primary)' : 'var(--cui-border-color)') + ' solid 2px'"
+                          (click)="selectedImageIndex.set(i)">
+                    <img [src]="img.url" [alt]="p.name" style="width:100%; height:100%; object-fit:cover;">
+                  </button>
+                }
+              </div>
+            }
+          } @else {
+            <div class="rounded-3 d-flex align-items-center justify-content-center catalog-modal-image">
+              <fa-icon icon="box-open" style="font-size:3rem; opacity:.2;" />
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Información: alertas, escalas, lotes -->
+      <div class="catalog-modal-info p-3">
+
+        <!-- Precio de venta -->
+        <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded-3 bg-body-tertiary">
+          <span class="text-body-secondary fw-semibold" style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+            Precio de venta
+          </span>
+          <span class="fw-bold fs-4">S/ {{ modalPrice() | number:'1.2-2' }}</span>
+        </div>
+
+        <!-- Sin stock -->
+        @if (avail <= 0) {
+          <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3 small">
+            <fa-icon icon="triangle-exclamation" />
+            Sin stock disponible. No se puede agregar.
+          </div>
+        }
+
+        <!-- Alerta de insuficiencia al pedir más de lo disponible -->
+        @if (shortfall > 0 && avail > 0) {
+          <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3 small">
+            <fa-icon icon="triangle-exclamation" />
+            Solo hay <strong class="ms-1">{{ avail }}</strong> disponibles.
+          </div>
+        }
+
+        @if (error()) {
+          <div class="alert alert-danger py-2 small mb-3 d-flex align-items-center gap-2">
+            <fa-icon icon="triangle-exclamation" />{{ error() }}
+          </div>
+        }
+
+        <!-- Escalas de precio -->
+        @if (activeTiers.length) {
+          <div class="mb-3">
+            <div class="text-body-secondary fw-semibold mb-2" style="font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;">
+              Escalas de precio
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              @for (tier of activeTiers; track tier.id) {
+                <span class="badge px-3 py-2 rounded-pill"
+                      style="font-size:.78rem;"
+                      [class.bg-success]="modalQty() >= tier.min_quantity"
+                      [class.bg-body-secondary]="modalQty() < tier.min_quantity"
+                      [class.text-success-emphasis]="modalQty() >= tier.min_quantity"
+                      [class.text-body-secondary]="modalQty() < tier.min_quantity">
+                  {{ tier.min_quantity }}+ → S/ {{ tier.price | number:'1.2-2' }}
+                </span>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Lotes FEFO -->
+        @if (lots.length > 0) {
+          <div class="mb-3">
+            <div class="text-body-secondary fw-semibold mb-2"
+                 style="font-size:.72rem; text-transform:uppercase; letter-spacing:.05em;">
+              Lotes disponibles · FEFO
+            </div>
+            <div class="rounded-3 overflow-hidden"
+                 style="border:1px solid var(--cui-border-color);">
+              <table class="table table-sm mb-0" style="font-size:.83rem;">
+                <thead style="font-size:.72rem; background:var(--cui-tertiary-bg);">
+                  <tr>
+                    <th class="px-3 py-2 fw-semibold text-body-secondary">Lote</th>
+                    <th class="py-2 fw-semibold text-body-secondary">Vencimiento</th>
+                    <th class="py-2 text-end fw-semibold text-body-secondary">Disp.</th>
+                    <th class="pe-3 py-2 text-end fw-semibold" style="color:var(--cui-primary);">A usar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (lot of lots; track lot.id) {
+                    @let useQty = alloc.get(lot.id) ?? 0;
+                    <tr style="background: {{ useQty > 0 ? 'var(--cui-primary-bg-subtle)' : 'transparent' }};">
+                      <td class="px-3 py-2 fw-semibold">
+                        {{ isRealLot(lot.lot_number) ? lot.lot_number : '—' }}
+                      </td>
+                      <td class="py-2">
+                        @if (lot.expiry_date) {
+                          <span class="badge {{ expiryBadgeClass(lot.expiry_date) }}"
+                                style="font-size:.7rem;">
+                            {{ expiryLabel(lot.expiry_date) }}
+                          </span>
+                        } @else {
+                          <span class="text-body-secondary">Sin venc.</span>
+                        }
+                      </td>
+                      <td class="py-2 text-end fw-semibold">{{ lot.available_stock }}</td>
+                      <td class="pe-3 py-2 text-end">
+                        @if (useQty > 0) {
+                          <c-badge color="primary" style="font-size:.75rem;">{{ useQty }}</c-badge>
+                        } @else {
+                          <span class="text-body-secondary">—</span>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot style="background:var(--cui-tertiary-bg); border-top:1px solid var(--cui-border-color);">
+                  <tr>
+                    <td colspan="3" class="px-3 py-2 text-end text-body-secondary" style="font-size:.75rem;">
+                      Total a descontar
+                    </td>
+                    <td class="pe-3 py-2 text-end fw-bold"
+                        [class.text-primary]="shortfall === 0"
+                        [class.text-danger]="shortfall > 0">
+                      {{ modalQty() - shortfall }}
+                      @if (shortfall > 0) { <span class="text-body-secondary">/{{ modalQty() }}</span> }
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        }
+
+      </div>
+    </div>
+
+    <!-- Footer: precio/total + cantidad + acción -->
+    <div class="px-3 px-md-4 py-3 d-flex flex-wrap align-items-center gap-3 flex-shrink-0"
+         style="border-top:1px solid var(--cui-border-color);">
+
+      <!-- Total -->
+      <div class="flex-grow-1">
+        <div class="text-body-secondary" style="font-size:.68rem; text-transform:uppercase; letter-spacing:.04em;">Total</div>
+        <div class="fw-bold fs-5 text-primary">S/ {{ modalLineTotal | number:'1.2-2' }}</div>
+      </div>
+
+      <!-- Cantidad + acción -->
+      <div class="d-flex align-items-center gap-2 flex-grow-1 flex-sm-grow-0">
+        <div class="input-group flex-nowrap" style="width:auto; flex-shrink:0;">
+          <button class="btn btn-outline-secondary" type="button"
+                  (click)="decrementQty()" [disabled]="modalQty() <= 1"
+                  style="min-width:48px;">
+            <fa-icon icon="minus" />
+          </button>
+          <input type="number" class="form-control text-center fw-bold"
+                 min="1" [value]="modalQty()"
+                 (input)="onModalQtyChange($any($event.target).value)"
+                 style="width:64px;">
+          <button class="btn btn-outline-secondary" type="button"
+                  (click)="incrementQty()"
+                  style="min-width:48px;">
+            <fa-icon icon="plus" />
+          </button>
+        </div>
+        <button type="button" class="btn btn-primary fw-semibold py-2 flex-grow-1 flex-sm-grow-0 catalog-modal-add-btn"
+                [disabled]="addingItem() || avail <= 0 || shortfall > 0"
+                (click)="confirmModal()">
+          @if (addingItem()) {
+            <c-spinner size="sm" class="me-1" />Reservando...
+          } @else if (uniqueProductIds().has(p.id)) {
+            <fa-icon icon="check" class="me-2" />Actualizar cantidad
+          } @else {
+            <fa-icon icon="plus" class="me-2" />Agregar
+          }
+        </button>
+      </div>
+    </div>
+
+  </div>
+}

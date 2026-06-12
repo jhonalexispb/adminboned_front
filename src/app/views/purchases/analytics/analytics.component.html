@@ -1,0 +1,267 @@
+<app-page-header title="Análisis de compras" subtitle="Métricas para tomar mejores decisiones">
+  <div class="d-flex gap-2 align-items-center">
+    <p-select
+      [(ngModel)]="selectedDays"
+      [options]="periodOptions"
+      optionLabel="label" optionValue="value"
+      [style]="{ width: '180px' }" appendTo="body"
+    />
+    <button class="btn btn-outline-primary btn-sm" (click)="loadAnalytics()">
+      <fa-icon icon="rotate" class="me-1" />Actualizar
+    </button>
+    <a class="btn btn-primary btn-sm" routerLink="/purchases/receipts/new">
+      <fa-icon icon="plus" class="me-1" />Nueva recepción
+    </a>
+  </div>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+<div class="row g-4">
+
+  <!-- ── Más vendidos ────────────────────────────────────────────────────── -->
+  <div class="col-lg-7">
+    <c-card class="h-100">
+      <c-card-header>
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <strong>Productos más vendidos</strong>
+            <span class="text-body-secondary fw-normal small ms-2">
+              Unidades salidas por ventas y ajustes
+            </span>
+          </div>
+        </div>
+      </c-card-header>
+      <c-card-body class="p-0">
+        @if (topSold().length === 0) {
+          <p class="text-body-secondary small text-center py-4 mb-0">
+            Sin movimientos de salida en el período seleccionado.
+          </p>
+        } @else {
+          <div class="table-responsive">
+            <table cTable hover class="mb-0">
+              <thead class="small text-body-secondary">
+                <tr>
+                  <th>#</th>
+                  <th>Producto</th>
+                  <th class="text-end">Vendido</th>
+                  <th class="text-end">Stock</th>
+                  <th>Último costo</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody class="small">
+                @for (p of topSold(); track p.product_id; let i = $index) {
+                  <tr>
+                    <td class="text-body-secondary">{{ i + 1 }}</td>
+                    <td>
+                      <div class="fw-medium">
+                        @if (p.product_laboratory) {
+                          <span class="text-info me-1">{{ p.product_laboratory }}</span>
+                        }
+                        {{ p.product_name }}
+                      </div>
+                      <div class="text-body-secondary font-monospace" style="font-size:.72rem">{{ p.sku ?? '—' }}</div>
+                    </td>
+                    <td class="text-end fw-semibold">{{ p.total_sold }}</td>
+                    <td class="text-end">
+                      <span [class]="stockClass(p)">{{ p.current_stock }}</span>
+                      @if (p.needs_reorder) {
+                        <c-badge color="danger" class="ms-1" style="font-size:.65rem">reordenar</c-badge>
+                      }
+                    </td>
+                    <td class="text-body-secondary">
+                      @if (p.last_cost) {
+                        S/ {{ p.last_cost | number:'1.2-2' }}
+                        <div style="font-size:.7rem">{{ p.last_supplier ?? '—' }}</div>
+                      } @else {
+                        <span class="fst-italic">Sin costo</span>
+                      }
+                    </td>
+                    <td>
+                      <button class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:2px 6px"
+                              (click)="orderProduct(p.product_id)">
+                        <fa-icon icon="cart-plus" />
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+  </div>
+
+  <!-- ── Stock bajo ──────────────────────────────────────────────────────── -->
+  <div class="col-lg-5">
+    <c-card class="h-100">
+      <c-card-header>
+        <strong>Alerta de stock bajo</strong>
+        <span class="text-body-secondary fw-normal small ms-2">Por debajo del mínimo</span>
+      </c-card-header>
+      <c-card-body class="p-0">
+        @if (lowStock().length === 0) {
+          <p class="text-success small text-center py-4 mb-0">
+            <fa-icon icon="circle-check" class="me-1" />Todo el stock está sobre el mínimo.
+          </p>
+        } @else {
+          <div class="table-responsive">
+            <table cTable hover class="mb-0">
+              <thead class="small text-body-secondary">
+                <tr>
+                  <th>Producto</th>
+                  <th class="text-end">Stock</th>
+                  <th class="text-end">Mínimo</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody class="small">
+                @for (p of lowStock(); track p.product_id) {
+                  <tr>
+                    <td>
+                      <div class="fw-medium">
+                        @if (p.product_laboratory) {
+                          <span class="text-info me-1">{{ p.product_laboratory }}</span>
+                        }
+                        {{ p.product_name }}
+                      </div>
+                      <div class="text-body-secondary font-monospace" style="font-size:.72rem">{{ p.sku ?? '—' }}</div>
+                    </td>
+                    <td class="text-end">
+                      <span [class]="stockClass(p)">{{ p.current_stock }}</span>
+                    </td>
+                    <td class="text-end text-body-secondary">{{ p.min_stock }}</td>
+                    <td>
+                      <button class="btn btn-xs btn-outline-primary" style="font-size:.72rem;padding:2px 6px"
+                              (click)="orderProduct(p.product_id)">
+                        <fa-icon icon="cart-plus" />
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+  </div>
+
+  <!-- ── Comparativa de proveedores ────────────────────────────────────────── -->
+  <div class="col-12">
+    <c-card>
+      <c-card-header>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <strong>Comparativa de precios por proveedor</strong>
+          <div class="d-flex align-items-center gap-2 ms-auto">
+            <p-select
+              [(ngModel)]="selectedProductId"
+              [options]="products()"
+              optionLabel="name" optionValue="id"
+              [filter]="true" filterBy="name,sku"
+              filterPlaceholder="Buscar producto..."
+              placeholder="Seleccionar producto"
+              emptyMessage="Sin resultados"
+              [style]="{ 'min-width': '260px' }" appendTo="body"
+            />
+            <button class="btn btn-sm btn-primary" (click)="loadComparison()"
+                    [disabled]="!selectedProductId || loadingComparison()">
+              @if (loadingComparison()) {
+                <c-spinner size="sm" />
+              } @else {
+                <fa-icon icon="magnifying-glass" class="me-1" />Ver historial
+              }
+            </button>
+          </div>
+        </div>
+      </c-card-header>
+      <c-card-body>
+        @if (!selectedProductId) {
+          <p class="text-body-secondary small text-center py-3 mb-0">
+            Seleccioná un producto para ver el historial de precios por proveedor.
+          </p>
+        } @else if (loadingComparison()) {
+          <div class="text-center py-3"><c-spinner color="primary" /></div>
+        } @else if (comparison().length === 0) {
+          <p class="text-body-secondary small text-center py-3 mb-0">
+            Sin historial de compras para este producto.
+          </p>
+        } @else {
+
+          <div class="row g-4">
+
+            <!-- Resumen por proveedor -->
+            <div class="col-md-5">
+              <div class="fw-medium small mb-2">Resumen por proveedor</div>
+              <table cTable [small]="true" [bordered]="true" class="mb-0 small">
+                <thead class="small text-body-secondary">
+                  <tr>
+                    <th>Proveedor</th>
+                    <th class="text-end">Mejor precio</th>
+                    <th class="text-end">Compras</th>
+                    <th>Última compra</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (s of supplierSummary; track s.supplier) {
+                    <tr [class.bg-success-subtle]="isBest(s.bestPrice.toString())">
+                      <td class="fw-medium">
+                        {{ s.supplier }}
+                        @if (isBest(s.bestPrice.toString())) {
+                          <c-badge color="success" class="ms-1" style="font-size:.65rem">más bajo</c-badge>
+                        }
+                      </td>
+                      <td class="text-end fw-semibold">S/ {{ s.bestPrice | number:'1.2-2' }}</td>
+                      <td class="text-end text-body-secondary">{{ s.count }}</td>
+                      <td class="text-body-secondary">{{ s.lastDate }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Historial detallado -->
+            <div class="col-md-7">
+              <div class="fw-medium small mb-2">Historial completo</div>
+              <div style="max-height:280px;overflow-y:auto">
+                <table cTable hover [small]="true" class="mb-0 small">
+                  <thead class="small text-body-secondary">
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Proveedor</th>
+                      <th class="text-end">Costo</th>
+                      <th>Notas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (e of comparison(); track $index) {
+                      <tr [class.bg-success-subtle]="isBest(e.cost_price)">
+                        <td class="text-nowrap">{{ e.date }}</td>
+                        <td>{{ e.supplier_name }}</td>
+                        <td class="text-end fw-medium">
+                          S/ {{ e.cost_price | number:'1.2-2' }}
+                          @if (isBest(e.cost_price)) {
+                            <fa-icon icon="star" class="text-warning ms-1" style="font-size:.7rem" />
+                          }
+                        </td>
+                        <td class="text-body-secondary">{{ e.notes ?? '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+  </div>
+
+</div>
+
+}

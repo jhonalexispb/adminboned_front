@@ -1,0 +1,250 @@
+<app-page-header title="Transportistas" subtitle="Empresas de transporte para envíos a provincia">
+  <button class="btn btn-primary btn-sm" (click)="openNew()">
+    <fa-icon icon="plus" class="me-1" />Nuevo transportista
+  </button>
+</app-page-header>
+
+<!-- ── Formulario inline ─────────────────────────────────────────────────────── -->
+@if (showForm()) {
+  <c-card class="mb-4">
+    <c-card-header>
+      <strong>{{ editingId() ? 'Editar transportista' : 'Nuevo transportista' }}</strong>
+    </c-card-header>
+    <c-card-body>
+      <form [formGroup]="form" (ngSubmit)="save()">
+        <div class="row g-3">
+
+          <!-- Nombre -->
+          <div class="col-md-5">
+            <label class="form-label small text-body-secondary mb-1">
+              Nombre <span class="text-danger">*</span>
+            </label>
+            <input cFormControl formControlName="name" type="text" placeholder="Ej: Olva Courier"
+                   [class.is-invalid]="form.get('name')?.invalid && form.get('name')?.touched" />
+            @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+              <div class="invalid-feedback">El nombre es requerido.</div>
+            }
+          </div>
+
+          <!-- RUC -->
+          <div class="col-md-3">
+            <label class="form-label small text-body-secondary mb-1">RUC</label>
+            <input cFormControl formControlName="ruc" type="text" placeholder="20xxxxxxxxx"
+                   maxlength="11" class="font-monospace"
+                   [class.is-invalid]="form.get('ruc')?.invalid && form.get('ruc')?.touched" />
+            @if (form.get('ruc')?.hasError('pattern') && form.get('ruc')?.touched) {
+              <div class="invalid-feedback">Debe tener exactamente 11 dígitos.</div>
+            }
+          </div>
+
+          <!-- Teléfono -->
+          <div class="col-md-2">
+            <label class="form-label small text-body-secondary mb-1">Teléfono</label>
+            <input cFormControl formControlName="phone" type="text" placeholder="Opcional" />
+          </div>
+
+          @if (editingId()) {
+            <div class="col-md-2 d-flex align-items-end">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" formControlName="active" id="activeCheck" />
+                <label class="form-check-label small" for="activeCheck">Activo</label>
+              </div>
+            </div>
+          }
+
+          <!-- Dirección -->
+          <div class="col-md-8">
+            <label class="form-label small text-body-secondary mb-1">Dirección</label>
+            <input cFormControl formControlName="address" type="text"
+                   placeholder="Av. Principal 123, zona industrial..." />
+          </div>
+
+          <!-- Notas -->
+          <div class="col-md-4">
+            <label class="form-label small text-body-secondary mb-1">Notas</label>
+            <input cFormControl formControlName="notes" type="text" placeholder="Opcional" />
+          </div>
+
+          <!-- Selectores geográficos -->
+          <div class="col-12">
+            <label class="form-label small text-body-secondary mb-1">
+              Zona de cobertura (Departamento → Provincia → Distrito)
+            </label>
+            <div class="row g-2">
+              <div class="col-md-4">
+                <p-select
+                  formControlName="department_id"
+                  [options]="departments()"
+                  optionLabel="name" optionValue="id"
+                  placeholder="Departamento"
+                  [filter]="true" filterPlaceholder="Buscar..."
+                  emptyMessage="Sin resultados"
+                  [style]="{ width: '100%' }" appendTo="body" />
+              </div>
+              <div class="col-md-4">
+                <p-select
+                  formControlName="province_id"
+                  [options]="provinces()"
+                  optionLabel="name" optionValue="id"
+                  [placeholder]="loadingProvs() ? 'Cargando...' : 'Provincia'"
+                  [loading]="loadingProvs()"
+                  [filter]="true" filterPlaceholder="Buscar..."
+                  emptyMessage="Selecciona un departamento"
+                  [style]="{ width: '100%' }" appendTo="body" />
+              </div>
+              <div class="col-md-4">
+                <p-select
+                  formControlName="district_id"
+                  [options]="districts()"
+                  optionLabel="name" optionValue="id"
+                  [placeholder]="loadingDists() ? 'Cargando...' : 'Distrito'"
+                  [loading]="loadingDists()"
+                  [filter]="true" filterPlaceholder="Buscar..."
+                  emptyMessage="Selecciona una provincia"
+                  [style]="{ width: '100%' }" appendTo="body" />
+              </div>
+            </div>
+            <div class="form-text">
+              El distrito de cobertura se usa como destino predeterminado en las guías de remisión.
+            </div>
+          </div>
+
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+          <button type="submit" class="btn btn-primary btn-sm" [disabled]="saving()">
+            @if (saving()) { <c-spinner size="sm" class="me-1" /> }
+            Guardar
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cancel()">
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </c-card-body>
+  </c-card>
+}
+
+<!-- ── Filtros ───────────────────────────────────────────────────────────────── -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-6">
+        <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><fa-icon icon="search" /></span>
+          <input class="form-control" placeholder="Nombre, teléfono o RUC..."
+                 [ngModel]="search()" (ngModelChange)="search.set($event)" />
+          @if (search()) {
+            <button class="btn btn-outline-secondary" type="button" (click)="search.set('')">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <select class="form-select form-select-sm"
+                [ngModel]="filterActive()" (ngModelChange)="filterActive.set($event)">
+          <option value="">Todos</option>
+          <option [ngValue]="true">Activos</option>
+          <option [ngValue]="false">Inactivos</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-auto ms-md-auto d-flex align-items-center justify-content-end">
+        <span class="text-body-secondary small">
+          {{ filtered().length }} transportista{{ filtered().length !== 1 ? 's' : '' }}
+        </span>
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- ── Tabla ─────────────────────────────────────────────────────────────────── -->
+<c-card>
+  <c-card-body class="p-0">
+    @if (loading()) {
+      <div class="text-center py-5"><c-spinner color="primary" /></div>
+    } @else {
+      <div class="table-responsive">
+        <table cTable hover style="font-size:.875rem">
+          <thead style="font-size:.78rem; text-transform:uppercase; letter-spacing:.04em;">
+            <tr>
+              <th class="ps-3">Nombre</th>
+              <th>RUC</th>
+              <th>Teléfono</th>
+              <th>Zona</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of filtered(); track c.id) {
+              <tr>
+                <td class="ps-3">
+                  <div class="fw-medium">{{ c.name }}</div>
+                  @if (c.address) {
+                    <div class="text-body-secondary" style="font-size:.75rem;">{{ c.address }}</div>
+                  }
+                </td>
+                <td class="font-monospace text-body-secondary small">{{ c.ruc ?? '—' }}</td>
+                <td class="text-body-secondary small">{{ c.phone ?? '—' }}</td>
+                <td style="font-size:.8rem;">
+                  @if (c.district) {
+                    <div class="lh-sm">
+                      <div class="fw-medium">{{ c.district.name }}</div>
+                      @if (c.district.province) {
+                        <div class="text-body-secondary" style="font-size:.72rem;">
+                          {{ c.district.province.name }}
+                          @if (c.district.province.department) {
+                            · {{ c.district.province.department.name }}
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+                <td>
+                  @if (c.active) {
+                    <span class="badge bg-success">Activo</span>
+                  } @else {
+                    <span class="badge bg-secondary">Inactivo</span>
+                  }
+                </td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-secondary" (click)="openEdit(c)">
+                      <fa-icon icon="pen" />
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger"
+                            (click)="delete(c)"
+                            [disabled]="deletingId() === c.id">
+                      @if (deletingId() === c.id) {
+                        <c-spinner size="sm" />
+                      } @else {
+                        <fa-icon icon="trash" />
+                      }
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="text-center text-body-secondary py-5">
+                  <fa-icon icon="truck" class="d-block mb-2" style="font-size:2rem;opacity:.3" />
+                  No hay transportistas registrados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </c-card-body>
+</c-card>

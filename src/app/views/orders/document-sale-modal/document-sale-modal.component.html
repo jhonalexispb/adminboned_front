@@ -1,0 +1,114 @@
+@if (order(); as o) {
+  <c-modal [visible]="true" (visibleChange)="!$event && cancel()" alignment="center">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="file-invoice" class="me-2 text-primary" />
+        Documentar pedido — {{ o.code }}
+      </h5>
+    </c-modal-header>
+    <c-modal-body>
+
+      <div class="rounded border p-3 mb-3 small">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-body-secondary">Tipo de documento</span>
+          @switch (o.document_type) {
+            @case ('invoice') {
+              <span class="fw-semibold">
+                <fa-icon icon="file-invoice" class="me-1 text-primary" />Factura (F001)
+              </span>
+            }
+            @case ('receipt') {
+              <span class="fw-semibold">
+                <fa-icon icon="receipt" class="me-1 text-success" />Boleta (B001)
+              </span>
+            }
+            @case ('sale_note') {
+              <span class="fw-semibold">
+                <fa-icon icon="file-lines" class="me-1 text-secondary" />Nota de venta
+              </span>
+            }
+            @default {
+              <span class="text-warning fw-semibold">
+                <fa-icon icon="triangle-exclamation" class="me-1" />Sin tipo definido
+              </span>
+            }
+          }
+        </div>
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="text-body-secondary">Cliente</span>
+          <span class="fw-medium">{{ o.client?.business_name || o.client?.name || '—' }}</span>
+        </div>
+        <div class="d-flex align-items-center justify-content-between">
+          <span class="text-body-secondary">Total</span>
+          <span class="fw-bold">S/ {{ o.total | number:'1.2-2' }}</span>
+        </div>
+        @if (o.document_type && o.document_type !== 'sale_note') {
+          <hr class="my-2" />
+          <div class="d-flex align-items-center justify-content-between text-body-secondary">
+            <span>Subtotal (sin IGV)</span>
+            <span>S/ {{ +(o.total) / 1.18 | number:'1.2-2' }}</span>
+          </div>
+          <div class="d-flex align-items-center justify-content-between text-body-secondary">
+            <span>IGV (18%)</span>
+            <span>S/ {{ +(o.total) - +(o.total) / 1.18 | number:'1.2-2' }}</span>
+          </div>
+        }
+      </div>
+
+      @if (o.document_type === 'invoice' || o.document_type === 'receipt') {
+        <div class="alert alert-success d-flex gap-2 py-2 mb-3 small">
+          <fa-icon icon="paper-plane" class="flex-shrink-0 mt-1" />
+          <span>Se enviará automáticamente a <strong>SUNAT</strong> vía ApiSunat.</span>
+        </div>
+      }
+      @if (o.document_type === 'sale_note') {
+        <div class="alert alert-secondary d-flex gap-2 py-2 mb-3 small">
+          <fa-icon icon="circle-info" class="flex-shrink-0 mt-1" />
+          <span>Nota de venta interna — no se envía a SUNAT.</span>
+        </div>
+      }
+      @if (!o.document_type) {
+        <div class="alert alert-danger d-flex gap-2 py-2 mb-3 small">
+          <fa-icon icon="triangle-exclamation" class="flex-shrink-0 mt-1" />
+          <span>Sin tipo de documento. Revierte la cotización a borrador y configúralo primero.</span>
+        </div>
+      }
+
+      @if (loadingSeries()) {
+        <div class="d-flex align-items-center gap-2 mb-3 small text-body-secondary">
+          <c-spinner size="sm" />Cargando series disponibles…
+        </div>
+      }
+
+      @if (needsSeriesSelection) {
+        <div class="mb-3">
+          <label class="form-label fw-medium">Serie</label>
+          <select class="form-select" [ngModel]="selectedSeriesId()" (ngModelChange)="selectedSeriesId.set($event)">
+            @for (s of activeSeries(); track s.id) {
+              <option [value]="s.id">{{ s.series }} — próximo: {{ s.next_correlative }}</option>
+            }
+          </select>
+          <div class="form-text">Hay varias series activas para este tipo. Elige cuál usar.</div>
+        </div>
+      }
+
+      <div class="mb-3">
+        <label class="form-label fw-medium">Fecha de emisión</label>
+        <input type="date" class="form-control" [(ngModel)]="issueDate" />
+      </div>
+      <div>
+        <label class="form-label fw-medium">Notas (opcional)</label>
+        <textarea class="form-control form-control-sm" rows="2" [(ngModel)]="notes"
+                  placeholder="Observaciones..."></textarea>
+      </div>
+
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="saving()" (click)="cancel()">Cancelar</button>
+      <button cButton color="primary" [disabled]="saving() || loadingSeries() || !o.document_type" (click)="save()">
+        @if (saving()) { <c-spinner size="sm" class="me-1" />Enviando… }
+        @else { <fa-icon icon="paper-plane" class="me-1" />Generar documento }
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}

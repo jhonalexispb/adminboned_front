@@ -1,0 +1,304 @@
+<app-page-header [title]="title" subtitle="Gestión de productos">
+  <button class="btn btn-outline-secondary" (click)="goBack()">
+    <fa-icon icon="arrow-left" class="me-1" />Volver
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+<!-- ══ MOBILE: tabs (solo en edición) ════════════════════════════════════ -->
+@if (isEdit) {
+  <ul class="nav nav-tabs mb-3 d-md-none">
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="activeTab() === 'datos'"
+              (click)="activeTab.set('datos')">
+        <fa-icon icon="box" class="me-1" />Datos
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" [class.active]="activeTab() === 'imagenes'"
+              (click)="activeTab.set('imagenes')">
+        <fa-icon icon="image" class="me-1" />Imágenes
+        @if (images().length) {
+          <span class="badge bg-secondary ms-1" style="font-size:.65rem;">{{ images().length }}</span>
+        }
+      </button>
+    </li>
+  </ul>
+}
+
+<!-- ══ SECCIÓN DATOS ══════════════════════════════════════════════════════ -->
+<div [class.d-none]="isEdit && activeTab() !== 'datos'"
+     [class.d-md-block]="true">
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()">
+  <div class="row g-4">
+
+    <!-- COLUMNA IZQUIERDA -->
+    <div class="col-lg-8">
+
+      <!-- Información general -->
+      <c-card class="mb-4">
+        <c-card-header><strong>Información general</strong></c-card-header>
+        <c-card-body>
+          @if (error) {
+            <div class="alert alert-danger py-2">{{ error }}</div>
+          }
+          <div class="row g-3">
+
+            <div class="col-12">
+              <label class="form-label" for="name">
+                Nombre <span class="text-danger">*</span>
+              </label>
+              <input cFormControl id="name" formControlName="name"
+                     placeholder="Ej: Pañales Huggies Talla M x 40"
+                     [class.is-invalid]="form.get('name')?.invalid && form.get('name')?.touched" />
+              @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+                <div class="invalid-feedback">El nombre es obligatorio.</div>
+              }
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label" for="sku">SKU</label>
+              <input cFormControl id="sku" formControlName="sku"
+                     placeholder="{{ isEdit ? (product?.sku ?? 'Auto') : 'Se genera automáticamente' }}"
+                     class="font-monospace" />
+              <div class="form-text">Se genera automáticamente si se deja vacío.</div>
+            </div>
+
+            <!-- Categoría -->
+            <div class="col-md-4">
+              <label class="form-label">Categoría <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <p-select
+                  formControlName="category_id"
+                  [options]="categories()"
+                  optionLabel="name" optionValue="id"
+                  placeholder="Selecciona..."
+                  [filter]="true" filterPlaceholder="Buscar..."
+                  emptyMessage="Sin resultados"
+                  [style]="{ flex: '1', minWidth: '0' }" appendTo="body"
+                />
+                <button type="button" class="btn btn-outline-secondary" title="Nueva categoría"
+                        (click)="openNewCategory()">
+                  <fa-icon icon="plus" />
+                </button>
+              </div>
+              @if (form.get('category_id')?.hasError('required') && form.get('category_id')?.touched) {
+                <div class="text-danger small mt-1">La categoría es obligatoria.</div>
+              }
+            </div>
+
+            <!-- Laboratorio -->
+            <div class="col-md-4">
+              <label class="form-label">Laboratorio <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <p-select
+                  formControlName="laboratory_id"
+                  [options]="laboratories()"
+                  optionLabel="name" optionValue="id"
+                  placeholder="Selecciona..."
+                  [filter]="true" filterPlaceholder="Buscar..."
+                  emptyMessage="Sin resultados"
+                  [style]="{ flex: '1', minWidth: '0' }" appendTo="body"
+                />
+                <button type="button" class="btn btn-outline-secondary" title="Nuevo laboratorio"
+                        (click)="openNewLaboratory()">
+                  <fa-icon icon="plus" />
+                </button>
+              </div>
+              @if (form.get('laboratory_id')?.hasError('required') && form.get('laboratory_id')?.touched) {
+                <div class="text-danger small mt-1">El laboratorio es obligatorio.</div>
+              }
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="description">Descripción</label>
+              <textarea cFormControl id="description" formControlName="description"
+                        rows="2" placeholder="Descripción del producto..."></textarea>
+            </div>
+
+          </div>
+        </c-card-body>
+      </c-card>
+
+      <!-- Precio y stock -->
+      <c-card class="mb-4">
+        <c-card-header><strong>Precio y stock</strong></c-card-header>
+        <c-card-body>
+          <div class="row g-3">
+
+            <div class="col-md-6">
+              <label class="form-label" for="base_price">
+                Precio de venta (S/) <span class="text-danger">*</span>
+              </label>
+              <input cFormControl id="base_price" formControlName="base_price"
+                     type="number" step="0.01" min="0" placeholder="0.00"
+                     [class.is-invalid]="form.get('base_price')?.invalid && form.get('base_price')?.touched" />
+              @if (form.get('base_price')?.hasError('required') && form.get('base_price')?.touched) {
+                <div class="invalid-feedback">El precio es obligatorio.</div>
+              }
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="min_stock">Stock mínimo</label>
+              <input cFormControl id="min_stock" formControlName="min_stock"
+                     type="number" min="0" placeholder="0" />
+              <div class="form-text">Alerta cuando el stock baje de este nivel.</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-medium">Afectación IGV</label>
+              <div class="d-flex gap-2 flex-wrap">
+                @for (opt of igvTypeOptions; track opt.value) {
+                  <label class="d-flex align-items-start gap-2 border rounded px-3 py-2 cursor-pointer"
+                         style="flex:1; min-width:140px;"
+                         [style.borderColor]="form.get('igv_type')?.value === opt.value ? 'var(--cui-primary)' : ''"
+                         [style.background]="form.get('igv_type')?.value === opt.value ? 'var(--cui-primary-bg-subtle)' : ''">
+                    <input type="radio" formControlName="igv_type" [value]="opt.value" class="form-check-input mt-1 flex-shrink-0" />
+                    <div>
+                      <div class="fw-semibold" style="font-size:.875rem;">{{ opt.label }}</div>
+                      <div class="text-body-secondary" style="font-size:.75rem;">{{ opt.desc }}</div>
+                    </div>
+                  </label>
+                }
+              </div>
+            </div>
+
+          </div>
+
+          @if (isEdit) {
+            <div class="alert alert-secondary py-2 small mt-3 mb-0">
+              <fa-icon icon="tags" class="me-1" />
+              Para gestionar escalas de precio, análisis de márgenes y costos, usa el botón
+              <strong>Escalas</strong> en el listado de productos.
+            </div>
+          }
+        </c-card-body>
+      </c-card>
+
+    </div>
+
+    <!-- COLUMNA DERECHA -->
+    <div class="col-lg-4">
+
+      <c-card class="mb-4">
+        <c-card-header><strong>Opciones de inventario</strong></c-card-header>
+        <c-card-body>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="tracks_lots"
+                   [checked]="tracksLots"
+                   (change)="onTracksLotsChange($event)" />
+            <label class="form-check-label fw-medium" for="tracks_lots">Controla lotes y vencimientos</label>
+            <div class="text-body-secondary small mt-1">
+              @if (tracksLots) {
+                Al registrar mercadería el sistema pedirá número de lote y fecha de vencimiento.
+              } @else {
+                El stock se acumula en un lote genérico (SIN-LOTE) sin trazabilidad de lote ni vencimiento.
+              }
+            </div>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="active" formControlName="active" />
+            <label class="form-check-label fw-medium" for="active">Producto activo</label>
+          </div>
+        </c-card-body>
+      </c-card>
+
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary" [disabled]="saving()">
+          @if (saving()) {
+            <c-spinner size="sm" class="me-1" />Guardando...
+          } @else {
+            <fa-icon icon="save" class="me-1" />{{ isEdit ? 'Guardar cambios' : 'Crear producto' }}
+          }
+        </button>
+        <button type="button" class="btn btn-outline-secondary" (click)="goBack()">Cancelar</button>
+      </div>
+
+      @if (!isEdit) {
+        <div class="alert alert-info mt-3 small">
+          <fa-icon icon="info-circle" class="me-1" />
+          Después de crear el producto podrás subir imágenes y gestionar escalas de precio desde el listado.
+        </div>
+      }
+
+    </div>
+  </div>
+</form>
+
+</div><!-- /sección datos -->
+
+<!-- ══ SECCIÓN IMÁGENES ═══════════════════════════════════════════════════ -->
+@if (isEdit) {
+  <div [class.d-none]="activeTab() !== 'imagenes'"
+       [class.d-md-block]="true"
+       class="mt-md-4">
+
+    <c-card class="mt-4">
+      <c-card-header>
+        <div class="d-flex align-items-center justify-content-between">
+          <strong>Imágenes del producto</strong>
+          <label class="btn btn-sm btn-outline-primary mb-0" [class.disabled]="uploading()">
+            @if (uploading()) {
+              <c-spinner size="sm" class="me-1" />Subiendo...
+            } @else {
+              <fa-icon icon="upload" class="me-1" />Subir imágenes
+            }
+            <input type="file" accept="image/*" multiple class="d-none"
+                   (change)="onFilesSelected($event)" [disabled]="uploading()" />
+          </label>
+        </div>
+      </c-card-header>
+      <c-card-body>
+        @if (imageError) {
+          <div class="alert alert-danger py-2">{{ imageError }}</div>
+        }
+        @if (images().length === 0) {
+          <p class="text-body-secondary text-center py-3 mb-0">Sin imágenes aún.</p>
+        } @else {
+          <div cdkDropList cdkDropListOrientation="mixed" class="row g-3" (cdkDropListDropped)="dropImage($event)">
+            @for (img of images(); track img.id) {
+              <div cdkDrag class="col-6 col-md-3 col-lg-2">
+                <div class="position-relative"
+                     [class.border]="img.is_primary" [class.border-primary]="img.is_primary"
+                     [class.rounded]="img.is_primary" style="padding:2px; cursor:grab;">
+                  <img [src]="img.url" class="img-fluid rounded"
+                       style="width:100%;height:120px;object-fit:cover" />
+                  @if (img.is_primary) {
+                    <span class="badge bg-primary position-absolute top-0 start-0 m-1"
+                          style="font-size:.65rem">Principal</span>
+                  }
+                  <span class="badge bg-body-secondary text-body-secondary position-absolute top-0 end-0 m-1"
+                        style="font-size:.65rem">
+                    <fa-icon icon="grip-vertical" />
+                  </span>
+                  <div class="d-flex gap-1 mt-1">
+                    @if (!img.is_primary) {
+                      <button type="button" class="btn btn-xs btn-outline-primary flex-fill"
+                              style="font-size:.7rem;padding:2px 4px" (click)="setPrimary(img)">
+                        Principal
+                      </button>
+                    }
+                    <button type="button" class="btn btn-xs btn-outline-danger"
+                            style="font-size:.7rem;padding:2px 6px" (click)="deleteImage(img)">
+                      <fa-icon icon="trash" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+          <div class="form-text mt-2">
+            La imagen "Principal" es la que aparece en el catálogo. Arrastra las imágenes para cambiar su orden.
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+
+  </div>
+}
+
+} <!-- end @if loading -->

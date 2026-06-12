@@ -1,0 +1,702 @@
+<app-page-header
+  [title]="order()?.code ?? 'Orden'"
+  subtitle="Detalle de orden de venta">
+  <button class="btn btn-outline-secondary btn-sm" routerLink="/orders">
+    <fa-icon icon="arrow-left" class="me-1" />Volver
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (order(); as o) {
+
+  <div class="row g-4">
+
+    <!-- Columna izquierda: info + estado + documento -->
+    <div class="col-lg-4 d-flex flex-column gap-4">
+
+      <!-- Info general -->
+      <c-card>
+        <c-card-header><strong>Información</strong></c-card-header>
+        <c-card-body>
+          <dl class="row mb-0" style="font-size:.875rem">
+            <dt class="col-5 text-body-secondary">Código</dt>
+            <dd class="col-7 font-monospace fw-medium">{{ o.code }}</dd>
+
+            <dt class="col-5 text-body-secondary">Estado</dt>
+            <dd class="col-7">
+              <c-badge [color]="statusColors[o.status]">
+                {{ statusLabels[o.status] ?? o.status }}
+              </c-badge>
+            </dd>
+
+            <dt class="col-5 text-body-secondary">Cliente</dt>
+            <dd class="col-7">
+              <div class="fw-medium">{{ clientName(o) }}</div>
+              @if (o.client?.phone) {
+                <div class="text-body-secondary small">{{ o.client!.phone }}</div>
+              }
+            </dd>
+
+            <dt class="col-5 text-body-secondary">Vendedor</dt>
+            <dd class="col-7">{{ o.seller?.name ?? '—' }}</dd>
+
+            @if (o.quotation_id) {
+              <dt class="col-5 text-body-secondary">Cotización</dt>
+              <dd class="col-7">
+                <a [routerLink]="['/quotations', o.quotation_id]" class="small">
+                  Ver cotización
+                </a>
+              </dd>
+            }
+
+            <dt class="col-5 text-body-secondary">Fecha</dt>
+            <dd class="col-7 small">{{ o.created_at | date:'dd/MM/yyyy HH:mm' }}</dd>
+          </dl>
+        </c-card-body>
+      </c-card>
+
+      <!-- ── Flujo de estado ─────────────────────────────────────────────── -->
+      <c-card>
+        <c-card-body class="pb-2">
+
+          <!-- Pipeline visual (solo estados del flujo normal) -->
+          @if (currentStepIndex >= 0) {
+            <div class="d-flex align-items-center mb-3 overflow-auto pb-1"
+                 style="font-size:.7rem; gap:0;">
+              @for (step of statusPipeline; track step; let i = $index) {
+
+                <!-- Paso -->
+                <div class="d-flex flex-column align-items-center flex-shrink-0"
+                     style="min-width:50px;">
+                  <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                       style="width:26px; height:26px; font-size:.68rem; transition:background .2s;"
+                       [style.background]="i < currentStepIndex ? 'var(--cui-success)' :
+                                           i === currentStepIndex ? 'var(--cui-primary)' :
+                                           'var(--cui-secondary-bg)'"
+                       [style.color]="i <= currentStepIndex ? '#fff' : 'var(--cui-secondary-color)'">
+                    @if (i < currentStepIndex) { ✓ } @else { {{ i + 1 }} }
+                  </div>
+                  <div class="text-center mt-1 lh-1" style="font-size:.6rem; max-width:48px;"
+                       [style.fontWeight]="i === currentStepIndex ? '700' : '400'"
+                       [style.color]="i === currentStepIndex ? 'var(--cui-primary)' :
+                                      i < currentStepIndex ? 'var(--cui-success)' :
+                                      'var(--cui-secondary-color)'">
+                    {{ stepLabels[step] }}
+                  </div>
+                </div>
+
+                <!-- Conector -->
+                @if (i < statusPipeline.length - 1) {
+                  <div style="flex:1; height:2px; min-width:8px; margin-bottom:18px; transition:background .2s;"
+                       [style.background]="i < currentStepIndex ? 'var(--cui-success)' : 'var(--cui-secondary-bg)'">
+                  </div>
+                }
+
+              }
+            </div>
+          }
+
+          <!-- Estado terminal -->
+
+
+          <!-- Notas de almacén previas -->
+          @if (o.warehouse_notes) {
+            <div class="bg-body-tertiary rounded-3 px-3 py-2 mb-3 small text-body-secondary">
+              <fa-icon icon="comment" class="me-2" />{{ o.warehouse_notes }}
+            </div>
+          }
+
+          <!-- Acciones contextuales -->
+          @if (!isTerminal) {
+
+            <!-- Notas opcionales -->
+            <div class="mb-3">
+              <textarea class="form-control form-control-sm" rows="2"
+                        placeholder="Notas de almacén (opcional)..."
+                        [(ngModel)]="notesText"
+                        [ngModelOptions]="{standalone:true}"></textarea>
+            </div>
+
+            <!-- Botones según estado -->
+            @switch (o.status) {
+
+              @case ('pending') {
+                @if (saleDocument()?.status === 'rejected') {
+                  <div class="alert alert-danger py-2 small d-flex gap-2 align-items-center mb-3">
+                    <fa-icon icon="triangle-exclamation" />
+                    <span>El documento fue rechazado por SUNAT. Podés emitir uno nuevo.</span>
+                  </div>
+                } @else {
+                  <div class="alert alert-warning py-2 small d-flex gap-2 align-items-center mb-3">
+                    <fa-icon icon="file-invoice" />
+                    <span>Esperando documento de venta.</span>
+                  </div>
+                }
+                <div class="d-flex gap-2">
+                  @if (!saleDocument() || saleDocument()?.status === 'rejected') {
+                    <button class="btn btn-primary flex-grow-1 fw-semibold"
+                            [disabled]="updatingStatus() || savingDoc()"
+                            (click)="showDocForm.set(true)">
+                      <fa-icon icon="file-invoice" class="me-1" />
+                      {{ saleDocument()?.status === 'rejected' ? 'Nuevo documento' : 'Documentar' }}
+                    </button>
+                  }
+                  <button class="btn btn-outline-danger"
+                          [disabled]="deleting()"
+                          (click)="showDeleteConfirm.set(true)"
+                          title="Eliminar pedido">
+                    <fa-icon icon="trash" />
+                  </button>
+                </div>
+              }
+
+              @case ('documented') {
+                <button class="btn btn-success w-100 fw-semibold py-2"
+                        [disabled]="updatingStatus()"
+                        (click)="quickAction('assembled')">
+                  @if (updatingStatus()) { <c-spinner size="sm" class="me-1" /> } @else { <fa-icon icon="box" class="me-1" /> }
+                  Marcar como armado
+                </button>
+              }
+
+              @case ('assembled') {
+                <div class="alert alert-info py-2 small d-flex gap-2 align-items-center mb-0">
+                  <fa-icon icon="truck" />
+                  <span>Listo — pendiente de carga en módulo Despacho.</span>
+                </div>
+              }
+
+              @case ('dispatched') {
+                <div class="alert alert-warning py-2 small d-flex gap-2 align-items-center mb-0">
+                  <fa-icon icon="truck" />
+                  <span>En ruta — gestionado desde módulo Despacho.</span>
+                </div>
+              }
+
+              @case ('delivered') {
+                <div class="alert alert-success py-2 small d-flex gap-2 align-items-center mb-0">
+                  <fa-icon icon="check" />
+                  <span>Entregado — pendiente de cobro en módulo Despacho.</span>
+                </div>
+              }
+
+            }
+
+            <!-- Opciones avanzadas -->
+            <div class="mt-3">
+              <button class="btn btn-link btn-sm p-0 text-body-secondary text-decoration-none"
+                      style="font-size:.78rem;"
+                      (click)="showAdvanced.set(!showAdvanced())">
+                <fa-icon [icon]="showAdvanced() ? 'chevron-up' : 'chevron-down'" class="me-1" />
+                Cambio avanzado de estado
+              </button>
+              @if (showAdvanced()) {
+                <form [formGroup]="warehouseForm" (ngSubmit)="updateStatus()"
+                      class="d-flex gap-2 align-items-start mt-2">
+                  <p-select
+                    formControlName="status"
+                    [options]="warehouseStatusOptions"
+                    optionLabel="label" optionValue="value"
+                    placeholder="Estado destino"
+                    [style]="{ width: '100%' }" appendTo="body"
+                    [class.is-invalid]="warehouseForm.get('status')?.invalid && warehouseForm.get('status')?.touched"
+                  />
+                  <button type="submit" class="btn btn-sm btn-primary flex-shrink-0"
+                          [disabled]="updatingStatus()">
+                    <fa-icon icon="check" />
+                  </button>
+                </form>
+              }
+            </div>
+
+          }
+
+        </c-card-body>
+      </c-card>
+
+      <!-- Documento de venta -->
+      <c-card>
+        <c-card-header><strong>Documento de venta</strong></c-card-header>
+        <c-card-body>
+
+          @if (showDocForm()) {
+            <form [formGroup]="docForm" (ngSubmit)="saveDoc()" class="d-flex flex-column gap-2 mb-3">
+              @if (o.document_type) {
+                <div class="d-flex align-items-center justify-content-between rounded border px-3 py-2"
+                     style="font-size:.85rem;">
+                  <span class="text-body-secondary small">Tipo de documento</span>
+                  <span class="fw-semibold">
+                    {{ o.document_type === 'invoice' ? 'Factura (F001)' :
+                       o.document_type === 'receipt' ? 'Boleta (B001)' : 'Nota de venta (NV01)' }}
+                  </span>
+                </div>
+              }
+              <div>
+                <label class="form-label small text-body-secondary mb-1">Fecha emisión</label>
+                <input cFormControl formControlName="issue_date" type="date" />
+              </div>
+              <div>
+                <label class="form-label small text-body-secondary mb-1">Notas</label>
+                <input cFormControl formControlName="notes" type="text" placeholder="Opcional" />
+              </div>
+              <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary" [disabled]="savingDoc()">
+                  @if (savingDoc()) { <c-spinner size="sm" class="me-1" /> }
+                  <fa-icon icon="file-invoice" class="me-1" />Generar documento
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        (click)="showDocForm.set(false)">Cancelar</button>
+              </div>
+            </form>
+          }
+
+          @if (saleDocument(); as doc) {
+            <dl class="row mb-3" style="font-size:.875rem">
+              <dt class="col-5 text-body-secondary">Tipo</dt>
+              <dd class="col-7">{{ docTypeLabels[doc.document_type] }}</dd>
+              <dt class="col-5 text-body-secondary">Número</dt>
+              <dd class="col-7 font-monospace fw-semibold">{{ doc.full_number ?? '—' }}</dd>
+              <dt class="col-5 text-body-secondary">Estado</dt>
+              <dd class="col-7">
+                <c-badge [color]="docStatusColors[doc.status]">
+                  {{ docStatusLabels[doc.status] ?? doc.status }}
+                </c-badge>
+              </dd>
+              <dt class="col-5 text-body-secondary">Total</dt>
+              <dd class="col-7 fw-semibold">S/ {{ doc.total | number:'1.2-2' }}</dd>
+            </dl>
+            <div class="d-flex gap-2 flex-wrap">
+              @if (doc.document_type === 'sale_note' || doc.pdf_url) {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
+                        (click)="openDocFile('pdf')" title="Descargar PDF">
+                  @if (downloadingKey() === 'sale-documents:' + doc.id + ':pdf') { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="file-pdf" style="font-size:1rem;" /> }
+                  <small>PDF</small>
+                </button>
+              }
+              @if (doc.xml_url) {
+                <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':xml'"
+                        (click)="openDocFile('xml')" title="Descargar XML">
+                  @if (downloadingKey() === 'sale-documents:' + doc.id + ':xml') { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="file-code" style="font-size:1rem;" /> }
+                  <small>XML</small>
+                </button>
+              }
+              @if (doc.cdr_url) {
+                <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':cdr'"
+                        (click)="openDocFile('cdr')" title="Descargar CDR">
+                  @if (downloadingKey() === 'sale-documents:' + doc.id + ':cdr') { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="file-zipper" style="font-size:1rem;" /> }
+                  <small>CDR</small>
+                </button>
+              }
+              @if (doc.document_type !== 'sale_note' && doc.status === 'draft') {
+                <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        (click)="submitDoc()" [disabled]="submittingDoc()">
+                  @if (submittingDoc()) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="paper-plane" style="font-size:1rem;" /> }
+                  <small>Enviar</small>
+                </button>
+              }
+              @if (doc.document_type !== 'sale_note' && doc.status === 'sent') {
+                <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        (click)="consultarEstadoDoc()" [disabled]="consultingDoc()">
+                  @if (consultingDoc()) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="rotate" style="font-size:1rem;" /> }
+                  <small>Consultar</small>
+                </button>
+              }
+            </div>
+          } @else if (!showDocForm()) {
+            <p class="text-body-secondary small mb-0">Sin documento generado.</p>
+          }
+
+          <!-- Panel de respuesta ApiSunat (debug) -->
+          @if (sunatRaw()) {
+            <div class="mt-3 border rounded-3 overflow-hidden" style="font-size:.78rem;">
+              <button class="btn btn-link btn-sm w-100 text-start d-flex align-items-center justify-content-between px-3 py-2 text-body-secondary text-decoration-none"
+                      (click)="showSunatRaw.set(!showSunatRaw())">
+                <span><fa-icon icon="code" class="me-2" />Respuesta ApiSunat</span>
+                <fa-icon [icon]="showSunatRaw() ? 'chevron-up' : 'chevron-down'" />
+              </button>
+              @if (showSunatRaw()) {
+                <div class="border-top bg-body-tertiary px-3 py-2" style="font-size:.72rem;">
+                  <div class="row g-2 mb-2">
+                    <div class="col-6">
+                      <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase;">Estado ApiSunat</div>
+                      <code>{{ sunatRaw().apisunat_status ?? '—' }}</code>
+                    </div>
+                    <div class="col-6">
+                      <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase;">Estado local</div>
+                      <code>{{ sunatRaw().estado ?? '—' }}</code>
+                    </div>
+                    <div class="col-12">
+                      <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase;">Mensaje</div>
+                      <span>{{ sunatRaw().message ?? '—' }}</span>
+                    </div>
+                    @if (sunatRaw().faults?.length) {
+                      <div class="col-12">
+                        <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase;">Faults SUNAT</div>
+                        @for (f of sunatRaw().faults; track $index) {
+                          <div class="text-danger">{{ f | json }}</div>
+                        }
+                      </div>
+                    }
+                    @if (sunatRaw().documentId) {
+                      <div class="col-12">
+                        <div class="text-body-secondary" style="font-size:.65rem; text-transform:uppercase;">Document ID / File</div>
+                        <code class="small">{{ sunatRaw().documentId }} · {{ sunatRaw().fileName }}</code>
+                      </div>
+                    }
+                  </div>
+                  <pre class="mb-0 p-2 rounded bg-body-secondary" style="font-size:.65rem; max-height:200px; overflow:auto; white-space:pre-wrap; word-break:break-all;">{{ sunatRaw() | json }}</pre>
+                </div>
+              }
+            </div>
+          }
+
+        </c-card-body>
+      </c-card>
+
+      <!-- Guía de remisión -->
+      <c-card>
+        <c-card-header>
+          <div class="d-flex align-items-center justify-content-between">
+            <strong>Guía de Remisión</strong>
+            @if (!shippingGuide() && o.status === 'documented') {
+              <button class="btn btn-sm btn-outline-primary"
+                      (click)="showGuideModal.set(true)" title="Crear guía de remisión">
+                <fa-icon icon="truck" class="me-1" />Crear guía
+              </button>
+            }
+          </div>
+        </c-card-header>
+        <c-card-body>
+          @if (shippingGuide(); as guide) {
+            <dl class="row mb-3" style="font-size:.875rem">
+              <dt class="col-5 text-body-secondary">Número</dt>
+              <dd class="col-7 font-monospace fw-semibold">{{ guide.full_number ?? '—' }}</dd>
+              <dt class="col-5 text-body-secondary">Estado</dt>
+              <dd class="col-7">
+                <c-badge [color]="guideStatusColor[guide.sunat_status]">
+                  {{ guideStatusLabel[guide.sunat_status] }}
+                </c-badge>
+              </dd>
+              <dt class="col-5 text-body-secondary">Transportista</dt>
+              <dd class="col-7 small">
+                {{ guide.carrier_name }}
+                @if (guide.carrier_ruc) { <span class="text-body-secondary">· RUC {{ guide.carrier_ruc }}</span> }
+              </dd>
+              <dt class="col-5 text-body-secondary">Fecha traslado</dt>
+              <dd class="col-7 small">{{ guide.transfer_date | date:'dd/MM/yyyy' }}</dd>
+            </dl>
+            <div class="d-flex gap-2 flex-wrap">
+              @if (guide.pdf_url) {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':pdf'"
+                        (click)="openGuideFile('pdf')" title="Descargar PDF">
+                  @if (downloadingKey() === 'shipping-guides:' + guide.id + ':pdf') { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="file-pdf" style="font-size:1rem;" /> }
+                  <small>PDF</small>
+                </button>
+              }
+              @if (guide.xml_url) {
+                <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':xml'"
+                        (click)="openGuideFile('xml')" title="Descargar XML">
+                  @if (downloadingKey() === 'shipping-guides:' + guide.id + ':xml') { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="file-code" style="font-size:1rem;" /> }
+                  <small>XML</small>
+                </button>
+              }
+              @if (guide.cdr_url) {
+                <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':cdr'"
+                        (click)="openGuideFile('cdr')" title="Descargar CDR">
+                  @if (downloadingKey() === 'shipping-guides:' + guide.id + ':cdr') { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="file-zipper" style="font-size:1rem;" /> }
+                  <small>CDR</small>
+                </button>
+              }
+              @if (guide.sunat_status === 'draft') {
+                <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="submittingGuide()"
+                        (click)="submitGuide()">
+                  @if (submittingGuide()) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="paper-plane" style="font-size:1rem;" /> }
+                  <small>Enviar</small>
+                </button>
+              }
+              @if (guide.sunat_status === 'sent') {
+                <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="consultingGuide()"
+                        (click)="consultarEstadoGuia()">
+                  @if (consultingGuide()) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="rotate" style="font-size:1rem;" /> }
+                  <small>Consultar</small>
+                </button>
+              }
+              @if (guide.sunat_status === 'draft' || guide.sunat_status === 'sent') {
+                <button class="btn btn-sm btn-danger d-flex flex-column align-items-center"
+                        style="min-width:52px; font-size:.75rem;"
+                        [disabled]="voidingGuide()"
+                        (click)="voidGuide()">
+                  @if (voidingGuide()) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="ban" style="font-size:1rem;" /> }
+                  <small>Anular</small>
+                </button>
+              }
+            </div>
+          } @else {
+            <p class="text-body-secondary small mb-0">Sin guía de remisión.</p>
+          }
+        </c-card-body>
+      </c-card>
+
+    </div>
+
+    <!-- Columna derecha: ítems + pagos -->
+    <div class="col-lg-8 d-flex flex-column gap-4">
+
+      <!-- Ítems -->
+      <c-card>
+        <c-card-header><strong>Productos</strong></c-card-header>
+        <c-card-body class="p-0">
+          <div class="table-responsive">
+            <table class="table mb-0" style="font-size:.875rem">
+              <thead style="font-size:.78rem">
+                <tr>
+                  <th class="ps-3">Producto</th>
+                  <th class="text-end">Cant.</th>
+                  <th class="text-end">Precio unit.</th>
+                  <th class="text-end pe-3">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of o.items; track item.id) {
+                  <tr>
+                    <td class="ps-3">
+                      @if (item.product_laboratory) {
+                        <span class="text-info me-1" style="font-size:.8rem;">{{ item.product_laboratory }}</span>
+                      }
+                      {{ item.product_name ?? '—' }}
+                    </td>
+                    <td class="text-end">{{ item.quantity }}</td>
+                    <td class="text-end">S/ {{ item.unit_price | number:'1.2-2' }}</td>
+                    <td class="text-end pe-3 fw-medium">S/ {{ item.total | number:'1.2-2' }}</td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="4" class="text-center text-body-secondary py-4">Sin ítems</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                @if (+o.discount > 0) {
+                  <tr>
+                    <td colspan="2"></td>
+                    <td class="text-end text-body-secondary small">Subtotal</td>
+                    <td class="text-end pe-3">S/ {{ o.subtotal | number:'1.2-2' }}</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2"></td>
+                    <td class="text-end text-success small">Descuento</td>
+                    <td class="text-end pe-3 text-success">- S/ {{ o.discount | number:'1.2-2' }}</td>
+                  </tr>
+                }
+                <tr>
+                  <td colspan="2"></td>
+                  <td class="text-end fw-bold">Total</td>
+                  <td class="text-end pe-3 fw-bold fs-5">S/ {{ o.total | number:'1.2-2' }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </c-card-body>
+      </c-card>
+
+      <!-- Pagos -->
+      <c-card>
+        <c-card-header>
+          <div class="d-flex justify-content-between align-items-center">
+            <strong>Pagos</strong>
+            <button class="btn btn-sm btn-outline-primary"
+                    (click)="showPaymentForm.set(!showPaymentForm())">
+              <fa-icon icon="plus" class="me-1" />Registrar pago
+            </button>
+          </div>
+        </c-card-header>
+        <c-card-body>
+
+          @if (showPaymentForm()) {
+            <div class="border rounded p-3 mb-3">
+              <div class="small fw-medium text-body-secondary mb-2">Nuevo pago</div>
+              <form [formGroup]="paymentForm" (ngSubmit)="savePayment()">
+                <div class="row g-2">
+                  <div class="col-sm-4">
+                    <label class="form-label small text-body-secondary mb-1">
+                      Monto (S/) <span class="text-danger">*</span>
+                    </label>
+                    <input cFormControl formControlName="amount"
+                           type="number" step="0.01" min="0.01" placeholder="0.00"
+                           [class.is-invalid]="paymentForm.get('amount')?.invalid && paymentForm.get('amount')?.touched" />
+                  </div>
+                  <div class="col-sm-4">
+                    <label class="form-label small text-body-secondary mb-1">
+                      Método <span class="text-danger">*</span>
+                    </label>
+                    <p-select
+                      formControlName="payment_method_id"
+                      [options]="paymentMethods()"
+                      optionLabel="name" optionValue="id"
+                      placeholder="Seleccionar"
+                      [style]="{ width: '100%' }" appendTo="body"
+                      [class.is-invalid]="paymentForm.get('payment_method_id')?.invalid && paymentForm.get('payment_method_id')?.touched"
+                    />
+                  </div>
+                  <div class="col-sm-4">
+                    <label class="form-label small text-body-secondary mb-1">Tipo</label>
+                    <p-select
+                      formControlName="payment_type"
+                      [options]="paymentTypeOptions"
+                      optionLabel="label" optionValue="value"
+                      [style]="{ width: '100%' }" appendTo="body"
+                    />
+                  </div>
+                  <div class="col-sm-4">
+                    <label class="form-label small text-body-secondary mb-1">Fecha</label>
+                    <input cFormControl formControlName="payment_date" type="date" />
+                  </div>
+                  <div class="col-sm-4">
+                    <label class="form-label small text-body-secondary mb-1">N° operación</label>
+                    <input cFormControl formControlName="operation_number"
+                           type="text" placeholder="Opcional" />
+                  </div>
+                  <div class="col-sm-4">
+                    <label class="form-label small text-body-secondary mb-1">Notas</label>
+                    <input cFormControl formControlName="notes" type="text" placeholder="Opcional" />
+                  </div>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                  <button type="submit" class="btn btn-sm btn-primary" [disabled]="savingPayment()">
+                    @if (savingPayment()) { <c-spinner size="sm" class="me-1" /> }
+                    Guardar pago
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary"
+                          (click)="showPaymentForm.set(false)">Cancelar</button>
+                </div>
+              </form>
+            </div>
+          }
+
+          @if (payments().length > 0) {
+            <div class="table-responsive">
+              <table class="table table-sm mb-2" style="font-size:.8rem">
+                <thead style="font-size:.75rem">
+                  <tr>
+                    <th>Código</th>
+                    <th>Método</th>
+                    <th>Tipo</th>
+                    <th class="text-end">Monto</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (p of payments(); track p.id) {
+                    <tr>
+                      <td class="font-monospace">{{ p.code }}</td>
+                      <td>{{ p.payment_method?.name ?? '—' }}</td>
+                      <td>{{ paymentTypeLabels[p.payment_type] }}</td>
+                      <td class="text-end fw-medium">S/ {{ p.amount | number:'1.2-2' }}</td>
+                      <td>{{ p.payment_date | date:'dd/MM/yyyy' }}</td>
+                      <td>
+                        <c-badge [color]="paymentStatusColors[p.status]">
+                          {{ p.status === 'pending' ? 'Pendiente' : p.status === 'validated' ? 'Validado' : 'Rechazado' }}
+                        </c-badge>
+                      </td>
+                      <td>
+                        @if (p.status === 'pending') {
+                          <div class="d-flex gap-1">
+                            <button class="btn btn-xs btn-success"
+                                    style="font-size:.72rem; padding:2px 6px"
+                                    (click)="validatePayment(p.id, 'validate')"
+                                    [disabled]="validatingPaymentId() !== null">
+                              <fa-icon icon="check" />
+                            </button>
+                            <button class="btn btn-xs btn-outline-danger"
+                                    style="font-size:.72rem; padding:2px 6px"
+                                    (click)="validatePayment(p.id, 'reject')"
+                                    [disabled]="validatingPaymentId() !== null">
+                              <fa-icon icon="xmark" />
+                            </button>
+                          </div>
+                        }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Resumen pagos -->
+            <div class="d-flex justify-content-end">
+              <table style="font-size:.875rem; min-width:200px">
+                <tr>
+                  <td class="text-body-secondary pe-4 py-1">Total orden</td>
+                  <td class="text-end fw-medium">S/ {{ o.total | number:'1.2-2' }}</td>
+                </tr>
+                <tr>
+                  <td class="text-body-secondary pe-4 py-1">Pagado (validado)</td>
+                  <td class="text-end text-success fw-medium">S/ {{ paymentsTotal | number:'1.2-2' }}</td>
+                </tr>
+                <tr>
+                  <td class="text-body-secondary pe-4 py-1 fw-semibold">Pendiente</td>
+                  <td class="text-end fw-bold" [class.text-danger]="paymentsPending > 0">
+                    S/ {{ paymentsPending | number:'1.2-2' }}
+                  </td>
+                </tr>
+              </table>
+            </div>
+          } @else if (!showPaymentForm()) {
+            <p class="text-body-secondary small mb-0">Sin pagos registrados.</p>
+          }
+
+        </c-card-body>
+      </c-card>
+
+    </div>
+  </div>
+
+}
+
+<!-- Modales extraídos como componentes -->
+<app-shipping-guide-modal
+  [visible]="showGuideModal()"
+  [order]="order()"
+  (saved)="onGuideSaved($event)"
+  (cancelled)="showGuideModal.set(false)" />
+
+<app-confirm-modal
+  [visible]="showDeleteConfirm()"
+  title="Eliminar pedido"
+  message="¿Eliminar este pedido? La cotización volverá a borrador. No se puede deshacer."
+  confirmLabel="Eliminar"
+  [confirmColor]="'danger'"
+  (confirm)="deleteOrder()"
+  (cancel)="showDeleteConfirm.set(false)" />

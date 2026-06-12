@@ -1,0 +1,239 @@
+<app-page-header title="Documentos de ingreso" subtitle="Control de comprobantes de compra recibidos">
+</app-page-header>
+
+<!-- Filtros -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Buscar N° documento</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><fa-icon icon="search" /></span>
+          <input type="text" class="form-control"
+                 placeholder="F001-00001 o REC-2026..."
+                 [(ngModel)]="filters.search"
+                 (keyup.enter)="onSearch()" />
+          @if (filters.search) {
+            <button class="btn btn-outline-secondary" type="button"
+                    (click)="filters.search = ''; onSearch()">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Proveedor</label>
+        <p-select
+          [(ngModel)]="filters.supplier_id"
+          [options]="suppliers()"
+          optionLabel="name" optionValue="id"
+          placeholder="Todos los proveedores"
+          [showClear]="true"
+          [filter]="true" filterPlaceholder="Buscar..."
+          emptyMessage="Sin resultados"
+          [style]="{ width: '100%' }" appendTo="body"
+          (ngModelChange)="onSearch()"
+        />
+      </div>
+
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Tipo documento</label>
+        <p-select
+          [(ngModel)]="filters.document_type"
+          [options]="docTypeOptions"
+          optionLabel="label" optionValue="value"
+          [style]="{ width: '100%' }" appendTo="body"
+          (ngModelChange)="onSearch()"
+        />
+      </div>
+
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">F. emisión desde</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_from"
+               (change)="onSearch()" />
+      </div>
+
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">F. emisión hasta</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_to"
+               (change)="onSearch()" />
+      </div>
+
+    </div>
+
+    @if (hasActiveFilters()) {
+      <div class="d-flex justify-content-end mt-2">
+        <button class="btn btn-outline-secondary btn-sm" (click)="clearFilters()">
+          <fa-icon icon="xmark" class="me-1" />Limpiar filtros
+        </button>
+      </div>
+    }
+
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ MOBILE: cards ════════════════════════════════════════════════════ -->
+  <div class="d-md-none d-flex flex-column gap-2 mb-3">
+    @for (r of receipts(); track r.id) {
+      <c-card>
+        <c-card-body class="px-3 py-2" style="cursor:pointer" (click)="openDetail(r)">
+
+          <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+            <div>
+              <div class="font-monospace fw-medium" style="font-size:.85rem;">
+                {{ r.document_number ?? '—' }}
+              </div>
+              <div class="text-body-secondary" style="font-size:.73rem;">
+                {{ docTypeLabel[r.document_type] }} · {{ r.code }}
+              </div>
+            </div>
+            <c-badge [color]="r.status === 'validated' ? 'success' : 'warning'">
+              {{ r.status === 'validated' ? 'Validado' : 'Pendiente' }}
+            </c-badge>
+          </div>
+
+          <div class="fw-semibold lh-sm mb-1">{{ r.supplier?.name ?? '—' }}</div>
+
+          <div class="d-flex gap-3 mb-2 flex-wrap" style="font-size:.78rem;">
+            @if (r.document_date) {
+              <span class="text-body-secondary">
+                <fa-icon icon="calendar" class="me-1" />{{ r.document_date | date:'dd/MM/yyyy' }}
+              </span>
+            }
+            @if (r.due_date) {
+              <span class="text-body-secondary">Vence: {{ r.due_date | date:'dd/MM/yyyy' }}</span>
+            }
+            <span class="ms-auto fw-semibold">
+              {{ r.currency }} {{ r.subtotal | number:'1.2-2' }}
+            </span>
+          </div>
+
+          <div class="d-flex gap-2 pt-2 border-top" (click)="$event.stopPropagation()">
+            <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                    (click)="openDetail(r)">
+              <fa-icon icon="eye" /><small>Ver / Editar</small>
+            </button>
+            @if (r.document_file_url) {
+              <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                      [disabled]="downloadingId() === r.id"
+                      (click)="downloadDoc(r, $event)">
+                @if (downloadingId() === r.id) { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-pdf" /> }
+                <small>Comprobante</small>
+              </button>
+            }
+          </div>
+
+        </c-card-body>
+      </c-card>
+    } @empty {
+      <c-card>
+        <c-card-body>
+          <div class="text-center text-body-secondary py-5">
+            <fa-icon icon="file-invoice" class="d-block mb-2" style="font-size:2.5rem;opacity:.3;" />
+            <div class="fw-medium mb-1">Sin documentos</div>
+            <div class="small">Ajusta los filtros para encontrar documentos.</div>
+          </div>
+        </c-card-body>
+      </c-card>
+    }
+  </div>
+
+  <!-- ══ DESKTOP: tabla ═══════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th>N° Documento</th>
+              <th>Proveedor</th>
+              <th>Tipo</th>
+              <th>F. Emisión</th>
+              <th>F. Vencimiento</th>
+              <th>Cond. Pago</th>
+              <th class="text-end">Total</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of receipts(); track r.id) {
+              <tr style="cursor:pointer" (click)="openDetail(r)">
+                <td class="font-monospace fw-medium">
+                  {{ r.document_number ?? '—' }}
+                  <div class="text-body-secondary" style="font-size:.73rem;">{{ r.code }}</div>
+                </td>
+                <td>{{ r.supplier?.name ?? '—' }}</td>
+                <td>{{ docTypeLabel[r.document_type] }}</td>
+                <td class="text-nowrap">
+                  {{ r.document_date ? (r.document_date | date:'dd/MM/yyyy') : '—' }}
+                </td>
+                <td class="text-nowrap">
+                  {{ r.due_date ? (r.due_date | date:'dd/MM/yyyy') : '—' }}
+                </td>
+                <td>
+                  {{ r.payment_condition ? (paymentCondLabel[r.payment_condition] ?? r.payment_condition) : '—' }}
+                </td>
+                <td class="text-end fw-semibold text-nowrap">
+                  {{ r.currency }} {{ r.subtotal | number:'1.2-2' }}
+                </td>
+                <td>
+                  <c-badge [color]="r.status === 'validated' ? 'success' : 'warning'">
+                    {{ r.status === 'validated' ? 'Validado' : 'Pendiente' }}
+                  </c-badge>
+                </td>
+                <td (click)="$event.stopPropagation()">
+                  <div class="d-inline-flex gap-1">
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                            style="min-width:44px" (click)="openDetail(r)">
+                      <fa-icon icon="eye" /><small>Ver</small>
+                    </button>
+                    @if (r.document_file_url) {
+                      <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                              style="min-width:44px"
+                              [disabled]="downloadingId() === r.id"
+                              (click)="downloadDoc(r, $event)">
+                        @if (downloadingId() === r.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="file-pdf" /> }
+                        <small>Comprobante</small>
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="9" class="text-center py-4 text-body-secondary">
+                  Sin documentos para los filtros seleccionados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- Total -->
+  @if (total() > 0) {
+    <div class="d-flex justify-content-between align-items-center mt-2">
+      <small class="text-body-secondary">Total: {{ total() }} documentos</small>
+      <app-pagination
+        [currentPage]="filters.page!"
+        [lastPage]="lastPage()"
+        wrapperClass=""
+        (pageChange)="goToPage($event)"
+      />
+    </div>
+  }
+
+}

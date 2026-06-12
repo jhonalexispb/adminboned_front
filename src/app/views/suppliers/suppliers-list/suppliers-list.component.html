@@ -1,0 +1,245 @@
+<app-page-header title="Proveedores" subtitle="Gestión de proveedores">
+  <button class="btn btn-primary" (click)="openCreate()">
+    <fa-icon icon="plus" class="me-1" />Nuevo proveedor
+  </button>
+</app-page-header>
+
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-6">
+        <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+        <div class="input-group input-group-sm">
+          <input class="form-control" placeholder="Nombre, RUC o contacto..."
+                 [(ngModel)]="filters.search" (keyup.enter)="onSearch()" />
+          @if (filters.search) {
+            <button class="btn btn-outline-secondary" type="button"
+                    (click)="filters.search = ''; onSearch()">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+          <button class="btn btn-primary" type="button" (click)="onSearch()">
+            <fa-icon icon="search" />
+          </button>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <select class="form-select form-select-sm" [(ngModel)]="filters.active" (change)="onSearch()">
+          <option value="">Todos</option>
+          <option [ngValue]="true">Activos</option>
+          <option [ngValue]="false">Inactivos</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-auto ms-md-auto d-flex align-items-end">
+        <span class="text-body-secondary small">
+          {{ total() }} proveedor{{ total() !== 1 ? 'es' : '' }}
+        </span>
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ MOBILE: cards ══════════════════════════════════════════════════════ -->
+  <div class="d-md-none d-flex flex-column gap-2 mb-3">
+    @for (sup of suppliers(); track sup.id) {
+      <c-card>
+        <c-card-body class="px-3 py-2">
+          <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+            <div>
+              <div class="fw-semibold lh-sm">{{ sup.name }}</div>
+              @if (sup.ruc) {
+                <div class="text-body-secondary font-monospace" style="font-size:.75rem;">RUC {{ sup.ruc }}</div>
+              }
+            </div>
+            <app-status-badge [active]="sup.active" />
+          </div>
+          <div class="d-flex flex-column gap-1 mt-1" style="font-size:.8rem;">
+            @if (sup.contact_name) {
+              <div class="d-flex align-items-center gap-2">
+                <fa-icon icon="user" class="text-body-secondary" style="width:12px;" />
+                <span>{{ sup.contact_name }}</span>
+              </div>
+            }
+            @if (sup.phone) {
+              <div class="d-flex align-items-center gap-2">
+                <fa-icon icon="phone" class="text-body-secondary" style="width:12px;" />
+                <span>{{ sup.phone }}</span>
+              </div>
+            }
+            @if (sup.district?.name) {
+              <div class="d-flex align-items-center gap-2 text-body-secondary">
+                <fa-icon icon="location-dot" style="width:12px;" />
+                <span>{{ sup.district?.name }}</span>
+              </div>
+            }
+          </div>
+
+
+          <div class="d-flex gap-2 mt-2 pt-2 border-top">
+            @if (sup.phone || sup.email) {
+              <div ngbDropdown class="flex-grow-1">
+                <button type="button" ngbDropdownToggle
+                        class="btn btn-sm btn-success d-flex flex-column align-items-center w-100"
+                        style="font-size:.68rem;">
+                  <fa-icon icon="address-book" style="font-size:.85rem;" /><small>Contactar</small>
+                </button>
+                <div ngbDropdownMenu>
+                  @if (sup.phone) {
+                    <button ngbDropdownItem (click)="call(sup.phone)">
+                      <fa-icon icon="phone" class="me-2 text-primary" />Llamar
+                    </button>
+                    <button ngbDropdownItem (click)="whatsapp(sup.phone)">
+                      <fa-icon [icon]="['fab','whatsapp']" class="me-2 text-success" />WhatsApp
+                    </button>
+                  }
+                  @if (sup.phone && sup.email) {
+                    <div class="dropdown-divider"></div>
+                  }
+                  @if (sup.email) {
+                    <button ngbDropdownItem (click)="mail(sup.email)">
+                      <fa-icon icon="envelope" class="me-2 text-secondary" />Correo
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+            <button class="btn btn-sm btn-info d-flex flex-column align-items-center flex-grow-1"
+                    style="font-size:.68rem;" (click)="openLabs(sup)">
+              <fa-icon icon="flask" style="font-size:.85rem;" /><small>Labs</small>
+            </button>
+            <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-grow-1"
+                    style="font-size:.68rem;" (click)="openEdit(sup)">
+              <fa-icon icon="pencil" style="font-size:.85rem;" /><small>Editar</small>
+            </button>
+            <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-grow-1"
+                    style="font-size:.68rem;" (click)="confirmDelete(sup)">
+              <fa-icon icon="trash" style="font-size:.85rem;" /><small>Eliminar</small>
+            </button>
+          </div>
+        </c-card-body>
+      </c-card>
+    } @empty {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="truck" class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+        No hay proveedores registrados.
+      </div>
+    }
+  </div>
+
+  <!-- ══ DESKTOP: tabla ════════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th style="width:60px">#</th>
+              <th>Nombre / Razón social</th>
+              <th style="width:130px">RUC</th>
+              <th>Contacto</th>
+              <th>Teléfono</th>
+              <th>Laboratorios</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:150px" class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (sup of suppliers(); track sup.id) {
+              <tr>
+                <td class="text-body-secondary">{{ sup.id }}</td>
+                <td class="fw-semibold">{{ sup.name }}</td>
+                <td class="text-body-secondary font-monospace" style="font-size:.82rem;">{{ sup.ruc ?? '—' }}</td>
+                <td>{{ sup.contact_name ?? '—' }}</td>
+                <td>{{ sup.phone ?? '—' }}</td>
+                <td>
+                  @if (sup.laboratories.length) {
+                    <div class="d-flex flex-wrap gap-1">
+                      @for (lab of sup.laboratories; track lab.id) {
+                        <span class="badge text-bg-primary" style="font-size:.7rem;">{{ lab.name }}</span>
+                      }
+                    </div>
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+                <td><app-status-badge [active]="sup.active" /></td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2 align-items-center">
+                    @if (sup.phone || sup.email) {
+                      <div ngbDropdown container="body">
+                        <button type="button" ngbDropdownToggle
+                                class="btn btn-sm btn-success d-flex flex-column align-items-center">
+                          <fa-icon icon="address-book" /><small>Contactar</small>
+                        </button>
+                        <div ngbDropdownMenu>
+                          @if (sup.phone) {
+                            <button ngbDropdownItem (click)="call(sup.phone)">
+                              <fa-icon icon="phone" class="me-2 text-primary" />Llamar
+                            </button>
+                            <button ngbDropdownItem (click)="whatsapp(sup.phone)">
+                              <fa-icon [icon]="['fab','whatsapp']" class="me-2 text-success" />WhatsApp
+                            </button>
+                          }
+                          @if (sup.phone && sup.email) {
+                            <div class="dropdown-divider"></div>
+                          }
+                          @if (sup.email) {
+                            <button ngbDropdownItem (click)="mail(sup.email)">
+                              <fa-icon icon="envelope" class="me-2 text-secondary" />Correo
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    }
+                    <button class="btn btn-sm btn-info d-flex flex-column align-items-center" (click)="openLabs(sup)"
+                            title="Gestionar laboratorios">
+                      <fa-icon icon="flask" /><small>Labs</small>
+                    </button>
+                    <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEdit(sup)">
+                      <fa-icon icon="pencil" /><small>Editar</small>
+                    </button>
+                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDelete(sup)">
+                      <fa-icon icon="trash" /><small>Eliminar</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" class="text-center py-4 text-body-secondary">
+                  No hay proveedores registrados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </c-card-body>
+  </c-card>
+
+} <!-- /loading -->
+
+<app-pagination
+  [currentPage]="filters.page!"
+  [lastPage]="lastPage()"
+  [total]="total()"
+  (pageChange)="goToPage($event)"
+/>
+
+<app-confirm-modal
+  [visible]="showConfirm()"
+  title="Eliminar proveedor"
+  [message]="'¿Eliminar &quot;' + deletingName() + '&quot;? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  (confirm)="onConfirmDelete()"
+  (cancel)="showConfirm.set(false)"
+/>

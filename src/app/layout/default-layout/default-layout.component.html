@@ -14,7 +14,7 @@
   </c-sidebar-header>
 
   <ng-scrollbar pointerEventsMethod="scrollbar" visibility="hover">
-    <c-sidebar-nav [navItems]="navItems" dropdownMode="close" compact />
+    <c-sidebar-nav [navItems]="navItems()" dropdownMode="close" />
   </ng-scrollbar>
 
   @if (!sidebar1.narrow) {
@@ -34,11 +34,17 @@
     sidebarId="sidebar1"
   />
   <!--app-body-->
-  <div class="body flex-grow-1">
+  <div class="body flex-grow-1 mb-5">
     <c-container breakpoint="lg" class="h-auto px-4">
       <router-outlet />
     </c-container>
   </div>
-  <!--app footer-->
-  <app-default-footer />
+
 </div>
+
+<!-- Registrar depósito (acceso rápido desde la deuda en el header) -->
+<app-register-deposit-modal
+  [open]="collectionService.showNewDeposit()"
+  [deposit]="null"
+  (registered)="onDepositRegistered($event)"
+  (cancelled)="collectionService.showNewDeposit.set(false)" />

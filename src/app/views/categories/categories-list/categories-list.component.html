@@ -1,0 +1,146 @@
+<app-page-header title="Categorías" subtitle="Gestión de categorías de productos">
+  <button class="btn btn-primary" (click)="openCreate()">
+    <fa-icon icon="plus" class="me-1" />Nueva categoría
+  </button>
+</app-page-header>
+
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-6">
+        <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+        <div class="input-group input-group-sm">
+          <input class="form-control" placeholder="Buscar por nombre..."
+                 [(ngModel)]="filters.search" (keyup.enter)="onSearch()" />
+          @if (filters.search) {
+            <button class="btn btn-outline-secondary" type="button"
+                    (click)="filters.search = ''; onSearch()">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+          <button class="btn btn-primary" type="button" (click)="onSearch()">
+            <fa-icon icon="search" />
+          </button>
+        </div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <select class="form-select form-select-sm" [(ngModel)]="filters.active" (change)="onSearch()">
+          <option value="">Todos</option>
+          <option [ngValue]="true">Activos</option>
+          <option [ngValue]="false">Inactivos</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-auto ms-md-auto d-flex align-items-end">
+        <span class="text-body-secondary small">
+          {{ total() }} categoría{{ total() !== 1 ? 's' : '' }}
+        </span>
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ MOBILE: cards ══════════════════════════════════════════════════════ -->
+  <div class="d-md-none d-flex flex-column gap-2 mb-3">
+    @for (cat of categories(); track cat.id) {
+      <c-card>
+        <c-card-body class="px-3 py-2">
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <div class="flex-grow-1 min-width-0">
+              <div class="fw-semibold">{{ cat.name }}</div>
+              @if (cat.description) {
+                <div class="text-body-secondary small text-truncate">{{ cat.description }}</div>
+              }
+            </div>
+            <app-status-badge [active]="cat.active" />
+          </div>
+          <div class="d-flex gap-2 mt-2 pt-2 border-top">
+            <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-grow-1"
+                    style="font-size:.68rem;" (click)="openEdit(cat)">
+              <fa-icon icon="pencil" style="font-size:.85rem;" /><small>Editar</small>
+            </button>
+            <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-grow-1"
+                    style="font-size:.68rem;" (click)="confirmDelete(cat)">
+              <fa-icon icon="trash" style="font-size:.85rem;" /><small>Eliminar</small>
+            </button>
+          </div>
+        </c-card-body>
+      </c-card>
+    } @empty {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="tag" class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+        No hay categorías registradas.
+      </div>
+    }
+  </div>
+
+  <!-- ══ DESKTOP: tabla ════════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th style="width:60px">#</th>
+              <th>Nombre</th>
+              <th>Descripción</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:100px" class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (cat of categories(); track cat.id) {
+              <tr>
+                <td class="text-body-secondary">{{ cat.id }}</td>
+                <td>{{ cat.name }}</td>
+                <td class="text-body-secondary">{{ cat.description ?? '—' }}</td>
+                <td><app-status-badge [active]="cat.active" /></td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2">
+                    <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEdit(cat)">
+                      <fa-icon icon="pencil" /><small>Editar</small>
+                    </button>
+                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDelete(cat)">
+                      <fa-icon icon="trash" /><small>Eliminar</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="text-center py-4 text-body-secondary">
+                  No hay categorías registradas.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </c-card-body>
+  </c-card>
+
+} <!-- /loading -->
+
+<app-pagination
+  [currentPage]="filters.page!"
+  [lastPage]="lastPage()"
+  [total]="total()"
+  (pageChange)="goToPage($event)"
+/>
+
+<app-confirm-modal
+  [visible]="showConfirm()"
+  title="Eliminar categoría"
+  [message]="'¿Eliminar &quot;' + deletingName() + '&quot;? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  (confirm)="onConfirmDelete()"
+  (cancel)="showConfirm.set(false)"
+/>

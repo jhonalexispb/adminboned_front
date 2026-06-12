@@ -1,0 +1,72 @@
+<c-modal-header>
+  <h5 cModalTitle>{{ isEdit ? 'Editar gasto' : 'Registrar gasto' }}</h5>
+  <button (click)="modal.dismiss()" type="button" class="btn-close" aria-label="Cerrar"></button>
+</c-modal-header>
+
+<c-modal-body>
+  <c-row class="g-3">
+    <c-col [md]="6">
+      <label cLabel for="expDate">Fecha *</label>
+      <input cFormControl id="expDate" type="date" [(ngModel)]="form.date" />
+    </c-col>
+    <c-col [md]="6">
+      <div class="d-flex justify-content-between align-items-center">
+        <label cLabel for="expCategory">Categoría *</label>
+        <a class="small text-primary text-decoration-none" style="cursor:pointer" (click)="manageCategories()">+ Nueva categoría</a>
+      </div>
+      <select cSelect id="expCategory" [(ngModel)]="form.category">
+        <option value="">Seleccionar...</option>
+        @for (cat of categories(); track cat.id) {
+          <option [value]="cat.name">{{ cat.name }}</option>
+        }
+      </select>
+    </c-col>
+    <c-col [md]="8">
+      <label cLabel for="expDesc">Descripción</label>
+      <input cFormControl id="expDesc" type="text" [(ngModel)]="form.description"
+             placeholder="Ej: Llenado completo camioneta" maxlength="255" />
+    </c-col>
+    <c-col [md]="4">
+      <label cLabel for="expAmount">Monto S/ *</label>
+      <input cFormControl id="expAmount" type="number" [(ngModel)]="form.amount"
+             min="0.01" step="0.01" placeholder="0.00" />
+    </c-col>
+    <c-col [md]="6">
+      <label cLabel for="expDocNumber">N° de documento <span class="text-body-secondary">(opcional)</span></label>
+      <input cFormControl id="expDocNumber" type="text" [(ngModel)]="form.document_number"
+             placeholder="Ej: F001-00123" maxlength="50" />
+    </c-col>
+    <c-col [md]="6">
+      <label class="form-label small mb-1 d-block">
+        Imagen del documento <span class="text-body-secondary">(opcional)</span>
+      </label>
+      <input type="file" class="form-control form-control-sm"
+             accept="image/*,.pdf"
+             (change)="onFileSelected($event)" />
+      @if (previewUrl) {
+        <div class="mt-2">
+          <img [src]="previewUrl" alt="Documento"
+               class="rounded border"
+               style="max-height:120px; max-width:100%; object-fit:contain;" />
+        </div>
+      } @else if (existingImageUrl) {
+        <div class="mt-2">
+          <a [href]="existingImageUrl" target="_blank" class="small text-primary text-decoration-none">
+            <fa-icon icon="paperclip" class="me-1" />Ver imagen actual (se reemplazará si subes una nueva)
+          </a>
+        </div>
+      }
+    </c-col>
+  </c-row>
+</c-modal-body>
+
+<c-modal-footer>
+  <button cButton color="secondary" variant="outline" (click)="modal.dismiss()" type="button">
+    Cancelar
+  </button>
+  <button cButton color="primary" (click)="save()" type="button"
+          [disabled]="saving() || !form.date || !form.category || !form.amount">
+    @if (saving()) { <c-spinner size="sm" class="me-1" /> }
+    {{ isEdit ? 'Guardar cambios' : 'Registrar' }}
+  </button>
+</c-modal-footer>

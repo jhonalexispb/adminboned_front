@@ -1,0 +1,161 @@
+@if (loading()) {
+  <div style="text-align:center;padding:40px;font-family:sans-serif">Cargando...</div>
+} @else if (order(); as o) {
+<div class="print-page">
+
+  <style>
+    body { margin: 0; }
+    .print-page { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #111; max-width: 800px; margin: 0 auto; padding: 24px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 16px; }
+    .company { font-size: 18px; font-weight: 700; }
+    .doc-title { text-align: right; }
+    .doc-title h2 { margin: 0; font-size: 16px; }
+    .doc-title .code { font-size: 20px; font-weight: 700; font-family: monospace; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .info-box { border: 1px solid #ddd; border-radius: 4px; padding: 10px 12px; }
+    .info-box h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; color: #666; letter-spacing: .5px; }
+    .info-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .info-label { color: #555; }
+    .info-value { font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    th { background: #f0f0f0; border: 1px solid #ccc; padding: 6px 8px; text-align: left; font-size: 11px; text-transform: uppercase; color: #444; }
+    td { border: 1px solid #ddd; padding: 6px 8px; }
+    .text-right { text-align: right; }
+    .tfoot-row td { background: #f9f9f9; font-weight: 700; border-top: 2px solid #999; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+    .badge-secondary { background: #e0e0e0; color: #333; }
+    .badge-info    { background: #cce5ff; color: #004085; }
+    .badge-warning { background: #fff3cd; color: #856404; }
+    .badge-success { background: #d4edda; color: #155724; }
+    .badge-danger  { background: #f8d7da; color: #721c24; }
+    .footer { margin-top: 24px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 10px; color: #888; display: flex; justify-content: space-between; }
+    @media print {
+      .no-print { display: none !important; }
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+
+  <!-- Toolbar (hidden on print) -->
+  <div class="no-print" style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+    <button onclick="window.print()" style="background:#0d6efd;color:#fff;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px">
+      🖨 Imprimir / Guardar PDF
+    </button>
+    <button onclick="window.close()" style="background:#6c757d;color:#fff;border:none;border-radius:4px;padding:6px 14px;cursor:pointer;font-size:13px">
+      Cerrar
+    </button>
+    <span style="font-size:11px;color:#666">Tip: en el diálogo de impresión elige "Guardar como PDF" para exportar.</span>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="company">Boned Pharmacy</div>
+      <div style="color:#555;font-size:11px;margin-top:4px">Sistema de gestión de compras</div>
+    </div>
+    <div class="doc-title">
+      <h2>ORDEN DE COMPRA</h2>
+      <div class="code">{{ o.code }}</div>
+      <div style="margin-top:4px">
+        <span class="badge badge-{{ badgeClass(o.status) }}">
+          {{ statusLabel[o.status] }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info grid -->
+  <div class="info-grid">
+    <div class="info-box">
+      <h4>Proveedor</h4>
+      <div class="info-row">
+        <span class="info-label">Nombre</span>
+        <span class="info-value">{{ o.supplier?.name ?? '—' }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">RUC</span>
+        <span class="info-value" style="font-family:monospace">{{ o.supplier?.ruc ?? '—' }}</span>
+      </div>
+    </div>
+    <div class="info-box">
+      <h4>Información de la orden</h4>
+      <div class="info-row">
+        <span class="info-label">Fecha creación</span>
+        <span class="info-value">{{ o.created_at | date:'dd/MM/yyyy' }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Fecha esperada</span>
+        <span class="info-value">{{ o.expected_date ? (o.expected_date | date:'dd/MM/yyyy') : '—' }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Creado por</span>
+        <span class="info-value">{{ o.created_by ?? '—' }}</span>
+      </div>
+    </div>
+  </div>
+
+  @if (o.notes) {
+    <div style="background:#fffce8;border:1px solid #f0e060;border-radius:4px;padding:8px 12px;margin-bottom:16px;font-size:12px">
+      <strong>Notas:</strong> {{ o.notes }}
+    </div>
+  }
+
+  <!-- Items table -->
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Producto</th>
+        <th class="text-right">Cant.</th>
+        <th class="text-right">Bonif.</th>
+        <th>Lote esp.</th>
+        <th>Vencimiento</th>
+        <th class="text-right">Costo unit.</th>
+        <th class="text-right">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (item of o.items; track item.id; let i = $index) {
+        <tr>
+          <td style="color:#888">{{ i + 1 }}</td>
+          <td>
+            @if (item.product_laboratory) {
+              <span style="color:#004085">{{ item.product_laboratory }}</span>
+            }
+            <strong>{{ item.product_name }}</strong>
+          </td>
+          <td class="text-right">{{ item.expected_quantity }}</td>
+          <td class="text-right" style="color:#198754">
+            {{ (item.bonus_quantity ?? 0) > 0 ? '+' + item.bonus_quantity : '—' }}
+          </td>
+          <td style="font-family:monospace">{{ item.expected_lot ?? '—' }}</td>
+          <td>{{ item.expected_expiry_date ? (item.expected_expiry_date | date:'dd/MM/yyyy') : '—' }}</td>
+          <td class="text-right">S/ {{ item.unit_cost | number:'1.2-2' }}</td>
+          <td class="text-right"><strong>S/ {{ item.expected_quantity * item.unit_cost | number:'1.2-2' }}</strong></td>
+        </tr>
+      }
+    </tbody>
+    <tfoot>
+      <tr class="tfoot-row">
+        <td colspan="7" class="text-right">TOTAL:</td>
+        <td class="text-right">S/ {{ o.subtotal | number:'1.2-2' }}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- Signature area -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px">
+    <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">
+      Firma del responsable de compras
+    </div>
+    <div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:11px;color:#555">
+      Firma del proveedor / Sello
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Generado por Boned Admin · {{ o.code }}</span>
+    <span>Impreso el {{ today | date:'dd/MM/yyyy HH:mm' }}</span>
+  </div>
+
+</div>
+}

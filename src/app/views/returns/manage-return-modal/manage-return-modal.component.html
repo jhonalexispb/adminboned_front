@@ -1,0 +1,253 @@
+<c-modal [visible]="!!return_()" (visibleChange)="!$event && close()"
+         alignment="center" size="xl" [scrollable]="true">
+  @if (return_(); as r) {
+    <c-modal-header>
+      <h5 cModalTitle class="d-flex align-items-center gap-2 flex-wrap">
+        <fa-icon icon="rotate-left" class="text-body-secondary" />
+        <span class="font-monospace">{{ r.code }}</span>
+        <c-badge [textBgColor]="statusColors[r.status]" style="font-size:.75rem;">{{ statusLabels[r.status] }}</c-badge>
+        @if (r.action_type && r.status !== 'pending') {
+          <c-badge [textBgColor]="actionColors[r.action_type]" style="font-size:.7rem;">
+            {{ r.action_type === 'credit_note' ? 'NC SUNAT' : r.action_type === 'void' ? 'Anulada' : 'Interno' }}
+          </c-badge>
+        }
+      </h5>
+    </c-modal-header>
+
+    <c-modal-body>
+      @if (loading()) {
+        <div class="text-center py-3"><c-spinner size="sm" /></div>
+      }
+      <div class="row g-3">
+
+        <!-- Columna izquierda: datos -->
+        <div class="col-lg-5 d-flex flex-column gap-3">
+          <div class="border rounded p-3" style="font-size:.875rem;">
+            <div class="text-body-secondary small text-uppercase mb-2" style="letter-spacing:.04em;">Cliente y pedido</div>
+            <div class="fw-semibold">{{ clientName(r) }}</div>
+            <div class="text-body-secondary small">Pedido: {{ r.order?.code ?? '—' }}</div>
+            <div class="mt-2">
+              <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:.75rem;">
+                {{ r.type === 'full' ? 'Devolución total' : 'Devolución parcial' }}
+              </span>
+            </div>
+          </div>
+          <div class="border rounded p-3" style="font-size:.875rem;">
+            <div class="text-body-secondary small text-uppercase mb-2" style="letter-spacing:.04em;">Documento de venta</div>
+            @if (r.sale_document) {
+              <div class="font-monospace fw-semibold">{{ r.sale_document.full_number }}</div>
+              <div class="text-body-secondary small mt-1">
+                {{ r.sale_document.document_type === 'invoice' ? 'Factura' :
+                   r.sale_document.document_type === 'receipt' ? 'Boleta' : 'Nota de venta' }}
+                &nbsp;·&nbsp; {{ r.sale_document.issue_date | date:'dd/MM/yyyy' }}
+              </div>
+              <div class="small mt-1">Total: <strong>S/ {{ r.sale_document.total | number:'1.2-2' }}</strong></div>
+            } @else {
+              <span class="text-body-secondary small">Sin documento SUNAT</span>
+            }
+          </div>
+          <div class="border rounded p-3" style="font-size:.875rem;">
+            <div class="text-body-secondary small text-uppercase mb-2" style="letter-spacing:.04em;">Motivo</div>
+            <p class="mb-0 small" style="white-space:pre-wrap;">{{ r.reason }}</p>
+          </div>
+          <div class="border rounded p-3" style="font-size:.82rem;">
+            <div class="text-body-secondary small text-uppercase mb-2" style="letter-spacing:.04em;">Trazabilidad</div>
+            <div class="row g-1">
+              <div class="col-6">
+                <span class="text-body-secondary">Solicitado por</span>
+                <div class="fw-medium">{{ r.created_by ?? '—' }}</div>
+              </div>
+              <div class="col-6">
+                <span class="text-body-secondary">Fecha solicitud</span>
+                <div>{{ r.created_at | date:'dd/MM/yy HH:mm' }}</div>
+              </div>
+              @if (r.processed_by) {
+                <div class="col-6 mt-2">
+                  <span class="text-body-secondary">Procesado por</span>
+                  <div class="fw-medium">{{ r.processed_by }}</div>
+                </div>
+                <div class="col-6 mt-2">
+                  <span class="text-body-secondary">Fecha proceso</span>
+                  <div>{{ r.processed_at | date:'dd/MM/yy HH:mm' }}</div>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: ítems + acción -->
+        <div class="col-lg-7 d-flex flex-column gap-3">
+          <div class="border rounded" style="font-size:.875rem;">
+            <div class="px-3 py-2 border-bottom text-body-secondary small text-uppercase" style="letter-spacing:.04em;">
+              Productos a devolver
+            </div>
+            <table class="table table-sm mb-0">
+              <thead style="font-size:.75rem; text-transform:uppercase;">
+                <tr>
+                  <th class="ps-3">Producto</th>
+                  <th style="width:130px">Lote / Venc.</th>
+                  <th class="text-end pe-3" style="width:70px">Cant.</th>
+                </tr>
+              </thead>
+              <tbody>
+                @if (r.items && r.items.length > 0) {
+                  @for (item of r.items; track item.id) {
+                    <tr>
+                      <td class="ps-3">{{ item.product_name ?? '—' }}</td>
+                      <td>
+                        @if (item.lot_number) {
+                          <code class="text-body-secondary" style="font-size:.8rem;">{{ item.lot_number }}</code>
+                          @if (item.expiry_date) {
+                            <div class="text-body-secondary" style="font-size:.7rem;">
+                              {{ item.expiry_date | date:'dd/MM/yyyy' }}
+                            </div>
+                          }
+                        } @else {
+                          <span class="text-body-secondary small">—</span>
+                        }
+                      </td>
+                      <td class="text-end pe-3 fw-semibold">{{ item.quantity }}</td>
+                    </tr>
+                  }
+                } @else {
+                  <tr><td colspan="3" class="text-center text-body-secondary py-3 small">Sin ítems</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          @if (r.credit_note) {
+            <div class="border border-success rounded p-3" style="font-size:.875rem;">
+              <div class="text-success fw-semibold mb-2 d-flex align-items-center gap-2">
+                <fa-icon icon="check-circle" />Nota de Crédito emitida
+              </div>
+              <div class="font-monospace fw-bold mb-1">{{ r.credit_note.full_number }}</div>
+              <div class="small text-body-secondary mb-3">Total: S/ {{ r.credit_note.total | number:'1.2-2' }}</div>
+              <div class="d-flex gap-2">
+                @if (r.credit_note.pdf_url) {
+                  <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                          style="min-width:44px; font-size:.68rem;" (click)="openNcFile(r, 'pdf')">
+                    <fa-icon icon="file-pdf" /><small>PDF</small>
+                  </button>
+                }
+                @if (r.credit_note.xml_url) {
+                  <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                          style="min-width:44px; font-size:.68rem;" (click)="openNcFile(r, 'xml')">
+                    <fa-icon icon="file-code" /><small>XML</small>
+                  </button>
+                }
+                @if (r.credit_note.cdr_url) {
+                  <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                          style="min-width:44px; font-size:.68rem;" (click)="openNcFile(r, 'zip')">
+                    <fa-icon icon="file-zipper" /><small>CDR</small>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
+          @if (r.status === 'pending') {
+            @if (!showReject()) {
+              @if (r.sale_document?.status === 'accepted' && r.sale_document?.document_type !== 'sale_note') {
+                <div class="bg-body-tertiary rounded p-2 d-flex align-items-start gap-2" style="font-size:.82rem;">
+                  <fa-icon icon="circle-info" class="text-primary flex-shrink-0 mt-1" />
+                  <span>
+                    @if (canVoid()) {
+                      <strong>Hoy se puede anular o emitir NC.</strong>
+                    } @else {
+                      Solo se puede emitir <strong>Nota de Crédito</strong> — emitido el {{ r.sale_document!.issue_date | date:'dd/MM/yyyy' }}.
+                    }
+                  </span>
+                </div>
+              }
+              <div>
+                <div class="form-label fw-medium mb-2">¿Qué se hará con el documento?</div>
+                <div class="d-flex gap-2 flex-wrap">
+                  @if (isSunatDoc()) {
+                    <button class="btn flex-grow-1 py-2"
+                            [class.btn-success]="actionType === 'credit_note'"
+                            [class.btn-outline-success]="actionType !== 'credit_note'"
+                            (click)="actionType = 'credit_note'">
+                      <fa-icon icon="file-invoice" class="d-block mb-1" style="font-size:1.2rem;" />
+                      <div class="fw-semibold" style="font-size:.85rem;">Nota de Crédito</div>
+                    </button>
+                    <button class="btn flex-grow-1 py-2"
+                            [class.btn-warning]="actionType === 'void'"
+                            [class.btn-outline-warning]="actionType !== 'void'"
+                            [disabled]="!canVoid()"
+                            (click)="actionType = 'void'">
+                      <fa-icon icon="ban" class="d-block mb-1" style="font-size:1.2rem;" />
+                      <div class="fw-semibold" style="font-size:.85rem;">Anular</div>
+                      <div style="font-size:.72rem;">{{ canVoid() ? 'Disponible hoy' : 'Solo mismo día' }}</div>
+                    </button>
+                  }
+                  @if (isInternalOnly()) {
+                    <div class="alert alert-secondary d-flex gap-2 align-items-center py-2 w-100 mb-0" style="font-size:.85rem;">
+                      <fa-icon icon="circle-info" class="flex-shrink-0" />
+                      <span>Sin trámite SUNAT. Se registra internamente.</span>
+                    </div>
+                  }
+                </div>
+              </div>
+              @if (actionType === 'credit_note') {
+                <div class="row g-2">
+                  <div class="col-sm-7">
+                    <label class="form-label small fw-medium">Motivo SUNAT</label>
+                    <p-select [options]="motivoOptions" [(ngModel)]="motivoCode"
+                              optionLabel="label" optionValue="value" styleClass="w-100" appendTo="body" />
+                  </div>
+                  <div class="col-sm-5">
+                    <label class="form-label small fw-medium">Fecha de emisión NC</label>
+                    <input type="date" class="form-control" [(ngModel)]="issueDate" />
+                  </div>
+                </div>
+              }
+            } @else {
+              <div class="border border-danger rounded p-3">
+                <div class="fw-semibold text-danger mb-2">
+                  <fa-icon icon="xmark" class="me-1" />Rechazar solicitud
+                </div>
+                <label class="form-label small">Motivo (opcional)</label>
+                <textarea class="form-control form-control-sm" rows="2"
+                          placeholder="Explica por qué no procede..."
+                          [(ngModel)]="rejectNotes"></textarea>
+              </div>
+            }
+          }
+
+        </div>
+      </div>
+    </c-modal-body>
+
+    <c-modal-footer>
+      @if (r.status === 'pending') {
+        <!-- Revertir a borrador -->
+        <button cButton color="warning" variant="outline" size="sm" [disabled]="processing()"
+                title="Devolver al usuario para que pueda editarla"
+                (click)="revert()">
+          <fa-icon icon="rotate-left" class="me-1" />Revertir
+        </button>
+
+        @if (!showReject()) {
+          <button cButton color="danger" variant="outline" [disabled]="processing()"
+                  (click)="showReject.set(true)">
+            <fa-icon icon="xmark" class="me-1" />Rechazar
+          </button>
+          <button cButton color="primary" [disabled]="processing() || (actionType === 'void' && !canVoid())"
+                  (click)="process()">
+            @if (processing()) { <c-spinner size="sm" class="me-1" /> }
+            <fa-icon icon="check" class="me-1" />
+            {{ actionType === 'credit_note' ? 'Emitir NC' : actionType === 'void' ? 'Anular' : 'Procesar' }}
+          </button>
+        } @else {
+          <button cButton color="secondary" [disabled]="processing()" (click)="showReject.set(false)">Volver</button>
+          <button cButton color="danger" [disabled]="processing()" (click)="reject()">
+            @if (processing()) { <c-spinner size="sm" class="me-1" /> }
+            <fa-icon icon="xmark" class="me-1" />Rechazar definitivamente
+          </button>
+        }
+      }
+      <button cButton color="secondary" variant="outline" [disabled]="processing()" (click)="close()">Cerrar</button>
+    </c-modal-footer>
+  }
+</c-modal>

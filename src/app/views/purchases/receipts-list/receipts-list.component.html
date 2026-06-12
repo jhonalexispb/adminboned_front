@@ -1,0 +1,460 @@
+<app-page-header title="Recepciones de compra" subtitle="Gestión de mercadería recibida">
+  @if (activeTab() !== 'entrantes') {
+    <button class="btn btn-primary" (click)="openNew()">
+      <fa-icon icon="plus" class="me-1" />Nueva recepción
+    </button>
+  }
+</app-page-header>
+
+<!-- ══ TABS ═══════════════════════════════════════════════════════════════ -->
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item flex-grow-1">
+    <button type="button" class="nav-link w-100 d-flex flex-column align-items-center py-2 position-relative"
+            [class.active]="activeTab() === 'entrantes'"
+            (click)="switchTab('entrantes')">
+      <fa-icon icon="truck" style="font-size:1.1rem;" />
+      <small style="font-size:.7rem;">Por recibir</small>
+      @if (pendingOrders().length) {
+        <span class="position-absolute top-0 end-0 badge bg-primary m-1" style="font-size:.6rem;">
+          {{ pendingOrders().length }}
+        </span>
+      }
+    </button>
+  </li>
+  <li class="nav-item flex-grow-1">
+    <button type="button" class="nav-link w-100 d-flex flex-column align-items-center py-2 position-relative"
+            [class.active]="activeTab() === 'pendientes'"
+            (click)="switchTab('pendientes')">
+      <fa-icon icon="clock" style="font-size:1.1rem;" />
+      <small style="font-size:.7rem;">Pendientes</small>
+      @if (pendingCount() > 0) {
+        <span class="position-absolute top-0 end-0 badge bg-warning m-1" style="font-size:.6rem;">
+          {{ pendingCount() }}
+        </span>
+      }
+    </button>
+  </li>
+  <li class="nav-item flex-grow-1">
+    <button type="button" class="nav-link w-100 d-flex flex-column align-items-center py-2"
+            [class.active]="activeTab() === 'validadas'"
+            (click)="switchTab('validadas')">
+      <fa-icon icon="circle-check" style="font-size:1.1rem;" />
+      <small style="font-size:.7rem;">Validadas</small>
+    </button>
+  </li>
+</ul>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- TAB: POR RECIBIR                                                      -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+@if (activeTab() === 'entrantes') {
+
+  @if (loadingOrders()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (pendingOrders().length === 0) {
+    <c-card>
+      <c-card-body>
+        <div class="text-center text-body-secondary py-5">
+          <fa-icon icon="truck" class="d-block mb-2" style="font-size:2.5rem;opacity:.3;" />
+          <div class="fw-medium mb-1">Sin pedidos pendientes de recepción</div>
+          <div class="small">Las órdenes aprobadas por el área de compras aparecerán aquí.</div>
+        </div>
+      </c-card-body>
+    </c-card>
+  } @else {
+
+    <!-- Mobile: cards -->
+    <div class="d-md-none d-flex flex-column gap-2 mb-3">
+      @for (o of pendingOrders(); track o.id) {
+        <c-card>
+          <c-card-body class="px-3 py-2">
+            <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+              <div>
+                <span class="font-monospace fw-medium" style="font-size:.88rem;">{{ o.code }}</span>
+                @if (o.expected_date) {
+                  <div class="text-body-secondary" style="font-size:.75rem;">
+                    <fa-icon icon="calendar" class="me-1" />Esperado: {{ o.expected_date | date:'dd/MM/yyyy' }}
+                  </div>
+                }
+              </div>
+              <c-badge [color]="orderStatColor[o.status]">
+                {{ o.status === 'partial' ? 'Parcial' : 'Aprobado' }}
+              </c-badge>
+            </div>
+            <div class="fw-semibold lh-sm mb-1">{{ o.supplier?.name ?? '—' }}</div>
+            <div class="text-body-secondary mb-2" style="font-size:.8rem;">
+              S/ <strong class="text-body-emphasis">{{ o.subtotal | number:'1.2-2' }}</strong>
+            </div>
+            <div style="overflow-x:auto;">
+              <div class="d-inline-flex gap-2">
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                        (click)="openOrderDetail(o)">
+                  <fa-icon icon="eye" /><small>Ver orden</small>
+                </button>
+                @if (!o.all_pending_covered) {
+                  <a class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                     [routerLink]="['/purchases/receipts/new']"
+                     [queryParams]="{ order_id: o.id }">
+                    <fa-icon icon="clipboard-check" /><small>Recepcionar</small>
+                  </a>
+                }
+                <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                        [disabled]="downloadingOrderId() === o.id"
+                        (click)="downloadOrderPdf(o, $event)">
+                  @if (downloadingOrderId() === o.id) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="file-pdf" /> }
+                  <small>PDF</small>
+                </button>
+              </div>
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+
+    <!-- Desktop: tabla -->
+    <c-card class="d-none d-md-block">
+      <c-card-body class="p-0">
+        <div class="table-responsive">
+          <table cTable hover>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Proveedor</th>
+                <th>F. esperada</th>
+                <th class="text-end">Total</th>
+                <th>Estado</th>
+                <th class="text-nowrap">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (o of pendingOrders(); track o.id) {
+                <tr style="cursor:pointer" (click)="openOrderDetail(o)">
+                  <td class="font-monospace fw-medium">{{ o.code }}</td>
+                  <td>{{ o.supplier?.name ?? '—' }}</td>
+                  <td class="text-nowrap">
+                    {{ o.expected_date ? (o.expected_date | date:'dd/MM/yyyy') : '—' }}
+                  </td>
+                  <td class="text-end">S/ {{ o.subtotal | number:'1.2-2' }}</td>
+                  <td>
+                    <c-badge [color]="orderStatColor[o.status]">
+                      {{ o.status === 'partial' ? 'Parcial' : 'Aprobado' }}
+                    </c-badge>
+                  </td>
+                  <td (click)="$event.stopPropagation()">
+                    <div class="d-inline-flex gap-2">
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              (click)="openOrderDetail(o)">
+                        <fa-icon icon="eye" /><small>Ver orden</small>
+                      </button>
+                      @if (!o.all_pending_covered) {
+                        <a class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                           [routerLink]="['/purchases/receipts/new']"
+                           [queryParams]="{ order_id: o.id }">
+                          <fa-icon icon="clipboard-check" /><small>Recepcionar</small>
+                        </a>
+                      }
+                      <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                              [disabled]="downloadingOrderId() === o.id"
+                              (click)="downloadOrderPdf(o, $event)">
+                        @if (downloadingOrderId() === o.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="file-pdf" /> }
+                        <small>PDF</small>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+
+  }
+
+}
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- TABS: PENDIENTES + VALIDADAS                                          -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+@if (activeTab() === 'pendientes' || activeTab() === 'validadas') {
+
+  <!-- Filtros -->
+  <c-card class="mb-3">
+    <c-card-body class="py-2 px-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><fa-icon icon="search" /></span>
+            <input type="text" class="form-control"
+                   placeholder="N° documento o código..."
+                   [(ngModel)]="filters.search"
+                   (keyup.enter)="onSearch()" />
+            @if (filters.search) {
+              <button class="btn btn-outline-secondary" type="button"
+                      (click)="filters.search = ''; onSearch()">
+                <fa-icon icon="xmark" />
+              </button>
+            }
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1 text-body-secondary">Proveedor</label>
+          <p-select
+            [(ngModel)]="filters.supplier_id"
+            [options]="suppliers()"
+            optionLabel="name" optionValue="id"
+            placeholder="Todos los proveedores"
+            [showClear]="true"
+            [filter]="true" filterPlaceholder="Buscar..."
+            emptyMessage="Sin resultados"
+            [style]="{ width: '100%' }" appendTo="body"
+            (ngModelChange)="onSearch()"
+          />
+        </div>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  @if (loading()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else {
+
+    <!-- Mobile: cards -->
+    <div class="d-md-none d-flex flex-column gap-2 mb-3">
+      @for (r of receipts(); track r.id) {
+        <c-card>
+          <c-card-body class="px-3 py-2" style="cursor:pointer;" (click)="openDetail(r)">
+
+            <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+              <div>
+                <span class="font-monospace fw-medium" style="font-size:.88rem;">{{ r.code }}</span>
+                <div class="text-body-secondary" style="font-size:.75rem;">
+                  {{ docTypeLabel[r.document_type] }}
+                  @if (r.document_number) { · {{ r.document_number }} }
+                </div>
+              </div>
+              <c-badge [color]="r.status === 'validated' ? 'success' : 'warning'">
+                {{ r.status === 'validated' ? 'Validado' : 'Pendiente' }}
+              </c-badge>
+            </div>
+
+            <div class="fw-semibold lh-sm mb-1">{{ r.supplier?.name ?? '—' }}</div>
+
+            @if (r.purchase_order_id) {
+              <div class="text-body-secondary mb-1" style="font-size:.75rem;">
+                <fa-icon icon="link" class="me-1" />Vinculada a orden
+              </div>
+            }
+
+            <div class="d-flex gap-3 mb-2" style="font-size:.8rem;">
+              <span class="text-body-secondary">
+                S/ <strong class="text-body-emphasis">{{ r.subtotal | number:'1.2-2' }}</strong>
+              </span>
+              @if (r.document_date) {
+                <span class="text-body-secondary">{{ r.document_date | date:'dd/MM/yyyy' }}</span>
+              }
+            </div>
+
+            <div style="overflow-x:auto;" (click)="$event.stopPropagation()">
+              <div class="d-inline-flex gap-2">
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                        (click)="openDetail(r)">
+                  <fa-icon icon="eye" /><small>Ver</small>
+                </button>
+                @if (r.status === 'pending') {
+                  <a class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                     [routerLink]="['/purchases/receipts', r.id, 'edit']">
+                    <fa-icon icon="pencil" /><small>Editar</small>
+                  </a>
+                }
+                @if (r.status === 'pending') {
+                  <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                          [disabled]="validatingId() === r.id"
+                          (click)="startValidate(r, $event)">
+                    @if (validatingId() === r.id) { <c-spinner size="sm" /> }
+                    @else { <fa-icon icon="circle-check" /> }
+                    <small>Validar</small>
+                  </button>
+                }
+                @if (r.purchase_order_id) {
+                  <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                          (click)="openOrderFromList(r, $event)">
+                    <fa-icon icon="link" /><small>Ver orden</small>
+                  </button>
+                }
+                @if (r.document_file_url) {
+                  <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                          [disabled]="downloadingDocId() === r.id"
+                          (click)="downloadDoc(r, $event)">
+                    @if (downloadingDocId() === r.id) { <c-spinner size="sm" /> }
+                    @else { <fa-icon icon="file-pdf" /> }
+                    <small>Comprobante</small>
+                  </button>
+                }
+                @if (r.status === 'pending') {
+                  <button class="btn btn-sm btn-danger d-flex flex-column align-items-center"
+                          [disabled]="deletingId() === r.id"
+                          (click)="startDelete(r, $event)">
+                    @if (deletingId() === r.id) { <c-spinner size="sm" /> }
+                    @else { <fa-icon icon="trash" /> }
+                    <small>Eliminar</small>
+                  </button>
+                }
+              </div>
+            </div>
+
+          </c-card-body>
+        </c-card>
+      } @empty {
+        <div class="text-center text-body-secondary py-5">
+          <fa-icon [icon]="activeTab() === 'pendientes' ? 'clock' : 'circle-check'"
+                   class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+          @if (activeTab() === 'pendientes') {
+            No hay recepciones pendientes de validar.
+          } @else {
+            No hay recepciones validadas registradas.
+          }
+        </div>
+      }
+    </div>
+
+    <!-- Desktop: tabla -->
+    <c-card class="d-none d-md-block">
+      <c-card-body class="p-0">
+        <div class="table-responsive">
+          <table cTable hover>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Proveedor</th>
+                <th>Tipo doc.</th>
+                <th>N° documento</th>
+                <th>F. emisión</th>
+                <th class="text-end">Subtotal</th>
+                <th>Origen</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of receipts(); track r.id) {
+                <tr style="cursor:pointer" (click)="openDetail(r)">
+                  <td class="font-monospace fw-medium">{{ r.code }}</td>
+                  <td>{{ r.supplier?.name ?? '—' }}</td>
+                  <td>{{ docTypeLabel[r.document_type] }}</td>
+                  <td class="font-monospace">{{ r.document_number ?? '—' }}</td>
+                  <td class="text-nowrap">{{ r.document_date ? (r.document_date | date:'dd/MM/yyyy') : '—' }}</td>
+                  <td class="text-end">S/ {{ r.subtotal | number:'1.2-2' }}</td>
+                  <td>
+                    @if (r.purchase_order_id) {
+                      <span class="badge bg-body-secondary text-body border" style="font-size:.7rem;">
+                        <fa-icon icon="link" class="me-1" />Con orden
+                      </span>
+                    } @else {
+                      <span class="badge bg-body-secondary text-body border" style="font-size:.7rem;">
+                        <fa-icon icon="box-open" class="me-1" />Directa
+                      </span>
+                    }
+                  </td>
+                  <td (click)="$event.stopPropagation()">
+                    <div class="d-inline-flex gap-1">
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:44px" (click)="openDetail(r)">
+                        <fa-icon icon="eye" /><small>Ver</small>
+                      </button>
+                      @if (r.status === 'pending') {
+                        <a class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                           style="min-width:44px"
+                           [routerLink]="['/purchases/receipts', r.id, 'edit']">
+                          <fa-icon icon="pencil" /><small>Editar</small>
+                        </a>
+                      }
+                      @if (r.status === 'pending') {
+                        <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                                style="min-width:44px"
+                                (click)="startValidate(r, $event)"
+                                [disabled]="validatingId() === r.id">
+                          @if (validatingId() === r.id) { <c-spinner size="sm" /> }
+                          @else { <fa-icon icon="circle-check" /> }
+                          <small>Validar</small>
+                        </button>
+                      }
+                      @if (r.purchase_order_id) {
+                        <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                                style="min-width:44px"
+                                (click)="openOrderFromList(r, $event)">
+                          <fa-icon icon="link" /><small>Ver orden</small>
+                        </button>
+                      }
+                      @if (r.document_file_url) {
+                        <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                                style="min-width:44px"
+                                (click)="downloadDoc(r, $event)"
+                                [disabled]="downloadingDocId() === r.id">
+                          @if (downloadingDocId() === r.id) { <c-spinner size="sm" /> }
+                          @else { <fa-icon icon="file-pdf" /> }
+                          <small>Comprobante</small>
+                        </button>
+                      }
+                      @if (r.status === 'pending') {
+                        <button class="btn btn-sm btn-danger d-flex flex-column align-items-center"
+                                style="min-width:44px"
+                                (click)="startDelete(r, $event)"
+                                [disabled]="deletingId() === r.id">
+                          @if (deletingId() === r.id) { <c-spinner size="sm" /> }
+                          @else { <fa-icon icon="trash" /> }
+                          <small>Eliminar</small>
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="8" class="text-center py-4 text-body-secondary">
+                    @if (activeTab() === 'pendientes') {
+                      No hay recepciones pendientes de validar.
+                    } @else {
+                      No hay recepciones validadas registradas.
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+
+  }
+
+  <app-pagination
+    [currentPage]="filters.page!"
+    [lastPage]="lastPage()"
+    [total]="total()"
+    (pageChange)="goToPage($event)"
+  />
+
+}
+
+<!-- Confirmaciones -->
+<app-confirm-modal
+  [visible]="showValidateConfirm()"
+  title="Validar recepción"
+  [message]="'Al validar ' + (selectedForValidate()?.code ?? '') + ', el stock se actualizará y los costos quedarán registrados. Esta acción no se puede deshacer.'"
+  confirmLabel="Validar y actualizar stock"
+  confirmColor="success"
+  (confirm)="confirmValidate()"
+  (cancel)="showValidateConfirm.set(false)"
+/>
+<app-confirm-modal
+  [visible]="showDeleteConfirm()"
+  title="Eliminar recepción"
+  [message]="'¿Eliminar ' + (selectedForDelete()?.code ?? '') + ' permanentemente? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  confirmColor="danger"
+  (confirm)="confirmDelete()"
+  (cancel)="showDeleteConfirm.set(false)"
+/>

@@ -1,0 +1,140 @@
+<!-- Cabecera de selección -->
+<div class="px-3 py-2 border-bottom d-flex align-items-center gap-3 rounded-top bg-body-tertiary"
+     style="font-size:.78rem;">
+  <label class="d-flex align-items-center gap-2 mb-0 cursor-pointer" style="cursor:pointer;">
+    <input type="checkbox" class="form-check-input mt-0"
+           [checked]="selectedLines.length === lines().length && lines().length > 0"
+           (change)="toggleAll($any($event.target).checked)" />
+    Seleccionar todos
+  </label>
+  <span class="text-body-secondary ms-auto">
+    {{ selectedLines.length }} de {{ lines().length }} seleccionado(s)
+  </span>
+</div>
+
+<!-- DESKTOP: tabla -->
+<div class="d-none d-md-block table-responsive border border-top-0 rounded-bottom">
+  <table class="table mb-0 align-middle" style="font-size:.875rem;">
+    <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.03em;">
+      <tr>
+        <th class="ps-3" style="width:44px;"></th>
+        <th>Producto</th>
+        <th style="width:140px">Lote / Venc.</th>
+        <th class="text-center" style="width:75px">Vendido</th>
+        <th style="width:130px">A devolver</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (line of lines(); track line.orderItem.id) {
+        <tr [class.opacity-50]="!line.selected">
+          <td class="ps-3">
+            <input type="checkbox" class="form-check-input"
+                   [(ngModel)]="line.selected"
+                   [disabled]="maxReturnable(line.orderItem) === 0" />
+          </td>
+          <td class="fw-medium">{{ line.orderItem.product_name ?? '—' }}</td>
+          <td>
+            @if (line.orderItem.lot_number) {
+              <code class="text-body-secondary" style="font-size:.8rem;">{{ line.orderItem.lot_number }}</code>
+              @if (line.orderItem.expiry_date) {
+                <div class="text-body-secondary" style="font-size:.7rem;">
+                  {{ line.orderItem.expiry_date | date:'dd/MM/yyyy' }}
+                </div>
+              }
+            } @else {
+              <span class="text-body-secondary small">—</span>
+            }
+          </td>
+          <td class="text-center">
+            {{ line.orderItem.quantity }}
+            @if ((line.orderItem.already_returned ?? 0) > 0) {
+              <div class="text-warning" style="font-size:.68rem; white-space:nowrap;">
+                Devuelto: {{ line.orderItem.already_returned }}
+              </div>
+            }
+          </td>
+          <td>
+            @if (maxReturnable(line.orderItem) > 0) {
+              <div class="input-group input-group-sm" style="width:115px;">
+                <button class="btn btn-outline-secondary px-2" type="button"
+                        [disabled]="!line.selected || line.returnQty <= 1"
+                        (click)="line.returnQty = line.returnQty - 1">
+                  <fa-icon icon="minus" style="font-size:.7rem;" />
+                </button>
+                <input type="number" class="form-control text-center px-1"
+                       [min]="1" [max]="maxReturnable(line.orderItem)"
+                       [(ngModel)]="line.returnQty"
+                       [disabled]="!line.selected"
+                       style="font-size:.875rem;" />
+                <button class="btn btn-outline-secondary px-2" type="button"
+                        [disabled]="!line.selected || line.returnQty >= maxReturnable(line.orderItem)"
+                        (click)="line.returnQty = line.returnQty + 1">
+                  <fa-icon icon="plus" style="font-size:.7rem;" />
+                </button>
+              </div>
+              @if ((line.orderItem.already_returned ?? 0) > 0) {
+                <div class="text-body-secondary" style="font-size:.68rem;">
+                  Disponible: {{ maxReturnable(line.orderItem) }}
+                </div>
+              }
+            } @else {
+              <span class="badge text-bg-secondary">Ya devuelto completo</span>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+<!-- MOBILE: tarjetas por ítem -->
+<div class="d-md-none d-flex flex-column border border-top-0 rounded-bottom">
+  @for (line of lines(); track line.orderItem.id; let last = $last) {
+    <div class="p-3 d-flex gap-3 align-items-start"
+         [class.border-bottom]="!last"
+         [class.opacity-50]="!line.selected">
+      <input type="checkbox" class="form-check-input mt-1 flex-shrink-0"
+             [(ngModel)]="line.selected"
+             [disabled]="maxReturnable(line.orderItem) === 0" />
+      <div class="flex-grow-1">
+        <div class="fw-semibold" style="font-size:.9rem;">{{ line.orderItem.product_name ?? '—' }}</div>
+        @if (line.orderItem.lot_number) {
+          <div class="text-body-secondary" style="font-size:.78rem;">
+            <code>{{ line.orderItem.lot_number }}</code>
+            @if (line.orderItem.expiry_date) { · Vence: {{ line.orderItem.expiry_date | date:'dd/MM/yyyy' }} }
+          </div>
+        }
+        <div class="text-body-secondary small">Vendido: {{ line.orderItem.quantity }} uds</div>
+        @if ((line.orderItem.already_returned ?? 0) > 0) {
+          <div class="text-warning small">
+            Ya devuelto: {{ line.orderItem.already_returned }}
+            @if (maxReturnable(line.orderItem) > 0) { · Disponible: {{ maxReturnable(line.orderItem) }} }
+          </div>
+        }
+      </div>
+      <div class="flex-shrink-0">
+        @if (maxReturnable(line.orderItem) > 0) {
+          <div class="input-group input-group-sm" style="width:110px;">
+            <button class="btn btn-outline-secondary px-2" type="button"
+                    [disabled]="!line.selected || line.returnQty <= 1"
+                    (click)="line.returnQty = line.returnQty - 1">
+              <fa-icon icon="minus" style="font-size:.7rem;" />
+            </button>
+            <input type="number" class="form-control text-center px-1"
+                   [min]="1" [max]="maxReturnable(line.orderItem)"
+                   [(ngModel)]="line.returnQty"
+                   [disabled]="!line.selected"
+                   style="font-size:.875rem;" />
+            <button class="btn btn-outline-secondary px-2" type="button"
+                    [disabled]="!line.selected || line.returnQty >= maxReturnable(line.orderItem)"
+                    (click)="line.returnQty = line.returnQty + 1">
+              <fa-icon icon="plus" style="font-size:.7rem;" />
+            </button>
+          </div>
+        } @else {
+          <span class="badge text-bg-secondary">Completo</span>
+        }
+      </div>
+    </div>
+  }
+</div>

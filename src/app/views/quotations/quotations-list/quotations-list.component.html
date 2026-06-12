@@ -1,0 +1,906 @@
+<app-page-header title="Cotizaciones" subtitle="Propuestas de venta a clientes">
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-secondary btn-sm" [disabled]="loading()" (click)="load()">
+      <fa-icon icon="rotate" class="me-1" />Actualizar
+    </button>
+    <a class="btn btn-primary" routerLink="/quotations/new">
+      <fa-icon icon="plus" class="me-1" />Nueva cotización
+    </a>
+  </div>
+</app-page-header>
+
+<!-- ── Filtros ─────────────────────────────────────────────────────────────── -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+<div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Cliente</label>
+        <p-select [options]="clients()" optionLabel="displayLabel"
+                  [ngModel]="selectedClient" (ngModelChange)="onClientSelect($event)"
+                  [filter]="true" filterBy="displayLabel"
+                  placeholder="Buscar cliente..." [showClear]="true"
+                  styleClass="w-100" appendTo="body">
+          <ng-template #selectedItem let-c>
+            <span class="fw-medium">{{ c.business_name || c.name }}</span>
+            @if (c.ruc) { <span class="text-body-secondary small ms-2">RUC {{ c.ruc }}</span> }
+          </ng-template>
+          <ng-template #item let-c>
+            <div style="font-size:.85rem; line-height:1.4; padding:2px 0;">
+              <div class="fw-semibold">{{ c.business_name || c.name }}</div>
+              @if (c.business_name && c.name) {
+                <div class="text-body-secondary" style="font-size:.75rem;">{{ c.name }}</div>
+              }
+              <div class="d-flex gap-3" style="font-size:.72rem;">
+                @if (c.ruc) { <span class="text-body-secondary">RUC <strong>{{ c.ruc }}</strong></span> }
+                @if (c.dni) { <span class="text-body-secondary">DNI <strong>{{ c.dni }}</strong></span> }
+              </div>
+            </div>
+          </ng-template>
+        </p-select>
+      </div>
+
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <p-select [(ngModel)]="filters.status" [options]="statusOptions"
+                  optionLabel="label" optionValue="value"
+                  (ngModelChange)="onSearch()"
+                  styleClass="w-100" appendTo="body" placeholder="Todos" />
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Desde</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_from" (change)="onSearch()" />
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Hasta</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_to" (change)="onSearch()" />
+      </div>
+
+      <div class="col-12 col-md-auto ms-md-auto d-flex align-items-center justify-content-end">
+        <span class="text-body-secondary small">
+          {{ total() }} cotización{{ total() !== 1 ? 'es' : '' }}
+        </span>
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ VISTA MOBILE: tarjetas ══════════════════════════════════════════════ -->
+  <div class="d-md-none">
+    @if (!quotations().length) {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="file-invoice" class="d-block mb-2" style="font-size:2.5rem; opacity:.3;" />
+        No hay cotizaciones para los filtros seleccionados.
+      </div>
+    }
+
+    <div class="d-flex flex-column gap-2">
+      @for (q of quotations(); track q.id) {
+        <c-card>
+          <!-- ── Cabecera: código · fecha · tipo · estados ── -->
+          <c-card-header class="py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="font-monospace fw-bold" style="font-size:.88rem;">{{ q.code }}</span>
+                <span class="text-body-secondary" style="font-size:.72rem;">{{ q.created_at | date:'dd/MM/yy' }}</span>
+                @if (q.document_type) {
+                  <span class="badge rounded-pill"
+                        style="font-size:.65rem;"
+                        [style.background]="q.document_type === 'invoice' ? 'var(--cui-primary-bg-subtle)' :
+                                            q.document_type === 'receipt' ? 'var(--cui-success-bg-subtle)' :
+                                            'var(--cui-secondary-bg)'"
+                        [style.color]="q.document_type === 'invoice' ? 'var(--cui-primary-text-emphasis)' :
+                                       q.document_type === 'receipt' ? 'var(--cui-success-text-emphasis)' :
+                                       'var(--cui-secondary-color)'">
+                    {{ q.document_type === 'invoice' ? 'Factura' :
+                       q.document_type === 'receipt' ? 'Boleta' : 'Nota' }}
+                  </span>
+                }
+              </div>
+              <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+                <c-badge [color]="statusColors[q.status]" style="font-size:.7rem;">
+                  {{ statusLabels[q.status] }}
+                </c-badge>
+                @if (q.order_status) {
+                  <c-badge [color]="orderStatusColors[q.order_status] ?? 'secondary'"
+                           style="font-size:.65rem; cursor:pointer;"
+                           (click)="previewOrderId.set(q.order_id!)">
+                    <fa-icon [icon]="q.order_status === 'paid' ? 'circle-check' : 'truck'"
+                             class="me-1" style="font-size:.6rem;" />
+                    {{ orderStatusLabels[q.order_status] ?? q.order_status }}
+                  </c-badge>
+                }
+              </div>
+            </div>
+          </c-card-header>
+
+          <!-- ── Cuerpo: cliente · total · botones ── -->
+          <c-card-body class="px-3 py-2">
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <div class="fw-semibold" style="font-size:.95rem; line-height:1.2;">{{ clientName(q) }}</div>
+                <div class="text-body-secondary" style="font-size:.78rem;">{{ q.seller?.name ?? '—' }}</div>
+                @if (q.shipping_type) {
+                  <div class="text-body-secondary mt-1" style="font-size:.75rem;">
+                    <fa-icon [icon]="q.shipping_type === 'local' ? 'store' : 'truck'" class="me-1" />
+                    {{ q.shipping_type === 'local' ? 'Local' : 'Provincia' }}
+                    @if (q.carrier) { <span>· {{ q.carrier.name }}</span> }
+                  </div>
+                }
+              </div>
+              <div class="fw-bold ms-2 text-nowrap" style="font-size:1rem;">
+                S/ {{ q.total | number:'1.2-2' }}
+              </div>
+            </div>
+
+            <!-- Botones: scroll horizontal -->
+            <div class="d-flex gap-1 overflow-auto pb-1"
+                 style="scrollbar-width:none; -ms-overflow-style:none;"
+                 (click)="$event.stopPropagation()">
+
+              @if (!q.order_id) {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="openDetail(q)">
+                  <fa-icon icon="file-lines" style="font-size:.9rem;" />
+                  <small>Ver</small>
+                </button>
+              }
+
+              @if (q.status === 'draft') {
+                <a class="btn btn-sm btn-warning d-flex flex-column align-items-center flex-shrink-0"
+                   style="min-width:52px; font-size:.68rem;"
+                   [routerLink]="['/quotations', q.id, 'edit']">
+                  <fa-icon icon="pen" style="font-size:.9rem;" />
+                  <small>Editar</small>
+                </a>
+              }
+
+              @if (q.status === 'draft' || q.status === 'sent') {
+                <button class="btn btn-sm btn-success d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        [disabled]="approvingId() === q.id"
+                        (click)="approveFromList(q)">
+                  @if (approvingId() === q.id) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="check" style="font-size:.9rem;" /> }
+                  <small>Aprobar</small>
+                </button>
+              }
+
+              <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingId() === q.id"
+                      (click)="downloadPdf(q)">
+                @if (downloadingId() === q.id) { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-pdf" style="font-size:.9rem;" /> }
+                <small>PDF</small>
+              </button>
+
+              @if (q.order_id) {
+                <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="previewOrderId.set(q.order_id)">
+                  <fa-icon icon="box" style="font-size:.9rem;" />
+                  <small>Pedido</small>
+                </button>
+              }
+
+              @if (q.order_id && q.order_has_document) {
+                <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="openDocs(q.order_id!)">
+                  <fa-icon icon="file-invoice" style="font-size:.9rem;" />
+                  <small>Docs</small>
+                </button>
+              }
+
+              @if (q.order_id && (q.order_status === 'delivered' || q.order_status === 'paid')) {
+                <button class="btn btn-sm d-flex flex-column align-items-center flex-shrink-0"
+                        [class.btn-success]="q.order_status === 'paid'"
+                        [class.btn-outline-secondary]="q.order_status !== 'paid'"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="openCobros(q.order_id!)">
+                  <fa-icon [icon]="q.order_status === 'paid' ? 'circle-check' : 'money-bill-wave'" style="font-size:.9rem;" />
+                  <small>{{ q.order_status === 'paid' ? 'Cobrado' : 'Cobros' }}</small>
+                </button>
+              }
+
+              @if (q.status === 'draft') {
+                <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="askDelete(q)">
+                  <fa-icon icon="trash" style="font-size:.9rem;" />
+                  <small>Eliminar</small>
+                </button>
+              }
+
+            </div>
+
+            @if (q.order_sale_document || q.order_shipping_guide) {
+              <div class="d-flex flex-column gap-1 border-top pt-2 mt-2" style="font-size:.75rem;">
+                @if (q.order_sale_document) {
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="badge rounded-pill"
+                          style="font-size:.6rem; font-weight:500;"
+                          [style.background]="q.order_sale_document.document_type === 'invoice' ? 'var(--cui-primary-bg-subtle)' :
+                                              q.order_sale_document.document_type === 'receipt' ? 'var(--cui-success-bg-subtle)' :
+                                              'var(--cui-secondary-bg)'"
+                          [style.color]="q.order_sale_document.document_type === 'invoice' ? 'var(--cui-primary-text-emphasis)' :
+                                         q.order_sale_document.document_type === 'receipt' ? 'var(--cui-success-text-emphasis)' :
+                                         'var(--cui-secondary-color)'">
+                      <fa-icon [icon]="q.order_sale_document.document_type === 'invoice' ? 'file-invoice' :
+                                       q.order_sale_document.document_type === 'receipt' ? 'receipt' : 'file-lines'"
+                               class="me-1" style="font-size:.5rem;" />
+                      {{ q.order_sale_document.document_type === 'invoice' ? 'Factura' :
+                         q.order_sale_document.document_type === 'receipt' ? 'Boleta' : 'N. Venta' }}
+                    </span>
+                    @if (q.order_sale_document.full_number) {
+                      <span class="font-monospace text-body-secondary" style="font-size:.67rem;">{{ q.order_sale_document.full_number }}</span>
+                      <span style="display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;"
+                            [title]="q.order_sale_document.status"
+                            [style.background]="q.order_sale_document.status === 'accepted' ? 'var(--cui-success)' :
+                                                 q.order_sale_document.status === 'rejected' ? 'var(--cui-danger)' :
+                                                 q.order_sale_document.status === 'sent'     ? 'var(--cui-info)'   :
+                                                 'var(--cui-body-secondary-color)'">
+                      </span>
+                    }
+                  </div>
+                }
+                @if (q.order_shipping_guide?.full_number) {
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="badge rounded-pill"
+                          style="font-size:.6rem; font-weight:500; background:var(--cui-body-secondary-bg); color:var(--cui-secondary-color);">
+                      <fa-icon icon="truck" class="me-1" style="font-size:.5rem;" />Guía
+                    </span>
+                    <span class="font-monospace text-body-secondary" style="font-size:.67rem;">{{ q.order_shipping_guide!.full_number }}</span>
+                    <span style="display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;"
+                          [title]="q.order_shipping_guide!.sunat_status"
+                          [style.background]="q.order_shipping_guide!.sunat_status === 'accepted' ? 'var(--cui-success)' :
+                                               q.order_shipping_guide!.sunat_status === 'rejected' ? 'var(--cui-danger)' :
+                                               q.order_shipping_guide!.sunat_status === 'sent'     ? 'var(--cui-info)'   :
+                                               'var(--cui-body-secondary-color)'">
+                    </span>
+                  </div>
+                }
+              </div>
+            }
+
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+  </div>
+
+  <!-- ══ VISTA DESKTOP: tabla ════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle" style="font-size:.875rem">
+          <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+            <tr>
+              <th class="ps-3" style="width:120px">Código</th>
+              <th>Cliente</th>
+              <th style="width:90px">Vendedor</th>
+              <th style="width:110px">Envío</th>
+              <th style="width:175px">Documentos</th>
+              <th class="text-end" style="width:85px">Total</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:240px">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (q of quotations(); track q.id) {
+              <tr>
+                <td class="ps-3">
+                  <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ q.code }}</div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ q.created_at | date:'dd/MM/yy' }}</div>
+                </td>
+                <td>
+                  <div class="fw-medium lh-sm">{{ clientName(q) }}</div>
+                  @if (q.client?.phone) {
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ q.client!.phone }}</div>
+                  }
+                </td>
+                <td class="text-body-secondary small">{{ q.seller?.name ?? '—' }}</td>
+                <td style="font-size:.78rem;">
+                  @if (q.shipping_type) {
+                    <div class="d-flex align-items-center gap-1">
+                      <fa-icon [icon]="q.shipping_type === 'local' ? 'store' : 'truck'"
+                               class="text-body-secondary" style="font-size:.8rem;" />
+                      <span>{{ q.shipping_type === 'local' ? 'Local' : 'Provincia' }}</span>
+                    </div>
+                    @if (q.carrier) {
+                      <div class="text-body-secondary" style="font-size:.72rem;">{{ q.carrier.name }}</div>
+                    }
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+                <!-- Documentos -->
+                <td style="font-size:.78rem;">
+                  @if (q.order_sale_document) {
+                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                      <span class="badge rounded-pill"
+                            style="font-size:.6rem; font-weight:500;"
+                            [style.background]="q.order_sale_document.document_type === 'invoice' ? 'var(--cui-primary-bg-subtle)' :
+                                                q.order_sale_document.document_type === 'receipt' ? 'var(--cui-success-bg-subtle)' :
+                                                'var(--cui-secondary-bg)'"
+                            [style.color]="q.order_sale_document.document_type === 'invoice' ? 'var(--cui-primary-text-emphasis)' :
+                                           q.order_sale_document.document_type === 'receipt' ? 'var(--cui-success-text-emphasis)' :
+                                           'var(--cui-secondary-color)'">
+                        <fa-icon [icon]="q.order_sale_document.document_type === 'invoice' ? 'file-invoice' :
+                                         q.order_sale_document.document_type === 'receipt' ? 'receipt' : 'file-lines'"
+                                 class="me-1" style="font-size:.5rem;" />
+                        {{ q.order_sale_document.document_type === 'invoice' ? 'Factura' :
+                           q.order_sale_document.document_type === 'receipt' ? 'Boleta' : 'N. Venta' }}
+                      </span>
+                      @if (q.order_sale_document.full_number) {
+                        <span class="font-monospace text-body-secondary" style="font-size:.67rem;">{{ q.order_sale_document.full_number }}</span>
+                        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;"
+                              [title]="q.order_sale_document.status"
+                              [style.background]="q.order_sale_document.status === 'accepted' ? 'var(--cui-success)' :
+                                                   q.order_sale_document.status === 'rejected' ? 'var(--cui-danger)' :
+                                                   q.order_sale_document.status === 'sent'     ? 'var(--cui-info)'   :
+                                                   'var(--cui-body-secondary-color)'">
+                        </span>
+                      }
+                    </div>
+                  }
+                  @if (q.order_shipping_guide) {
+                    <div class="d-flex align-items-center gap-1 mt-1">
+                      <span class="badge rounded-pill"
+                            style="font-size:.6rem; font-weight:500; background:var(--cui-body-secondary-bg); color:var(--cui-secondary-color);">
+                        <fa-icon icon="truck" class="me-1" style="font-size:.5rem;" />Guía
+                      </span>
+                      @if (q.order_shipping_guide.full_number) {
+                        <span class="font-monospace text-body-secondary" style="font-size:.67rem;">{{ q.order_shipping_guide.full_number }}</span>
+                        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;flex-shrink:0;"
+                              [title]="q.order_shipping_guide.sunat_status"
+                              [style.background]="q.order_shipping_guide.sunat_status === 'accepted' ? 'var(--cui-success)' :
+                                                   q.order_shipping_guide.sunat_status === 'rejected' ? 'var(--cui-danger)' :
+                                                   q.order_shipping_guide.sunat_status === 'sent'     ? 'var(--cui-info)'   :
+                                                   'var(--cui-body-secondary-color)'">
+                        </span>
+                      }
+                    </div>
+                  }
+                  @if (!q.order_sale_document && !q.order_shipping_guide) {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+
+                <td class="text-end fw-semibold">
+                  S/ {{ q.total | number:'1.2-2' }}
+                  @if (+q.discount > 0) {
+                    <div class="text-success" style="font-size:.72rem;">-S/ {{ q.discount | number:'1.2-2' }}</div>
+                  }
+                </td>
+                <td>
+                  <c-badge [color]="statusColors[q.status]" style="font-size:.72rem;">
+                    {{ statusLabels[q.status] }}
+                  </c-badge>
+                  @if (q.order_status) {
+                    <div class="mt-1">
+                      <c-badge [color]="orderStatusColors[q.order_status] ?? 'secondary'"
+                               style="font-size:.68rem; cursor:pointer;"
+                               (click)="previewOrderId.set(q.order_id!)"
+                               title="Ver pedido">
+                        <fa-icon [icon]="q.order_status === 'paid' ? 'circle-check' : 'truck'"
+                                 class="me-1" style="font-size:.6rem;" />
+                        {{ orderStatusLabels[q.order_status] ?? q.order_status }}
+                      </c-badge>
+                    </div>
+                  }
+                </td>
+
+                <td (click)="$event.stopPropagation()" style="min-width:260px;">
+                  <div class="d-flex gap-1 align-items-center overflow-auto pb-1"
+                       style="scrollbar-width:none; -ms-overflow-style:none;">
+
+                    @if (!q.order_id) {
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              (click)="openDetail(q)">
+                        <fa-icon icon="file-lines" /><small>Ver</small>
+                      </button>
+                    }
+
+                    @if (q.status === 'draft') {
+                      <a class="btn btn-sm btn-warning d-flex flex-column align-items-center"
+                         style="min-width:38px; font-size:.7rem;"
+                         [routerLink]="['/quotations', q.id, 'edit']">
+                        <fa-icon icon="pen" /><small>Editar</small>
+                      </a>
+                    }
+
+                    @if (q.status === 'draft' || q.status === 'sent') {
+                      <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              [disabled]="approvingId() === q.id"
+                              (click)="approveFromList(q)">
+                        @if (approvingId() === q.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="check" /> }
+                        <small>Aprobar</small>
+                      </button>
+                    }
+
+                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                            style="min-width:38px; font-size:.7rem;"
+                            [disabled]="downloadingId() === q.id"
+                            (click)="downloadPdf(q)">
+                      @if (downloadingId() === q.id) { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-pdf" /> }
+                      <small>PDF</small>
+                    </button>
+
+                    @if (q.order_id) {
+                      <button class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              (click)="previewOrderId.set(q.order_id)">
+                        <fa-icon icon="box" /><small>Pedido</small>
+                      </button>
+                    }
+
+                    @if (q.order_id && q.order_has_document) {
+                      <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              (click)="openDocs(q.order_id!)">
+                        <fa-icon icon="file-invoice" /><small>Docs</small>
+                      </button>
+                    }
+
+                    @if (q.order_id && (q.order_status === 'delivered' || q.order_status === 'paid')) {
+                      <button class="btn btn-sm d-flex flex-column align-items-center"
+                              [class.btn-success]="q.order_status === 'paid'"
+                              [class.btn-outline-secondary]="q.order_status !== 'paid'"
+                              style="min-width:38px; font-size:.7rem;"
+                              (click)="openCobros(q.order_id!)">
+                        <fa-icon [icon]="q.order_status === 'paid' ? 'circle-check' : 'money-bill-wave'" />
+                        <small>{{ q.order_status === 'paid' ? 'Cobrado' : 'Cobros' }}</small>
+                      </button>
+                    }
+
+                    @if (q.status === 'draft') {
+                      <button class="btn btn-sm btn-danger d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              (click)="askDelete(q)">
+                        <fa-icon icon="trash" /><small>Eliminar</small>
+                      </button>
+                    }
+
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" class="text-center text-body-secondary py-5">
+                  <fa-icon icon="file-invoice" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+                  No hay cotizaciones para los filtros seleccionados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [currentPage]="filters.page!"
+        [lastPage]="lastPage()"
+        [total]="total()"
+        wrapperClass="px-3 py-2 border-top"
+        (pageChange)="goToPage($event)"
+      />
+    </c-card-body>
+  </c-card>
+
+  <!-- Paginación mobile -->
+  @if (lastPage() > 1) {
+    <div class="d-md-none d-flex justify-content-between align-items-center mt-3">
+      <button cButton color="secondary" size="sm" variant="outline"
+              [disabled]="filters.page === 1"
+              (click)="goToPage(filters.page - 1)">
+        <fa-icon icon="chevron-left" class="me-1" />Anterior
+      </button>
+      <small class="text-body-secondary">{{ filters.page }} / {{ lastPage() }}</small>
+      <button cButton color="secondary" size="sm" variant="outline"
+              [disabled]="filters.page === lastPage()"
+              (click)="goToPage(filters.page + 1)">
+        Siguiente<fa-icon icon="chevron-right" class="ms-1" />
+      </button>
+    </div>
+  }
+
+} <!-- /loading -->
+
+<app-order-detail-modal
+  [orderId]="previewOrderId()"
+  (closed)="previewOrderId.set(null)" />
+
+<!-- Modales extraídos como componentes -->
+<app-quotation-detail-modal
+  [quotation]="detailQ()"
+  (closed)="detailQ.set(null)"
+  (deleted)="onDeleted($event)" />
+
+<!-- ── Modal Documentos (solo lectura) ───────────────────────────────────── -->
+@if (loadingDocs() || docsOrder()) {
+  <c-modal [visible]="true" size="lg" alignment="center"
+           (visibleChange)="!$event && closeDocs()">
+    <c-modal-header>
+      <h6 cModalTitle class="mb-0 fw-bold">
+        Documentos · {{ docsOrder()?.code ?? '…' }}
+      </h6>
+      <button type="button" class="btn-close" (click)="closeDocs()"></button>
+    </c-modal-header>
+    <c-modal-body class="p-3 p-md-4">
+      @if (loadingDocs()) {
+        <div class="text-center py-4"><c-spinner color="primary" /></div>
+      } @else if (docsOrder(); as o) {
+        <div class="mb-4">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <fa-icon icon="file-invoice" class="text-body-secondary" />
+            <span class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing:.06em;">Documento de venta</span>
+          </div>
+          @if (o.sale_document; as doc) {
+            <div class="border rounded-3 p-3">
+              <div class="d-flex flex-column flex-md-row gap-3">
+                <div class="d-flex gap-3 flex-wrap flex-grow-1" style="font-size:.875rem; min-width:0;">
+                  <div>
+                    <div class="text-body-secondary small mb-1">Tipo</div>
+                    <div class="fw-medium">{{ docTypeLabels[doc.document_type] }}</div>
+                  </div>
+                  <div>
+                    <div class="text-body-secondary small mb-1">Número</div>
+                    <div class="fw-bold font-monospace">{{ doc.full_number ?? '—' }}</div>
+                  </div>
+                  <div>
+                    <div class="text-body-secondary small mb-1">Estado</div>
+                    <c-badge [color]="docStatusColors[doc.status]">{{ docStatusLabels[doc.status] }}</c-badge>
+                  </div>
+                  <div>
+                    <div class="text-body-secondary small mb-1">Total</div>
+                    <div class="fw-bold">S/ {{ doc.total | number:'1.2-2' }}</div>
+                  </div>
+                </div>
+                <div class="d-flex gap-2 flex-shrink-0 align-self-end align-self-md-center">
+                  @if (doc.document_type === 'sale_note' || doc.pdf_url) {
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                            style="min-width:52px; font-size:.75rem;"
+                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
+                            (click)="openDocFile('pdf')" title="Descargar PDF">
+                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':pdf') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-pdf" style="font-size:1rem;" /> }
+                      <small>PDF</small>
+                    </button>
+                  }
+                  @if (doc.xml_url) {
+                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                            style="min-width:52px; font-size:.75rem;"
+                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':xml'"
+                            (click)="openDocFile('xml')" title="Descargar XML">
+                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':xml') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-code" style="font-size:1rem;" /> }
+                      <small>XML</small>
+                    </button>
+                  }
+                  @if (doc.cdr_url) {
+                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                            style="min-width:52px; font-size:.75rem;"
+                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':cdr'"
+                            (click)="openDocFile('cdr')" title="Descargar CDR">
+                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':cdr') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-zipper" style="font-size:1rem;" /> }
+                      <small>CDR</small>
+                    </button>
+                  }
+                  @if (doc.document_type !== 'sale_note' && !doc.pdf_url && !doc.xml_url) {
+                    <span class="text-body-secondary small align-self-center">Sin archivos SUNAT aún</span>
+                  }
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="bg-body-tertiary rounded-3 px-3 py-3 small text-body-secondary">
+              Sin documento de venta generado.
+            </div>
+          }
+        </div>
+
+        <!-- Guía de remisión -->
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <fa-icon icon="truck" class="text-body-secondary" />
+            <span class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing:.06em;">
+              Guía de remisión
+            </span>
+          </div>
+          @if (o.shipping_guide; as guide) {
+            <div class="border rounded-3 p-3">
+              <div class="d-flex flex-column flex-md-row gap-3">
+                <div class="d-flex gap-3 flex-wrap flex-grow-1" style="font-size:.875rem; min-width:0;">
+                  <div>
+                    <div class="text-body-secondary small mb-1">Número</div>
+                    <div class="fw-bold font-monospace lh-sm">{{ guide.full_number ?? '—' }}</div>
+                  </div>
+                  <div>
+                    <div class="text-body-secondary small mb-1">Estado</div>
+                    <c-badge [color]="{ draft:'secondary', sent:'info', accepted:'success', rejected:'danger', voided:'dark' }[guide.sunat_status]">
+                      {{ { draft:'Borrador', sent:'Enviada', accepted:'Aceptada', rejected:'Rechazada', voided:'Anulada' }[guide.sunat_status] }}
+                    </c-badge>
+                  </div>
+                  <div>
+                    <div class="text-body-secondary small mb-1">Transportista</div>
+                    <div class="fw-medium lh-sm">{{ guide.carrier_name }}</div>
+                    @if (guide.carrier_ruc) {
+                      <div class="text-body-secondary small font-monospace">{{ guide.carrier_ruc }}</div>
+                    }
+                  </div>
+                  <div>
+                    <div class="text-body-secondary small mb-1">Fecha traslado</div>
+                    <div class="fw-medium">{{ guide.transfer_date | date:'dd/MM/yyyy' }}</div>
+                  </div>
+                </div>
+                <!-- Descargas guía (URLs de ApiSunat) -->
+                <div class="d-flex gap-2 flex-shrink-0 align-self-end align-self-md-center">
+                  @if (guide.pdf_url) {
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                            style="min-width:52px; font-size:.75rem;"
+                            [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':pdf'"
+                            (click)="openGuideFile('pdf')" title="Descargar PDF">
+                      @if (downloadingKey() === 'shipping-guides:' + guide.id + ':pdf') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-pdf" style="font-size:1rem;" /> }
+                      <small>PDF</small>
+                    </button>
+                  }
+                  @if (guide.xml_url) {
+                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                            style="min-width:52px; font-size:.75rem;"
+                            [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':xml'"
+                            (click)="openGuideFile('xml')" title="Descargar XML">
+                      @if (downloadingKey() === 'shipping-guides:' + guide.id + ':xml') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-code" style="font-size:1rem;" /> }
+                      <small>XML</small>
+                    </button>
+                  }
+                  @if (guide.cdr_url) {
+                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                            style="min-width:52px; font-size:.75rem;"
+                            [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':cdr'"
+                            (click)="openGuideFile('cdr')" title="Descargar CDR">
+                      @if (downloadingKey() === 'shipping-guides:' + guide.id + ':cdr') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-zipper" style="font-size:1rem;" /> }
+                      <small>CDR</small>
+                    </button>
+                  }
+                  @if (!guide.pdf_url && !guide.xml_url && guide.sunat_status !== 'draft') {
+                    <span class="text-body-secondary small align-self-center">Sin archivos SUNAT aún</span>
+                  }
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="bg-body-tertiary rounded-3 px-3 py-3 small text-body-secondary">
+              Sin guía de remisión generada.
+            </div>
+          }
+        </div>
+
+      }
+    </c-modal-body>
+    <c-modal-footer class="py-2">
+      <button class="btn btn-secondary btn-sm" (click)="closeDocs()">Cerrar</button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- ── Modal cobros del pedido ────────────────────────────────────────────── -->
+@if (cobrosOrder() || loadingCobros()) {
+  <c-modal [visible]="true" size="lg" alignment="center"
+           (visibleChange)="!$event && closeCobros()">
+    <c-modal-header>
+      <div>
+        <h6 cModalTitle class="mb-0 fw-bold d-flex align-items-center gap-2">
+          @if (cobrosOrder()?.status === 'paid') {
+            <fa-icon icon="circle-check" class="text-success" />
+          } @else {
+            <fa-icon icon="money-bill-wave" class="text-body-secondary" />
+          }
+          Cobros · {{ cobrosOrder()?.code ?? '…' }}
+        </h6>
+        @if (cobrosOrder(); as o) {
+          <div class="text-body-secondary mt-1 d-flex flex-wrap gap-3" style="font-size:.8rem;">
+            <span>Total <strong>S/ {{ o.total | number:'1.2-2' }}</strong></span>
+            @if (cobrosTotal > 0) {
+              <span class="text-success">Cobrado <strong>S/ {{ cobrosTotal | number:'1.2-2' }}</strong></span>
+            }
+            @if (cobrosPendiente > 0) {
+              <span class="text-warning">Pendiente <strong>S/ {{ cobrosPendiente | number:'1.2-2' }}</strong></span>
+            }
+          </div>
+        }
+      </div>
+      <button type="button" class="btn-close ms-auto" (click)="closeCobros()"></button>
+    </c-modal-header>
+
+    <c-modal-body class="p-3">
+      @if (loadingCobros()) {
+        <div class="text-center py-4"><c-spinner color="primary" /></div>
+      } @else if (!orderCollections().length) {
+        <div class="text-center text-body-secondary py-4" style="font-size:.9rem;">
+          <fa-icon icon="inbox" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+          Sin cobros registrados para este pedido.
+        </div>
+      } @else {
+
+        <!-- Mobile: tarjetas -->
+        <div class="d-md-none d-flex flex-column gap-2">
+          @for (c of orderCollections(); track c.id) {
+            <div class="rounded-2 border p-3"
+                 [class.border-danger]="c.status === 'rejected'"
+                 [class.bg-danger-subtle]="c.status === 'rejected'"
+                 [class.border-success]="c.status === 'validated'"
+                 style="font-size:.84rem;">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div>
+                  <div class="fw-bold" style="font-size:1rem;">
+                    <fa-icon [icon]="c.collection_form === 'cash' ? 'money-bill-wave' : 'building-columns'"
+                             class="me-1 text-body-secondary" style="font-size:.85rem;" />
+                    S/ {{ c.amount | number:'1.2-2' }}
+                  </div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">
+                    {{ c.created_at | date:'dd/MM/yy, HH:mm' }}
+                    @if (c.registered_by_name) { · {{ c.registered_by_name }} }
+                  </div>
+                </div>
+                <c-badge [color]="colStatusColor[c.status]" style="font-size:.65rem;">
+                  {{ colStatusLabel[c.status] }}
+                </c-badge>
+              </div>
+              @if (c.collection_form === 'transfer') {
+                <div class="d-flex align-items-start gap-3">
+                  <div class="flex-grow-1" style="font-size:.8rem;">
+                    @if (c.bank?.name) {
+                      <div class="text-body-secondary">
+                        <strong class="text-body">{{ c.bank!.name }}</strong>
+                        @if (c.payment_method?.name) { — {{ c.payment_method!.name }} }
+                      </div>
+                    }
+                    @if (c.operation_number) {
+                      <div class="text-body-secondary font-monospace">Op. {{ c.operation_number }}</div>
+                    }
+                    @if (c.operation_date) {
+                      <div class="text-body-secondary">{{ c.operation_date | date:'dd/MM/yyyy' }}</div>
+                    }
+                  </div>
+                  @if (c.voucher_url) {
+                    @if (isImage(c.voucher_url)) {
+                      <img [src]="c.voucher_url" alt="Voucher"
+                           class="rounded border flex-shrink-0"
+                           style="width:60px; height:60px; object-fit:cover; cursor:zoom-in;"
+                           (click)="openVoucher(c.voucher_url)" />
+                    } @else {
+                      <button type="button"
+                              class="btn btn-sm btn-outline-danger flex-shrink-0 d-flex flex-column align-items-center gap-1"
+                              style="font-size:.68rem; padding:.35rem .5rem; border-radius:8px;"
+                              (click)="openVoucher(c.voucher_url)">
+                        <fa-icon icon="file-pdf" style="font-size:1.2rem;" />PDF
+                      </button>
+                    }
+                  }
+                </div>
+              }
+              @if (c.notes) {
+                <div class="mt-2 small text-danger">
+                  <fa-icon icon="triangle-exclamation" class="me-1" />{{ c.notes }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Desktop: tabla -->
+        <table class="table table-sm mb-0 d-none d-md-table" style="font-size:.82rem;">
+          <thead>
+            <tr>
+              <th>Forma</th>
+              <th>Banco / Método</th>
+              <th>N° Operación</th>
+              <th>Fecha op.</th>
+              <th class="text-end">Monto</th>
+              <th>Estado</th>
+              <th class="text-center" style="width:60px;">Voucher</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of orderCollections(); track c.id) {
+              <tr [class.table-danger]="c.status === 'rejected'">
+                <td>
+                  <fa-icon [icon]="c.collection_form === 'cash' ? 'money-bill-wave' : 'building-columns'"
+                           class="me-1 text-body-secondary" />
+                  {{ c.collection_form === 'cash' ? 'Efectivo' : 'Transferencia' }}
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ c.created_at | date:'dd/MM HH:mm' }}</div>
+                </td>
+                <td>
+                  @if (c.bank?.name) {
+                    <div>{{ c.bank!.name }}</div>
+                    @if (c.payment_method?.name) {
+                      <div class="text-body-secondary" style="font-size:.75rem;">{{ c.payment_method!.name }}</div>
+                    }
+                  } @else { — }
+                </td>
+                <td class="font-monospace">{{ c.operation_number || '—' }}</td>
+                <td>
+                  {{ c.operation_date ? (c.operation_date | date:'dd/MM/yy') : '—' }}
+                  @if (c.operation_time) {
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ c.operation_time.slice(0,5) }}</div>
+                  }
+                </td>
+                <td class="text-end fw-semibold">S/ {{ c.amount | number:'1.2-2' }}</td>
+                <td><c-badge [color]="colStatusColor[c.status]" style="font-size:.68rem;">{{ colStatusLabel[c.status] }}</c-badge></td>
+                <td class="text-center">
+                  @if (c.voucher_url) {
+                    @if (isImage(c.voucher_url)) {
+                      <img [src]="c.voucher_url" alt="Voucher"
+                           class="rounded border"
+                           style="width:40px; height:40px; object-fit:cover; cursor:zoom-in;"
+                           (click)="openVoucher(c.voucher_url)" />
+                    } @else {
+                      <button type="button" class="btn btn-sm btn-outline-danger p-1"
+                              title="Ver PDF" (click)="openVoucher(c.voucher_url)">
+                        <fa-icon icon="file-pdf" />
+                      </button>
+                    }
+                  } @else { <span class="text-body-secondary">—</span> }
+                </td>
+              </tr>
+              @if (c.notes) {
+                <tr [class.table-danger]="c.status === 'rejected'">
+                  <td colspan="7" class="pt-0 pb-2" style="font-size:.75rem;">
+                    <fa-icon icon="triangle-exclamation" class="me-1 text-danger" />{{ c.notes }}
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      }
+    </c-modal-body>
+    <c-modal-footer class="py-2">
+      <button class="btn btn-secondary btn-sm" (click)="closeCobros()">Cerrar</button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- ── Lightbox de imagen ──────────────────────────────────────────────────── -->
+@if (voucherPreviewUrl()) {
+  <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+       style="z-index:9999; background:rgba(0,0,0,.88); cursor:zoom-out;"
+       (click)="voucherPreviewUrl.set(null)">
+    <img [src]="voucherPreviewUrl()!" alt="Comprobante"
+         style="max-width:95vw; max-height:88vh; border-radius:6px; object-fit:contain; box-shadow:0 8px 32px rgba(0,0,0,.5); cursor:default;"
+         (click)="$event.stopPropagation()" />
+    <button type="button"
+            class="btn btn-sm btn-outline-light position-absolute"
+            style="top:16px; right:16px; opacity:.85;"
+            (click)="voucherPreviewUrl.set(null)">
+      <fa-icon icon="xmark" />
+    </button>
+    <a [href]="voucherPreviewUrl()!" target="_blank" rel="noopener"
+       class="btn btn-sm btn-outline-light position-absolute d-flex align-items-center gap-1"
+       style="top:16px; right:76px; opacity:.85;"
+       (click)="$event.stopPropagation()">
+      <fa-icon icon="download" class="me-1" />Descargar
+    </a>
+  </div>
+}
+

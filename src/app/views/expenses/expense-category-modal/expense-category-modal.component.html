@@ -1,0 +1,39 @@
+<c-modal-header>
+  <h5 cModalTitle>Categorías de gastos</h5>
+  <button (click)="close()" type="button" class="btn-close" aria-label="Cerrar"></button>
+</c-modal-header>
+
+<c-modal-body>
+  <div class="d-flex gap-2 mb-3">
+    <input cFormControl type="text" placeholder="Ej: Mantenimiento de vehículos" maxlength="50"
+           [(ngModel)]="newName" (keyup.enter)="add()" />
+    <button cButton color="primary" class="text-nowrap" (click)="add()" [disabled]="saving() || !newName.trim()">
+      @if (saving()) { <c-spinner size="sm" /> } @else { + Agregar }
+    </button>
+  </div>
+
+  @if (loading()) {
+    <div class="text-center py-3"><c-spinner color="primary" size="sm" /></div>
+  } @else if (categories().length === 0) {
+    <div class="text-center text-body-secondary small py-3">Aún no tienes categorías registradas.</div>
+  } @else {
+    <ul class="list-group">
+      @for (cat of categories(); track cat.id) {
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ cat.name }}
+          <button cButton color="danger" variant="ghost" size="sm" (click)="remove(cat)" title="Eliminar categoría">
+            <fa-icon icon="trash" />
+          </button>
+        </li>
+      }
+    </ul>
+  }
+
+  <div class="text-body-secondary small mt-3">
+    Solo puedes eliminar categorías que aún no tengan gastos registrados.
+  </div>
+</c-modal-body>
+
+<c-modal-footer>
+  <button cButton color="secondary" variant="outline" (click)="close()" type="button">Cerrar</button>
+</c-modal-footer>

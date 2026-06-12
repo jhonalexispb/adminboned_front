@@ -1,0 +1,275 @@
+<app-page-header title="Mis devoluciones" subtitle="Solicitudes que has registrado">
+  <a class="btn btn-primary" routerLink="/returns/new">
+    <fa-icon icon="plus" class="me-1" />Nueva solicitud
+  </a>
+</app-page-header>
+
+<!-- Filtros -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1 text-body-secondary">Cliente</label>
+        <app-client-select [value]="selectedClient" (valueChange)="onClientFilterChange($event)" />
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <p-select [options]="statusOptions" [(ngModel)]="filters.status"
+                  optionLabel="label" optionValue="value"
+                  styleClass="w-100" (ngModelChange)="onSearch()" />
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Desde</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_from" (change)="onSearch()" />
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Hasta</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_to" (change)="onSearch()" />
+      </div>
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ MOBILE ══════════════════════════════════════════════════════════════ -->
+  <div class="d-md-none">
+    @if (!returns().length) {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="rotate-left" class="d-block mb-2" style="font-size:2.5rem; opacity:.3;" />
+        No tienes solicitudes registradas.
+      </div>
+    }
+    <div class="d-flex flex-column gap-2">
+      @for (r of returns(); track r.id) {
+        <c-card>
+          <c-card-header class="py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <div class="d-flex align-items-center gap-2">
+                <span class="font-monospace fw-bold" style="font-size:.88rem;">{{ r.code }}</span>
+                <span class="text-body-secondary" style="font-size:.72rem;">{{ r.created_at | date:'dd/MM/yy' }}</span>
+              </div>
+              <c-badge [textBgColor]="statusColors[r.status]" style="font-size:.7rem;">
+                {{ statusLabels[r.status] }}
+              </c-badge>
+            </div>
+          </c-card-header>
+          <c-card-body class="px-3 py-2">
+            <div class="mb-2">
+              <div class="fw-semibold" style="font-size:.95rem; line-height:1.2;">{{ clientName(r) }}</div>
+              <div class="text-body-secondary" style="font-size:.78rem;">
+                {{ r.order?.code ?? '—' }}
+                @if (r.sale_document) { · <span class="font-monospace">{{ r.sale_document.full_number }}</span> }
+              </div>
+            </div>
+            <div class="d-flex gap-1 overflow-auto pb-1" style="scrollbar-width:none;">
+              @if (r.status === 'draft') {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="openDetail(r)">
+                  <fa-icon icon="eye" style="font-size:.9rem;" /><small>Ver</small>
+                </button>
+                <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="sendReturn(r)">
+                  <fa-icon icon="paper-plane" style="font-size:.9rem;" /><small>Enviar</small>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="openEdit(r)">
+                  <fa-icon icon="pen" style="font-size:.9rem;" /><small>Editar</small>
+                </button>
+                <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="confirmDelete(r)">
+                  <fa-icon icon="trash" style="font-size:.9rem;" /><small>Eliminar</small>
+                </button>
+              } @else {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="openDetail(r)">
+                  <fa-icon icon="eye" style="font-size:.9rem;" /><small>Ver</small>
+                </button>
+                @if (r.credit_note) {
+                  <button class="btn btn-sm btn-outline-success d-flex flex-column align-items-center flex-shrink-0"
+                          style="min-width:52px; font-size:.68rem;"
+                          [disabled]="downloadingNc() === r.credit_note.id"
+                          (click)="downloadCreditNote(r)">
+                    @if (downloadingNc() === r.credit_note.id) { <c-spinner size="sm" /> } @else { <fa-icon icon="file-pdf" style="font-size:.9rem;" /> }
+                    <small>NC</small>
+                  </button>
+                }
+              }
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+  </div>
+
+  <!-- ══ DESKTOP ═════════════════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle" style="font-size:.875rem">
+          <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+            <tr>
+              <th class="ps-3" style="width:140px">Código</th>
+              <th>Cliente / Pedido</th>
+              <th style="width:130px">Documento</th>
+              <th style="width:100px">Estado</th>
+              <th style="width:110px">Fecha</th>
+              <th style="width:160px">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of returns(); track r.id) {
+              <tr>
+                <td class="ps-3">
+                  <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ r.code }}</div>
+                </td>
+                <td>
+                  <div class="fw-medium">{{ clientName(r) }}</div>
+                  <div class="text-body-secondary small">{{ r.order?.code ?? '—' }}</div>
+                </td>
+                <td class="font-monospace small">{{ r.sale_document?.full_number ?? '—' }}</td>
+                <td>
+                  <c-badge [textBgColor]="statusColors[r.status]" style="font-size:.72rem;">
+                    {{ statusLabels[r.status] }}
+                  </c-badge>
+                  @if (r.action_type === 'credit_note') {
+                    <div class="text-success mt-1" style="font-size:.7rem;">NC emitida</div>
+                  }
+                </td>
+                <td class="small text-body-secondary">{{ r.created_at | date:'dd/MM/yy HH:mm' }}</td>
+                <td>
+                  <div class="d-flex gap-1">
+                    @if (r.status === 'draft') {
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:44px; font-size:.68rem;"
+                              title="Ver"
+                              (click)="openDetail(r)">
+                        <fa-icon icon="eye" /><small>Ver</small>
+                      </button>
+                      <button class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                              style="min-width:44px; font-size:.68rem;"
+                              title="Enviar al admin"
+                              (click)="sendReturn(r)">
+                        <fa-icon icon="paper-plane" /><small>Enviar</small>
+                      </button>
+                      <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center"
+                              style="min-width:44px; font-size:.68rem;"
+                              title="Editar"
+                              (click)="openEdit(r)">
+                        <fa-icon icon="pen" /><small>Editar</small>
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center"
+                              style="min-width:44px; font-size:.68rem;"
+                              title="Eliminar"
+                              (click)="confirmDelete(r)">
+                        <fa-icon icon="trash" /><small>Eliminar</small>
+                      </button>
+                    } @else {
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              style="min-width:44px; font-size:.68rem;"
+                              (click)="openDetail(r)">
+                        <fa-icon icon="eye" /><small>Ver</small>
+                      </button>
+                      @if (r.credit_note) {
+                        <button class="btn btn-sm btn-outline-success d-flex flex-column align-items-center"
+                                style="min-width:44px; font-size:.68rem;"
+                                title="Descargar Nota de Crédito"
+                                [disabled]="downloadingNc() === r.credit_note.id"
+                                (click)="downloadCreditNote(r)">
+                          @if (downloadingNc() === r.credit_note.id) { <c-spinner size="sm" /> } @else { <fa-icon icon="file-pdf" /> }
+                          <small>NC</small>
+                        </button>
+                      }
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="text-center text-body-secondary py-5">No tienes solicitudes registradas.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [currentPage]="filters.page!"
+        [lastPage]="lastPage()"
+        [total]="total()"
+        wrapperClass="px-3 py-2 border-top"
+        (pageChange)="goToPage($event)"
+      />
+    </c-card-body>
+  </c-card>
+
+}
+
+<!-- Modal detalle -->
+<app-return-detail-modal
+  [return_]="selected()"
+  [loadingItems]="loadingDetail()"
+  (closed)="selected.set(null)" />
+
+<!-- Modal editar solicitud -->
+@if (editingReturn()) {
+  <c-modal [visible]="true" size="lg" alignment="center" (visibleChange)="!$event && editingReturn.set(null)">
+    <c-modal-header>
+      <h5 cModalTitle><fa-icon icon="pen" class="me-2" />Editar solicitud</h5>
+    </c-modal-header>
+    <c-modal-body>
+      @if (editingReturn(); as r) {
+        <div class="rounded border p-2 px-3 mb-3 bg-body-tertiary" style="font-size:.82rem;">
+          <div><strong>Cliente:</strong> {{ clientName(r) }}</div>
+          <div><strong>Pedido:</strong> {{ r.order?.code ?? '—' }}</div>
+          @if (r.sale_document) {
+            <div>
+              <strong>Documento:</strong>
+              <span class="font-monospace ms-1">{{ r.sale_document.full_number }}</span>
+            </div>
+          }
+        </div>
+      }
+
+      <label class="form-label small mb-1">Motivo <span class="text-danger">*</span></label>
+      <textarea class="form-control mb-3" rows="3" [(ngModel)]="editReason"
+                placeholder="Motivo de la devolución..."></textarea>
+
+      <label class="form-label small mb-1 d-block">Productos a devolver <span class="text-danger">*</span></label>
+      @if (loadingEditItems()) {
+        <div class="text-center py-4">
+          <c-spinner size="sm" class="me-2" />Cargando productos del pedido...
+        </div>
+      } @else {
+        <app-return-items-editor [(lines)]="editLines" />
+      }
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" size="sm" [disabled]="saving()" (click)="editingReturn.set(null)">Cancelar</button>
+      <button cButton color="primary" size="sm"
+              [disabled]="saving() || !editReason.trim() || !hasSelectedEditItems"
+              (click)="saveEdit()">
+        @if (saving()) { <c-spinner size="sm" class="me-1" /> }Guardar
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- Confirm eliminar -->
+<app-confirm-modal
+  [visible]="!!deletingId()"
+  title="Eliminar solicitud"
+  message="¿Eliminar esta solicitud? No se podrá recuperar."
+  confirmLabel="Eliminar"
+  confirmColor="danger"
+  (confirm)="doDelete()"
+  (cancel)="deletingId.set(null)" />

@@ -1,0 +1,332 @@
+<app-page-header title="Bancos / Medios de pago" subtitle="Bancos, billeteras digitales y otros medios">
+  <button class="btn btn-primary btn-sm" (click)="openCreate()">
+    <fa-icon icon="plus" class="me-1" />Nuevo banco
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (!banks().length) {
+  <c-card><c-card-body>
+    <div class="text-center text-body-secondary py-4">Sin bancos registrados.</div>
+  </c-card-body></c-card>
+} @else {
+
+  <!-- ══ MOBILE: cards ═══════════════════════════════════════════════════════ -->
+  <div class="d-md-none">
+    @for (b of banks(); track b.id) {
+      <c-card class="mb-2">
+        <c-card-body class="py-2 px-3">
+
+          <!-- Banco header -->
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <div class="fw-semibold" style="font-size:.95rem;">{{ b.name }}</div>
+              <c-badge [color]="b.active ? 'success' : 'secondary'" class="mt-1" style="font-size:.7rem;">
+                {{ b.active ? 'Activo' : 'Inactivo' }}
+              </c-badge>
+            </div>
+            <div class="d-flex gap-1 flex-shrink-0">
+              <button class="btn btn-sm btn-outline-primary d-flex flex-column align-items-center"
+                      style="min-width:46px; font-size:.68rem;" (click)="openEdit(b)">
+                <fa-icon icon="pen" /><small>Editar</small>
+              </button>
+              <button class="btn btn-sm d-flex flex-column align-items-center"
+                      style="min-width:46px; font-size:.68rem;"
+                      [class.btn-outline-warning]="b.active"
+                      [class.btn-outline-success]="!b.active"
+                      [disabled]="togglingId() === b.id"
+                      (click)="toggleActive(b)">
+                @if (togglingId() === b.id) { <c-spinner size="sm" /> }
+                @else {
+                  <fa-icon [icon]="b.active ? 'eye-slash' : 'eye'" />
+                  <small>{{ b.active ? 'Pausar' : 'Activar' }}</small>
+                }
+              </button>
+              <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center"
+                      style="min-width:46px; font-size:.68rem;"
+                      [disabled]="deletingBankId() === b.id"
+                      (click)="deleteBank(b)">
+                @if (deletingBankId() === b.id) { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="trash" /><small>Borrar</small> }
+              </button>
+            </div>
+          </div>
+
+          <!-- Toggle medios -->
+          <button class="btn btn-sm btn-ghost w-100 mt-2 d-flex align-items-center justify-content-center gap-2"
+                  style="font-size:.78rem; border: 1px dashed var(--cui-border-color);"
+                  (click)="toggleExpand(b)">
+            <fa-icon [icon]="expandedBankId() === b.id ? 'chevron-up' : 'chevron-down'" />
+            <span>{{ expandedBankId() === b.id ? 'Ocultar medios' : 'Ver medios de pago' }}</span>
+          </button>
+
+          <!-- Methods cards -->
+          @if (expandedBankId() === b.id) {
+            <div class="mt-2 pt-2" style="border-top: 1px solid var(--cui-border-color);">
+
+              @if (methodsLoading() === b.id) {
+                <div class="text-center py-2"><c-spinner size="sm" /></div>
+              } @else {
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="text-body-secondary fw-semibold"
+                        style="font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;">
+                    Medios de pago
+                  </span>
+                  <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+                          style="font-size:.72rem;" (click)="openCreateMethod(b)">
+                    <fa-icon icon="plus" /><span>Agregar</span>
+                  </button>
+                </div>
+
+                @if (!(methodsMap()[b.id]?.length)) {
+                  <div class="text-body-secondary text-center py-2" style="font-size:.8rem;">
+                    Sin medios de pago aún.
+                  </div>
+                } @else {
+                  @for (m of methodsMap()[b.id]; track m.id) {
+                    <div class="rounded border px-2 py-2 mb-2" style="font-size:.8rem; background: var(--cui-body-bg);">
+                      <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div class="flex-grow-1 min-width-0">
+                          <div class="fw-medium">{{ m.name }}</div>
+                          <div class="text-body-secondary mt-1" style="font-size:.72rem;">
+                            {{ formatLabel[m.op_format] }}
+                            @if (m.op_min_length || m.op_max_length) {
+                              · {{ m.op_min_length ?? '—' }}–{{ m.op_max_length ?? '—' }} car.
+                            }
+                          </div>
+                          <div class="d-flex align-items-center gap-2 mt-1">
+                            <c-badge [color]="m.active ? 'success' : 'secondary'" style="font-size:.65rem;">
+                              {{ m.active ? 'Activo' : 'Inactivo' }}
+                            </c-badge>
+                            @if (m.guide_image_url) {
+                              <a [href]="m.guide_image_url" target="_blank"
+                                 class="text-info" style="font-size:.72rem;">
+                                <fa-icon icon="image" class="me-1" />Guía
+                              </a>
+                            }
+                          </div>
+                        </div>
+                        <div class="d-flex gap-1 flex-shrink-0">
+                          <button class="btn btn-sm btn-outline-primary d-flex flex-column align-items-center"
+                                  style="min-width:40px; font-size:.65rem;"
+                                  (click)="openEditMethod(b, m)">
+                            <fa-icon icon="pen" /><small>Editar</small>
+                          </button>
+                          <button class="btn btn-sm d-flex flex-column align-items-center"
+                                  style="min-width:40px; font-size:.65rem;"
+                                  [class.btn-outline-warning]="m.active"
+                                  [class.btn-outline-success]="!m.active"
+                                  [disabled]="deletingMethodId() === m.id"
+                                  (click)="toggleMethodActive(b, m)">
+                            @if (deletingMethodId() === m.id) { <c-spinner size="sm" /> }
+                            @else {
+                              <fa-icon [icon]="m.active ? 'eye-slash' : 'eye'" />
+                              <small>{{ m.active ? 'Pausar' : 'Activar' }}</small>
+                            }
+                          </button>
+                          <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center"
+                                  style="min-width:40px; font-size:.65rem;"
+                                  [disabled]="deletingMethodId() === m.id"
+                                  (click)="deleteMethod(b, m)">
+                            @if (deletingMethodId() === m.id) { <c-spinner size="sm" /> }
+                            @else { <fa-icon icon="trash" /><small>Borrar</small> }
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                }
+              }
+            </div>
+          }
+
+        </c-card-body>
+      </c-card>
+    }
+  </div>
+
+  <!-- ══ DESKTOP: tabla ══════════════════════════════════════════════════════ -->
+  <div class="d-none d-md-block">
+    <c-card>
+      <c-card-body class="p-0">
+        <div class="table-responsive">
+          <table class="table mb-0 align-middle" style="font-size:.875rem;">
+            <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3" style="width:2.5rem;"></th>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (b of banks(); track b.id) {
+                <!-- Bank row -->
+                <tr>
+                  <td class="ps-3">
+                    <button class="btn btn-sm btn-ghost p-0" (click)="toggleExpand(b)"
+                            style="font-size:1rem; color:inherit;">
+                      <fa-icon [icon]="expandedBankId() === b.id ? 'chevron-down' : 'chevron-right'" />
+                    </button>
+                  </td>
+                  <td class="fw-medium">{{ b.name }}</td>
+                  <td>
+                    <c-badge [color]="b.active ? 'success' : 'secondary'" style="font-size:.75rem;">
+                      {{ b.active ? 'Activo' : 'Inactivo' }}
+                    </c-badge>
+                  </td>
+                  <td class="text-end pe-3">
+                    <div class="d-flex gap-1 justify-content-end">
+                      <button class="btn btn-sm btn-outline-primary d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;" (click)="openEdit(b)">
+                        <fa-icon icon="pen" /><small>Editar</small>
+                      </button>
+                      <button class="btn btn-sm d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              [class.btn-outline-warning]="b.active"
+                              [class.btn-outline-success]="!b.active"
+                              [disabled]="togglingId() === b.id"
+                              (click)="toggleActive(b)">
+                        @if (togglingId() === b.id) { <c-spinner size="sm" /> }
+                        @else {
+                          <fa-icon [icon]="b.active ? 'eye-slash' : 'eye'" />
+                          <small>{{ b.active ? 'Pausar' : 'Activar' }}</small>
+                        }
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center"
+                              style="min-width:46px; font-size:.7rem;"
+                              [disabled]="deletingBankId() === b.id"
+                              (click)="deleteBank(b)">
+                        @if (deletingBankId() === b.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="trash" /><small>Borrar</small> }
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Methods sub-panel -->
+                @if (expandedBankId() === b.id) {
+                  <tr>
+                    <td colspan="4" class="p-0 bg-body-secondary">
+                      <div class="px-4 py-3">
+
+                        @if (methodsLoading() === b.id) {
+                          <div class="text-center py-2"><c-spinner size="sm" /></div>
+                        } @else {
+                          <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small fw-semibold text-body-secondary"
+                                  style="font-size:.78rem; text-transform:uppercase; letter-spacing:.04em;">
+                              Medios de pago
+                            </span>
+                            <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+                                    style="font-size:.75rem;" (click)="openCreateMethod(b)">
+                              <fa-icon icon="plus" /><span>Agregar</span>
+                            </button>
+                          </div>
+
+                          @if (!(methodsMap()[b.id]?.length)) {
+                            <div class="text-body-secondary text-center py-2" style="font-size:.82rem;">
+                              Sin medios de pago. Agrega uno con el botón de arriba.
+                            </div>
+                          } @else {
+                            <table class="table table-sm mb-0 bg-transparent" style="font-size:.8rem;">
+                              <thead style="font-size:.7rem; text-transform:uppercase; letter-spacing:.03em;">
+                                <tr>
+                                  <th>Nombre</th>
+                                  <th>Formato N° Op.</th>
+                                  <th>Longitud</th>
+                                  <th>Guía</th>
+                                  <th>Estado</th>
+                                  <th></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                @for (m of methodsMap()[b.id]; track m.id) {
+                                  <tr>
+                                    <td class="fw-medium">{{ m.name }}</td>
+                                    <td class="text-body-secondary">{{ formatLabel[m.op_format] }}</td>
+                                    <td class="text-body-secondary font-monospace">
+                                      @if (m.op_min_length || m.op_max_length) {
+                                        {{ m.op_min_length ?? '—' }} – {{ m.op_max_length ?? '—' }}
+                                      } @else {
+                                        <span class="text-body-tertiary">Libre</span>
+                                      }
+                                    </td>
+                                    <td>
+                                      @if (m.guide_image_url) {
+                                        <a [href]="m.guide_image_url" target="_blank"
+                                           class="btn btn-sm btn-ghost py-0 px-1" title="Ver imagen guía">
+                                          <fa-icon icon="image" class="text-info" />
+                                        </a>
+                                      } @else {
+                                        <span class="text-body-tertiary">—</span>
+                                      }
+                                    </td>
+                                    <td>
+                                      <c-badge [color]="m.active ? 'success' : 'secondary'"
+                                               style="font-size:.68rem;">
+                                        {{ m.active ? 'Activo' : 'Inactivo' }}
+                                      </c-badge>
+                                    </td>
+                                    <td>
+                                      <div class="d-flex gap-1 justify-content-end">
+                                        <button class="btn btn-sm btn-outline-primary d-flex flex-column align-items-center"
+                                                style="min-width:42px; font-size:.68rem;"
+                                                (click)="openEditMethod(b, m)">
+                                          <fa-icon icon="pen" /><small>Editar</small>
+                                        </button>
+                                        <button class="btn btn-sm d-flex flex-column align-items-center"
+                                                style="min-width:42px; font-size:.68rem;"
+                                                [class.btn-outline-warning]="m.active"
+                                                [class.btn-outline-success]="!m.active"
+                                                [disabled]="deletingMethodId() === m.id"
+                                                (click)="toggleMethodActive(b, m)">
+                                          @if (deletingMethodId() === m.id) { <c-spinner size="sm" /> }
+                                          @else {
+                                            <fa-icon [icon]="m.active ? 'eye-slash' : 'eye'" />
+                                            <small>{{ m.active ? 'Pausar' : 'Activar' }}</small>
+                                          }
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center"
+                                                style="min-width:42px; font-size:.68rem;"
+                                                [disabled]="deletingMethodId() === m.id"
+                                                (click)="deleteMethod(b, m)">
+                                          @if (deletingMethodId() === m.id) { <c-spinner size="sm" /> }
+                                          @else { <fa-icon icon="trash" /><small>Borrar</small> }
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                }
+                              </tbody>
+                            </table>
+                          }
+                        }
+
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  </div>
+
+} <!-- /banks -->
+
+<app-bank-modal
+  [open]="showModal()"
+  [bank]="editBank()"
+  (saved)="onSaved($event)"
+  (cancelled)="showModal.set(false); editBank.set(null)" />
+
+<app-bank-method-modal
+  [open]="showMethodModal()"
+  [bank]="methodModalBank()"
+  [method]="editMethod()"
+  (saved)="onMethodSaved($event)"
+  (cancelled)="showMethodModal.set(false); editMethod.set(null)" />

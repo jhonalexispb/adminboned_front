@@ -1,0 +1,260 @@
+<app-page-header title="Productos" subtitle="Catálogo de productos">
+  <button class="btn btn-outline-primary me-2" (click)="openImport()">
+    <fa-icon icon="file-import" class="me-1" />Importar Excel
+  </button>
+  <button class="btn btn-primary" (click)="openCreate()">
+    <fa-icon icon="plus" class="me-1" />Nuevo producto
+  </button>
+</app-page-header>
+
+<app-product-import-modal
+  [visible]="showImport()"
+  (imported)="onImported()"
+  (cancelled)="showImport.set(false)"
+/>
+
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+        <div class="input-group input-group-sm">
+          <input class="form-control" placeholder="Nombre o SKU..."
+                 [(ngModel)]="filters.search" (keyup.enter)="onSearch()" />
+          <button class="btn btn-primary" type="button" (click)="onSearch()">
+            <fa-icon icon="search" />
+          </button>
+          @if (filters.search) {
+            <button class="btn btn-outline-secondary" type="button"
+                    (click)="filters.search = ''; onSearch()">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Categoría</label>
+        <p-select
+          [(ngModel)]="filters.category_id"
+          [options]="categories()"
+          optionLabel="name" optionValue="id"
+          placeholder="Todas"
+          [showClear]="true"
+          [filter]="true" filterPlaceholder="Buscar..."
+          emptyMessage="Sin resultados"
+          [style]="{ width: '100%' }" appendTo="body"
+          (ngModelChange)="onSearch()"
+        />
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Laboratorio</label>
+        <p-select
+          [(ngModel)]="filters.laboratory_id"
+          [options]="laboratories()"
+          optionLabel="name" optionValue="id"
+          placeholder="Todos"
+          [showClear]="true"
+          [filter]="true" filterPlaceholder="Buscar..."
+          emptyMessage="Sin resultados"
+          [style]="{ width: '100%' }" appendTo="body"
+          (ngModelChange)="onSearch()"
+        />
+      </div>
+
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <select class="form-select form-select-sm" [(ngModel)]="filters.active" (change)="onSearch()">
+          <option value="">Todos</option>
+          <option [ngValue]="true">Activos</option>
+          <option [ngValue]="false">Inactivos</option>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-auto ms-md-auto d-flex align-items-end">
+        <span class="text-body-secondary small">
+          {{ total() }} producto{{ total() !== 1 ? 's' : '' }}
+        </span>
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+<!-- ══ MOBILE: cartillas ════════════════════════════════════════════════════ -->
+<div class="d-md-none d-flex flex-column gap-2 mb-3">
+  @for (p of products(); track p.id) {
+    <c-card>
+      <c-card-body class="px-3 py-2">
+
+        <div class="d-flex gap-3 align-items-start">
+          <!-- Imagen -->
+          @if (primaryImage(p); as imgUrl) {
+            <img [src]="imgUrl" [alt]="p.name"
+                 style="width:52px;height:52px;object-fit:cover;border-radius:6px;flex-shrink:0" />
+          } @else {
+            <div class="d-flex align-items-center justify-content-center text-body-secondary flex-shrink-0"
+                 style="width:52px;height:52px;border-radius:6px;border:1px solid var(--bs-border-color)">
+              <fa-icon icon="image" style="font-size:1.2rem;" />
+            </div>
+          }
+
+          <!-- Info -->
+          <div class="flex-grow-1 min-width-0">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <span class="fw-semibold lh-sm" style="font-size:.93rem;">{{ p.name }}</span>
+              <app-status-badge [active]="p.active" />
+            </div>
+            <div class="text-body-secondary font-monospace" style="font-size:.75rem;">{{ p.sku ?? '—' }}</div>
+            <div class="d-flex flex-wrap gap-2 mt-1" style="font-size:.78rem;">
+              <span class="text-body-secondary">{{ p.category?.name ?? '—' }}</span>
+              <span class="text-body-secondary">·</span>
+              <span class="text-body-secondary">{{ p.laboratory?.name ?? '—' }}</span>
+            </div>
+            <div class="fw-bold mt-1" style="font-size:.95rem;">S/ {{ p.base_price }}</div>
+          </div>
+        </div>
+
+        <!-- Botones -->
+        <div class="d-flex gap-2 mt-2 pt-2 border-top">
+          <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-grow-1 position-relative"
+                  style="font-size:.68rem;" (click)="openPricing(p)">
+            <fa-icon icon="tags" style="font-size:.85rem;" />
+            @if (p.price_tiers.length) {
+              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
+                    style="font-size:.6rem">{{ p.price_tiers.length }}</span>
+            }
+            <small>Escalas</small>
+          </button>
+          <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-grow-1"
+                  style="font-size:.68rem;" (click)="openEdit(p)">
+            <fa-icon icon="pencil" style="font-size:.85rem;" /><small>Editar</small>
+          </button>
+          <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-grow-1"
+                  style="font-size:.68rem;" (click)="confirmDelete(p)">
+            <fa-icon icon="trash" style="font-size:.85rem;" /><small>Eliminar</small>
+          </button>
+        </div>
+
+      </c-card-body>
+    </c-card>
+  } @empty {
+    <div class="text-center text-body-secondary py-5">
+      <fa-icon icon="box-open" class="d-block mb-2" style="font-size:2rem;opacity:.3;" />
+      No hay productos registrados.
+    </div>
+  }
+</div>
+
+<!-- ══ DESKTOP: tabla ═══════════════════════════════════════════════════════ -->
+<c-card class="d-none d-md-block">
+  <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th style="width:48px"></th>
+              <th>Nombre</th>
+              <th>SKU</th>
+              <th>Categoría</th>
+              <th>Laboratorio</th>
+              <th class="text-end">Precio base</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:100px" class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of products(); track p.id) {
+              <tr>
+                <td class="py-2">
+                  @if (primaryImage(p); as imgUrl) {
+                    <img [src]="imgUrl" [alt]="p.name"
+                         style="width:36px;height:36px;object-fit:cover;border-radius:4px" />
+                  } @else {
+                    <div class="d-flex align-items-center justify-content-center text-body-secondary"
+                         style="width:36px;height:36px;border-radius:4px;border:1px solid var(--bs-border-color)">
+                      <fa-icon icon="image" />
+                    </div>
+                  }
+                </td>
+                <td>
+                  <span class="fw-medium">{{ p.name }}</span>
+                </td>
+                <td class="text-body-secondary font-monospace">{{ p.sku ?? '—' }}</td>
+                <td>{{ p.category?.name ?? '—' }}</td>
+                <td>{{ p.laboratory?.name ?? '—' }}</td>
+                <td class="text-end">S/ {{ p.base_price }}</td>
+                <td><app-status-badge [active]="p.active" /></td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2">
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center position-relative"
+                            (click)="openPricing(p)" title="Centro de precios y escalas">
+                      <fa-icon icon="tags" />
+                      @if (p.price_tiers.length) {
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary"
+                              style="font-size:.6rem">
+                          {{ p.price_tiers.length }}
+                        </span>
+                      }
+                      <small>Escalas</small>
+                    </button>
+                    <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEdit(p)">
+                      <fa-icon icon="pencil" />
+                      <small>Editar</small>
+                    </button>
+                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDelete(p)">
+                      <fa-icon icon="trash" />
+                      <small>Eliminar</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" class="text-center py-4 text-body-secondary">
+                  No hay productos registrados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+  </c-card-body>
+</c-card>
+
+} <!-- /loading -->
+
+<app-pagination
+  [currentPage]="filters.page!"
+  [lastPage]="lastPage()"
+  [total]="total()"
+  (pageChange)="goToPage($event)"
+/>
+
+<app-confirm-modal
+  [visible]="showConfirm()"
+  title="Eliminar producto"
+  [message]="'¿Eliminar &quot;' + deletingName() + '&quot;? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  confirmColor="danger"
+  (confirm)="onConfirmDelete()"
+  (cancel)="showConfirm.set(false)"
+/>
+
+<!-- Modal cuando el producto tiene historial: ofrece desactivar en cambio -->
+<app-confirm-modal
+  [visible]="showDeactivate()"
+  title="No se puede eliminar"
+  [message]="blockReason()"
+  confirmLabel="Desactivar en cambio"
+  confirmColor="warning"
+  cancelLabel="Entendido"
+  (confirm)="onConfirmDeactivate()"
+  (cancel)="showDeactivate.set(false)"
+/>

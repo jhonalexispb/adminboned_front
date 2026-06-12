@@ -1,0 +1,19 @@
+import { Injectable, signal } from '@angular/core';
+
+@Injectable({ providedIn: 'root' })
+export class LoadingService {
+  private _count   = 0;
+  readonly loading = signal(false);
+  readonly message = signal('Procesando...');
+
+  show(message = 'Procesando...'): void {
+    this._count++;
+    this.message.set(message);
+    this.loading.set(true);
+  }
+
+  hide(): void {
+    this._count = Math.max(0, this._count - 1);
+    if (this._count === 0) this.loading.set(false);
+  }
+}

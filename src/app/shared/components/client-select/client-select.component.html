@@ -1,0 +1,38 @@
+<p-select [options]="clients()" optionLabel="label"
+          [ngModel]="value()" (ngModelChange)="value.set($event)"
+          [filter]="true" filterBy="searchText"
+          [placeholder]="placeholder()"
+          [showClear]="true"
+          [disabled]="disabled()"
+          styleClass="w-100" panelStyleClass="select-multiline" appendTo="body">
+  <ng-template #item let-c>
+    <div>
+      <div class="fw-semibold" style="font-size:.875rem;">{{ c.label }}</div>
+      @if (c.address) {
+        <div class="text-body-secondary" style="font-size:.72rem;">
+          <fa-icon icon="map-location-dot" class="me-1" />{{ c.address }}
+        </div>
+      }
+      @if (c.addressLabel) {
+        <div class="text-body-secondary" style="font-size:.72rem;">
+          <fa-icon icon="location-dot" class="me-1" />{{ c.addressLabel }}
+        </div>
+      }
+    </div>
+  </ng-template>
+  <ng-template #selectedItem let-c>
+    <div>
+      <div style="font-size:.875rem;">{{ c.label }}</div>
+      @if (c.address) {
+        <div class="text-body-secondary" style="font-size:.7rem; line-height:1;">
+          <fa-icon icon="map-location-dot" class="me-1" />{{ c.address }}
+        </div>
+      }
+      @if (c.addressLabel) {
+        <div class="text-body-secondary" style="font-size:.7rem; line-height:1;">
+          <fa-icon icon="location-dot" class="me-1" />{{ c.addressLabel }}
+        </div>
+      }
+    </div>
+  </ng-template>
+</p-select>

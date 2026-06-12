@@ -1,0 +1,246 @@
+<app-page-header title="Gestionar devoluciones" subtitle="Solicitudes pendientes de revisión">
+  <button class="btn btn-outline-secondary btn-sm" (click)="load()">
+    <fa-icon icon="rotate" class="me-1" />Actualizar
+  </button>
+</app-page-header>
+
+<!-- Filtros -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1">Cliente</label>
+        <app-client-select [value]="selectedClient" (valueChange)="onClientFilterChange($event)" />
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1">Estado</label>
+        <p-select [options]="statusOptions" [(ngModel)]="filters.status"
+                  optionLabel="label" optionValue="value"
+                  styleClass="w-100" (ngModelChange)="onSearch()" />
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Desde</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_from" (change)="onSearch()" />
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Hasta</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_to" (change)="onSearch()" />
+      </div>
+      <div class="col-auto ms-md-auto d-flex align-items-end pb-1">
+        <span class="text-body-secondary small">{{ total() }} solicitudes</span>
+      </div>
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ MOBILE ══════════════════════════════════════════════════════════════ -->
+  <div class="d-md-none">
+    @if (!returns().length) {
+      <div class="text-center text-body-secondary py-5">
+        @if (filters.status === 'pending') {
+          <fa-icon icon="check-circle" class="d-block mb-2 text-success" style="font-size:2.5rem;" />
+          No hay solicitudes pendientes.
+        } @else {
+          <fa-icon icon="rotate-left" class="d-block mb-2" style="font-size:2.5rem; opacity:.3;" />
+          Sin solicitudes para los filtros aplicados.
+        }
+      </div>
+    }
+    <div class="d-flex flex-column gap-2">
+      @for (r of returns(); track r.id) {
+        <c-card>
+          <c-card-header class="py-2 px-3">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <div class="d-flex align-items-center gap-2">
+                <span class="font-monospace fw-bold" style="font-size:.88rem;">{{ r.code }}</span>
+                <span class="text-body-secondary" style="font-size:.72rem;">{{ r.created_at | date:'dd/MM/yy HH:mm' }}</span>
+              </div>
+              @if (r.status === 'pending') {
+                <c-badge textBgColor="warning" style="font-size:.7rem;">Pendiente</c-badge>
+              } @else {
+                <c-badge [textBgColor]="statusColors[r.status]" style="font-size:.7rem;">
+                  {{ statusLabels[r.status] }}
+                </c-badge>
+              }
+            </div>
+          </c-card-header>
+          <c-card-body class="px-3 py-2">
+            <div class="mb-2">
+              <div class="fw-semibold" style="font-size:.95rem; line-height:1.2;">{{ clientName(r) }}</div>
+              <div class="text-body-secondary" style="font-size:.78rem;">
+                {{ r.order?.code ?? '—' }}
+                @if (r.sale_document) { · <span class="font-monospace">{{ r.sale_document.full_number }}</span> }
+              </div>
+            </div>
+            <div class="mb-2">
+              <div style="font-size:.82rem;">{{ r.reason }}</div>
+              <div class="text-body-secondary" style="font-size:.72rem;">
+                {{ r.type === 'full' ? 'Devolución total' : 'Devolución parcial' }}
+                · Solicitó: {{ r.created_by ?? '—' }}
+              </div>
+            </div>
+            @if (r.status !== 'pending' && r.action_type) {
+              <div class="mb-2">
+                <c-badge [textBgColor]="actionColors[r.action_type]" style="font-size:.65rem;">
+                  {{ r.action_type === 'credit_note' ? 'NC SUNAT' :
+                     r.action_type === 'void' ? 'Anulada' : 'Interno' }}
+                </c-badge>
+              </div>
+            }
+            <div class="d-flex gap-1">
+              @if (r.status === 'pending') {
+                <button class="btn btn-sm btn-warning d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="openProcess(r)">
+                  <fa-icon icon="gavel" style="font-size:.9rem;" /><small>Procesar</small>
+                </button>
+              } @else {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        (click)="openProcess(r)">
+                  <fa-icon icon="eye" style="font-size:.9rem;" /><small>Ver</small>
+                </button>
+              }
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+
+    <app-pagination
+      [currentPage]="filters.page!"
+      [lastPage]="lastPage()"
+      [total]="total()"
+      wrapperClass="px-1 py-2"
+      (pageChange)="goToPage($event)"
+    />
+  </div>
+
+  <!-- ══ DESKTOP ═════════════════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle" style="font-size:.875rem">
+          <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+            <tr>
+              <th class="ps-3" style="width:150px">Solicitud</th>
+              <th>Cliente / Pedido</th>
+              <th style="width:130px">Documento</th>
+              <th>Motivo</th>
+              <th style="width:110px">Solicitó</th>
+              <th style="width:100px">Estado</th>
+              <th style="width:100px">Gestionar</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of returns(); track r.id) {
+              <tr>
+                <td class="ps-0">
+                  <div class="d-flex align-items-stretch" style="min-height:42px">
+                    <div style="width:4px; border-radius:2px; flex-shrink:0; margin-right:10px; margin-left:8px;"
+                         [style.background]="r.status==='pending' ? 'var(--cui-warning)' :
+                                             r.status==='accepted' ? 'var(--cui-success)' :
+                                             'var(--cui-secondary)'">
+                    </div>
+                    <div class="py-1">
+                      <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ r.code }}</div>
+                      <div class="text-body-secondary" style="font-size:.7rem;">
+                        {{ r.created_at | date:'dd/MM/yy HH:mm' }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="fw-medium lh-sm">{{ clientName(r) }}</div>
+                  <div class="text-body-secondary small">{{ r.order?.code ?? '—' }}</div>
+                </td>
+                <td>
+                  @if (r.sale_document) {
+                    <div class="font-monospace small fw-medium">{{ r.sale_document.full_number }}</div>
+                    <div class="text-body-secondary" style="font-size:.7rem;">
+                      {{ r.sale_document.issue_date | date:'dd/MM/yy' }}
+                    </div>
+                  } @else {
+                    <span class="text-body-secondary small">Sin documento</span>
+                  }
+                </td>
+                <td>
+                  <div class="small text-truncate" style="max-width:200px;" [title]="r.reason">
+                    {{ r.reason }}
+                  </div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">
+                    {{ r.type === 'full' ? 'Total' : 'Parcial' }}
+                  </div>
+                </td>
+                <td class="small text-body-secondary">{{ r.created_by ?? '—' }}</td>
+                <td>
+                  @if (r.status === 'pending') {
+                    <c-badge textBgColor="warning">Pendiente</c-badge>
+                  } @else {
+                    <c-badge [textBgColor]="statusColors[r.status]">{{ statusLabels[r.status] }}</c-badge>
+                    @if (r.action_type) {
+                      <div class="mt-1">
+                        <c-badge [textBgColor]="actionColors[r.action_type]" style="font-size:.65rem;">
+                          {{ r.action_type === 'credit_note' ? 'NC SUNAT' :
+                             r.action_type === 'void' ? 'Anulada' : 'Interno' }}
+                        </c-badge>
+                      </div>
+                    }
+                  }
+                </td>
+                <td>
+                  @if (r.status === 'pending') {
+                    <button class="btn btn-sm btn-warning d-flex flex-column align-items-center"
+                            style="min-width:52px; font-size:.7rem;"
+                            (click)="openProcess(r)">
+                      <fa-icon icon="gavel" /><small>Procesar</small>
+                    </button>
+                  } @else {
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                            style="min-width:52px; font-size:.7rem;"
+                            (click)="openProcess(r)">
+                      <fa-icon icon="eye" /><small>Ver</small>
+                    </button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="text-center text-body-secondary py-5">
+                  @if (filters.status === 'pending') {
+                    <fa-icon icon="check-circle" class="d-block mb-2 text-success" style="font-size:2rem;" />
+                    No hay solicitudes pendientes.
+                  } @else {
+                    Sin solicitudes para los filtros aplicados.
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [currentPage]="filters.page!"
+        [lastPage]="lastPage()"
+        [total]="total()"
+        wrapperClass="px-3 py-2 border-top"
+        (pageChange)="goToPage($event)"
+      />
+    </c-card-body>
+  </c-card>
+}
+
+<!-- Modal extraído como componente -->
+<app-manage-return-modal
+  [return_]="selected()"
+  (processed)="onProcessed($event)"
+  (rejected)="onRejected($event)"
+  (reverted)="onReverted($event)"
+  (closed)="selected.set(null)" />

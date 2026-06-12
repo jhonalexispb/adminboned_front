@@ -1,0 +1,81 @@
+<c-modal [visible]="!!payment()" (visibleChange)="!$event && cancel()" alignment="center" size="lg">
+  @if (payment(); as p) {
+    <c-modal-header>
+      <h5 cModalTitle><fa-icon icon="check-circle" class="me-2 text-success" />Validar pago</h5>
+    </c-modal-header>
+    <c-modal-body>
+
+      <div class="row g-2 mb-3" style="font-size:.875rem;">
+        <div class="col-sm-6">
+          <div class="bg-body-tertiary rounded p-2">
+            <div class="text-body-secondary small text-uppercase mb-1" style="letter-spacing:.04em;">Vendedor</div>
+            <div class="fw-semibold">{{ sellerName(p) }}</div>
+          </div>
+        </div>
+        <div class="col-sm-6">
+          <div class="bg-body-tertiary rounded p-2">
+            <div class="text-body-secondary small text-uppercase mb-1" style="letter-spacing:.04em;">Cliente / Pedido</div>
+            <div class="fw-semibold">{{ clientName(p) }}</div>
+            <div class="text-body-secondary small">{{ p.order?.code }}</div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="bg-body-tertiary rounded p-2">
+            <div class="text-body-secondary small text-uppercase mb-1" style="letter-spacing:.04em;">Monto</div>
+            <div class="fw-bold text-success" style="font-size:1.1rem;">S/ {{ p.amount | number:'1.2-2' }}</div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="bg-body-tertiary rounded p-2">
+            <div class="text-body-secondary small text-uppercase mb-1" style="letter-spacing:.04em;">Método</div>
+            <div class="fw-medium">{{ p.payment_method?.name ?? '—' }}</div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="bg-body-tertiary rounded p-2">
+            <div class="text-body-secondary small text-uppercase mb-1" style="letter-spacing:.04em;">Fecha</div>
+            <div>{{ p.payment_date | date:'dd/MM/yyyy' }}</div>
+          </div>
+        </div>
+      </div>
+
+      @if (p.vouchers?.length) {
+        <div class="mb-3">
+          <div class="small fw-medium text-body-secondary text-uppercase mb-2" style="letter-spacing:.04em;">Comprobantes</div>
+          <div class="d-flex gap-2 flex-wrap">
+            @for (v of p.vouchers; track v.id) {
+              <a [href]="v.url" target="_blank" class="border rounded overflow-hidden d-block"
+                 style="width:100px; height:80px;" [title]="v.description ?? ''">
+                <img [src]="v.url" alt="Comprobante" style="width:100%; height:100%; object-fit:cover;" />
+              </a>
+            }
+          </div>
+        </div>
+      } @else {
+        <div class="bg-body-tertiary rounded p-3 mb-3 text-body-secondary small d-flex gap-2 align-items-center">
+          <fa-icon icon="triangle-exclamation" class="text-warning flex-shrink-0" />
+          <span>El vendedor no ha adjuntado comprobante todavía.</span>
+        </div>
+      }
+
+      <div>
+        <label class="form-label small fw-medium">Notas (opcional — requerido si rechazas)</label>
+        <textarea class="form-control form-control-sm" rows="2"
+                  placeholder="Observaciones o motivo del rechazo..."
+                  [(ngModel)]="rejectNotes"></textarea>
+      </div>
+
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="danger" variant="outline" [disabled]="processing()" (click)="validate('reject')">
+        @if (processing()) { <c-spinner size="sm" class="me-1" /> }
+        <fa-icon icon="xmark" class="me-1" />Rechazar
+      </button>
+      <button cButton color="secondary" [disabled]="processing()" (click)="cancel()">Cancelar</button>
+      <button cButton color="success" [disabled]="processing()" (click)="validate('validate')">
+        @if (processing()) { <c-spinner size="sm" class="me-1" /> }
+        <fa-icon icon="check" class="me-1" />Validar pago
+      </button>
+    </c-modal-footer>
+  }
+</c-modal>

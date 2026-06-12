@@ -1,0 +1,99 @@
+@if (visible()) {
+  <c-modal [visible]="true" alignment="center" size="lg" (visibleChange)="!$event && cancelled.emit()">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon [icon]="isEdit ? 'pen' : 'user-plus'" class="me-2" />
+        {{ isEdit ? 'Editar usuario' : 'Nuevo usuario' }}
+      </h5>
+    </c-modal-header>
+
+    <c-modal-body>
+      <div class="row g-3" style="font-size:.875rem;">
+
+        <!-- Nombre -->
+        <div class="col-12 col-sm-6">
+          <label class="form-label small mb-1">Nombre completo <span class="text-danger">*</span></label>
+          <input type="text" class="form-control form-control-sm"
+                 [ngModel]="form().name"
+                 (ngModelChange)="form.update(f => ({...f, name: $event}))" />
+        </div>
+
+        <!-- Email -->
+        <div class="col-12 col-sm-6">
+          <label class="form-label small mb-1">Email <span class="text-danger">*</span></label>
+          <input type="email" class="form-control form-control-sm"
+                 [ngModel]="form().email"
+                 (ngModelChange)="form.update(f => ({...f, email: $event}))" />
+        </div>
+
+        <!-- Contraseña -->
+        <div class="col-12 col-sm-6">
+          <label class="form-label small mb-1">
+            Contraseña
+            @if (!isEdit) { <span class="text-danger">*</span> }
+            @else { <span class="text-body-secondary">(dejar en blanco para no cambiar)</span> }
+          </label>
+          <input type="password" class="form-control form-control-sm"
+                 autocomplete="new-password"
+                 [ngModel]="form().password"
+                 (ngModelChange)="form.update(f => ({...f, password: $event}))" />
+        </div>
+
+        <!-- Teléfono -->
+        <div class="col-12 col-sm-6">
+          <label class="form-label small mb-1">Teléfono</label>
+          <input type="text" class="form-control form-control-sm"
+                 [ngModel]="form().phone"
+                 (ngModelChange)="form.update(f => ({...f, phone: $event}))" />
+        </div>
+
+        <!-- Activo (solo en edición) -->
+        @if (isEdit) {
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="activeSwitch"
+                     [ngModel]="form().active"
+                     (ngModelChange)="form.update(f => ({...f, active: $event}))" />
+              <label class="form-check-label small" for="activeSwitch">
+                Cuenta activa
+                @if (!form().active) {
+                  <span class="text-warning ms-1">— El usuario no podrá iniciar sesión</span>
+                }
+              </label>
+            </div>
+          </div>
+        }
+
+        <!-- Roles -->
+        <div class="col-12">
+          <label class="form-label small mb-2">Roles <span class="text-danger">*</span></label>
+          <div class="d-flex flex-wrap gap-2">
+            @for (r of roles(); track r.id) {
+              @if (r.name !== 'super_admin') {
+                <button type="button"
+                        class="btn btn-sm"
+                        [class.btn-primary]="form().roles.includes(r.name)"
+                        [class.btn-outline-secondary]="!form().roles.includes(r.name)"
+                        (click)="toggleRole(r.name)">
+                  {{ roleLabel(r.name, r.display_name) }}
+                </button>
+              }
+            }
+          </div>
+          @if (!form().roles.length) {
+            <div class="text-danger mt-1" style="font-size:.75rem;">Selecciona al menos un rol.</div>
+          }
+        </div>
+
+      </div>
+    </c-modal-body>
+
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="saving()" (click)="cancelled.emit()">Cancelar</button>
+      <button cButton [color]="isEdit ? 'primary' : 'success'" [disabled]="saving() || !isValid" (click)="submit()">
+        @if (saving()) { <c-spinner size="sm" class="me-1" /> }
+        {{ isEdit ? 'Guardar cambios' : 'Crear usuario' }}
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}

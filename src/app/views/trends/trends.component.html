@@ -1,0 +1,137 @@
+@if (loading()) {
+  <div class="d-flex justify-content-center align-items-center" style="min-height: 300px">
+    <c-spinner color="primary" />
+  </div>
+} @else if (data(); as d) {
+
+  <!-- ── Encabezado ─────────────────────────────────────────────────────── -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h4 class="mb-0 fw-semibold">Tendencias</h4>
+      <div class="small text-body-secondary">Evolución mensual de tus ventas, compras y ganancia</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <label class="small text-body-secondary mb-0" for="trendsMes">Mes</label>
+      <select id="trendsMes" class="form-select form-select-sm" style="width:auto"
+              [ngModel]="mes()" (ngModelChange)="onMesChange($event)">
+        <option [ngValue]="null">Todos los meses</option>
+        @for (m of d.meses; track m.mes) {
+          <option [value]="m.mes">{{ m.nombre }}</option>
+        }
+      </select>
+      <label class="small text-body-secondary mb-0" for="trendsYear">Año</label>
+      <select id="trendsYear" class="form-select form-select-sm" style="width:auto"
+              [ngModel]="year()" (ngModelChange)="onYearChange($event)">
+        @for (y of d.years_disponibles; track y) {
+          <option [value]="y">{{ y }}</option>
+        }
+      </select>
+      <button type="button" class="btn btn-sm btn-outline-primary ms-1" [disabled]="downloadingPdf()" (click)="downloadPdf()">
+        @if (downloadingPdf()) {
+          <c-spinner size="sm" class="me-1" />Generando...
+        } @else {
+          <svg cIcon name="cilCloudDownload" class="me-1" size="sm"></svg> Descargar PDF
+        }
+      </button>
+    </div>
+  </div>
+
+  @if (tienePocoHistorial) {
+    <c-card class="border-0 shadow-sm mb-4 bg-info bg-opacity-10">
+      <c-card-body class="d-flex align-items-center gap-3">
+        <svg cIcon name="cilDescription" class="text-info flex-shrink-0" size="lg"></svg>
+        <div class="small text-body-secondary">
+          Esta vista se va llenando con cada mes que pasa — por ahora tienes pocos meses con ventas registradas.
+          Vuelve más adelante para descubrir patrones estacionales con más historial acumulado.
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- ── Resumen del año ────────────────────────────────────────────────── -->
+  <c-row [gutter]="3" class="mb-4">
+    <c-col [sm]="6" [lg]="4">
+      <c-card class="border-0 shadow-sm h-100">
+        <c-card-body>
+          <div class="text-body-secondary small fw-semibold text-uppercase ls-1 mb-1">Total del año</div>
+          <div class="fs-2 fw-bold">S/ {{ d.resumen.total_ventas | number:'1.2-2' }}</div>
+          <div class="small text-body-secondary mt-1">Ventas netas acumuladas en {{ d.year }}</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+    <c-col [sm]="6" [lg]="4">
+      <c-card class="border-0 shadow-sm h-100">
+        <c-card-body>
+          <div class="text-body-secondary small fw-semibold text-uppercase ls-1 mb-1">Promedio mensual</div>
+          <div class="fs-2 fw-bold">S/ {{ d.resumen.promedio_mensual | number:'1.2-2' }}</div>
+          <div class="small text-body-secondary mt-1">Sobre los meses con ventas registradas</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+    <c-col [sm]="6" [lg]="4">
+      <c-card class="border-0 shadow-sm h-100">
+        <c-card-body>
+          <div class="text-body-secondary small fw-semibold text-uppercase ls-1 mb-1">Mejor mes</div>
+          @if (d.resumen.mejor_mes; as mm) {
+            <div class="fs-2 fw-bold">{{ mm.nombre }}</div>
+            <div class="small text-body-secondary mt-1">S/ {{ mm.ventas | number:'1.2-2' }} en ventas netas</div>
+          } @else {
+            <div class="fs-2 fw-bold text-body-secondary">—</div>
+            <div class="small text-body-secondary mt-1">Aún sin ventas registradas este año</div>
+          }
+        </c-card-body>
+      </c-card>
+    </c-col>
+  </c-row>
+
+  <!-- ── Gráfico mensual ────────────────────────────────────────────────── -->
+  <c-card class="border-0 shadow-sm mb-4">
+    <c-card-header class="border-bottom">
+      <span class="fw-semibold">Ventas netas por mes — {{ d.year }}</span>
+    </c-card-header>
+    <c-card-body>
+      @if (chartData()) {
+        <c-chart type="bar" [data]="chartData()!" [options]="chartOptions" [height]="280" />
+      }
+    </c-card-body>
+  </c-card>
+
+  <!-- ── Detalle mensual ────────────────────────────────────────────────── -->
+  <c-card class="border-0 shadow-sm mb-4">
+    <c-card-header class="border-bottom d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">Detalle por mes</span>
+      @if (mes()) {
+        <button type="button" class="btn btn-link btn-sm text-decoration-none p-0" (click)="onMesChange('')">
+          Quitar filtro de mes ✕
+        </button>
+      }
+    </c-card-header>
+    <c-card-body class="p-0">
+      <table class="table table-hover table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="ps-4 text-body-secondary fw-semibold small">Mes</th>
+            <th class="text-end text-body-secondary fw-semibold small">Ventas</th>
+            <th class="text-end text-body-secondary fw-semibold small">Compras</th>
+            <th class="text-end text-body-secondary fw-semibold small">Gastos</th>
+            <th class="text-end text-body-secondary fw-semibold small">Ganancia</th>
+            <th class="text-end pe-4 text-body-secondary fw-semibold small">Pedidos</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (m of mesesFiltrados; track m.mes) {
+            <tr [class.text-body-secondary]="m.ventas === 0 && m.pedidos === 0">
+              <td class="ps-4">{{ m.nombre }}</td>
+              <td class="text-end">S/ {{ m.ventas | number:'1.2-2' }}</td>
+              <td class="text-end">S/ {{ m.compras | number:'1.2-2' }}</td>
+              <td class="text-end">S/ {{ m.gastos | number:'1.2-2' }}</td>
+              <td class="text-end fw-semibold" [class]="gananciaColor(m.ganancia)">S/ {{ m.ganancia | number:'1.2-2' }}</td>
+              <td class="text-end pe-4">{{ m.pedidos }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </c-card-body>
+  </c-card>
+
+}

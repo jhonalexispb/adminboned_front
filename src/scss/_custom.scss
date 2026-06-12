@@ -1,12 +1,43 @@
-// Here you can add other styles
-
-// custom .chartjs-tooltip-body-item padding
+// @use siempre primero — antes de cualquier regla CSS
 @use "charts";
-
-// custom tweaks for scrollbar styling (wip)
 @use "scrollbar";
 
- // custom calendar today cell color
+// Tablas responsivas: sin borde duplicado cuando la card ya tiene overflow oculto
+.table-responsive {
+  border-radius: inherit;
+}
+
+// PrimeNG overlays por encima de los modales de ng-bootstrap (z-index: 1055)
+.p-overlay,
+.p-select-overlay,
+.p-popover {
+  z-index: 1060 !important;
+}
+
+// PrimeNG Select: panel acotado al viewport y opciones con salto de línea (máx 2 líneas)
+.p-select-overlay {
+  max-width: 95vw !important;
+  overflow-x: hidden !important;
+
+  .p-select-option {
+    white-space: normal !important;
+
+    // Limitar a 2 líneas con ellipsis al cortar
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+
+  // Opciones con plantilla de varias líneas (varios <div>): no recortar el contenido
+  &.select-multiline .p-select-option {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    overflow: visible !important;
+  }
+}
+
+// custom calendar today cell color
 .calendar-cell.today {
   --cui-calendar-cell-today-color: var(--cui-info) !important;
 }

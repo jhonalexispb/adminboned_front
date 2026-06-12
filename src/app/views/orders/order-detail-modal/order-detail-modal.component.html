@@ -1,0 +1,391 @@
+@if (orderId()) {
+  <c-modal [visible]="true" size="xl" [scrollable]="true" alignment="center" (visibleChange)="!$event && close()">
+
+    <c-modal-header>
+      <h5 cModalTitle class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="font-monospace">{{ order()?.code ?? '…' }}</span>
+        @if (order()?.status) {
+          <c-badge [color]="statusColors[order()!.status]" style="font-size:.75rem;">
+            {{ statusLabels[order()!.status] }}
+          </c-badge>
+        }
+        @if (order()?.created_at) {
+          <span class="text-body-secondary" style="font-size:.75rem;">
+            {{ order()!.created_at | date:'dd/MM/yyyy HH:mm' }}
+          </span>
+        }
+      </h5>
+      <button type="button" class="btn-close" (click)="close()"></button>
+    </c-modal-header>
+
+    <c-modal-body>
+      @if (loading()) {
+        <div class="text-center py-5"><c-spinner color="primary" /></div>
+
+      } @else if (order(); as o) {
+        <div class="row g-3">
+
+          <!-- ── Columna izquierda ──────────────────────────────────────────── -->
+          <div class="col-lg-4 d-flex flex-column gap-3">
+
+            <!-- Info -->
+            <c-card>
+              <c-card-body class="p-0">
+                <dl class="mb-0" style="font-size:.875rem">
+
+                  <div class="px-3 py-2 border-bottom">
+                    <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Cliente</div>
+                    <div class="fw-semibold">{{ clientName(o) }}</div>
+                    @if (o.client?.phone) {
+                      <div class="text-body-secondary small">
+                        <fa-icon icon="phone" class="me-1" style="font-size:.75rem;" />{{ o.client!.phone }}
+                      </div>
+                    }
+                    @if (o.client?.ruc) {
+                      <div class="text-body-secondary small font-monospace">RUC {{ o.client!.ruc }}</div>
+                    }
+                  </div>
+
+                  <div class="px-3 py-2 border-bottom">
+                    <div class="row g-0">
+                      <div class="col-6">
+                        <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Vendedor</div>
+                        <div class="small fw-medium">{{ o.seller?.name ?? '—' }}</div>
+                      </div>
+                      <div class="col-6">
+                        <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Almacén</div>
+                        <div class="small fw-medium">{{ o.warehouse_user?.name ?? '—' }}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  @if (o.shipping?.type) {
+                    <div class="px-3 py-2 border-bottom">
+                      <div class="text-body-secondary mb-1" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Envío</div>
+                      <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge" [class]="o.shipping!.type === 'province' ? 'bg-warning text-dark' : 'bg-info text-white'">
+                          <fa-icon [icon]="o.shipping!.type === 'province' ? 'truck' : 'location-dot'" class="me-1" />
+                          {{ o.shipping!.type === 'province' ? 'Provincia' : 'Local' }}
+                        </span>
+                      </div>
+                      @if (o.shipping!.carrier) {
+                        <div class="p-2 rounded bg-body-tertiary" style="font-size:.82rem;">
+                          <div class="fw-semibold">{{ o.shipping!.carrier!.name }}</div>
+                          @if (o.shipping!.carrier!.ruc) {
+                            <div class="text-body-secondary small font-monospace">RUC {{ o.shipping!.carrier!.ruc }}</div>
+                          }
+                          @if (o.shipping!.carrier!.phone) {
+                            <div class="text-body-secondary small">
+                              <fa-icon icon="phone" class="me-1" style="font-size:.75rem;" />{{ o.shipping!.carrier!.phone }}
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  }
+
+                  @if (o.warehouse_notes) {
+                    <div class="px-3 py-2">
+                      <div class="text-body-secondary mb-1" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Notas de almacén</div>
+                      <p class="mb-0 small" style="white-space:pre-wrap">{{ o.warehouse_notes }}</p>
+                    </div>
+                  }
+
+                </dl>
+              </c-card-body>
+            </c-card>
+
+            <!-- Pipeline -->
+            <c-card>
+              <c-card-header class="py-2 px-3">
+                <strong style="font-size:.83rem;">Estado del pedido</strong>
+              </c-card-header>
+              <c-card-body class="py-3 px-3">
+                <div class="d-flex align-items-center">
+                  @for (step of statusPipeline; track step; let i = $index) {
+                    <div class="d-flex flex-column align-items-center flex-shrink-0" style="min-width:38px;">
+                      <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                           style="width:24px; height:24px; font-size:.62rem;"
+                           [style.background]="i < currentStepIndex ? 'var(--cui-success)' :
+                                               i === currentStepIndex ? 'var(--cui-primary)' :
+                                               'var(--cui-secondary-bg)'"
+                           [style.color]="i <= currentStepIndex ? '#fff' : 'var(--cui-secondary-color)'">
+                        @if (i < currentStepIndex) { ✓ } @else { {{ i + 1 }} }
+                      </div>
+                      <div class="text-center mt-1 lh-1" style="font-size:.55rem; max-width:36px;"
+                           [style.fontWeight]="i === currentStepIndex ? '700' : '400'"
+                           [style.color]="i === currentStepIndex ? 'var(--cui-primary)' :
+                                          i < currentStepIndex ? 'var(--cui-success)' :
+                                          'var(--cui-secondary-color)'">
+                        {{ stepLabels[step] }}
+                      </div>
+                      @if (stepDate(step); as d) {
+                        <div class="text-center text-body-secondary lh-1 mt-1" style="font-size:.5rem;">
+                          {{ d | date:'dd/MM HH:mm' }}
+                        </div>
+                      }
+                    </div>
+                    @if (i < statusPipeline.length - 1) {
+                      <div style="flex:1; height:2px; min-width:3px; margin-bottom:24px;"
+                           [style.background]="i < currentStepIndex ? 'var(--cui-success)' : 'var(--cui-secondary-bg)'">
+                      </div>
+                    }
+                  }
+                </div>
+              </c-card-body>
+            </c-card>
+
+            <!-- Documento emitido -->
+            @let docs = o.sale_documents ?? (o.sale_document ? [o.sale_document] : []);
+            @if (docs.length) {
+              <c-card>
+                <c-card-header class="py-2 px-3">
+                  <strong style="font-size:.83rem;">Documento emitido</strong>
+                </c-card-header>
+                <c-card-body class="p-0">
+                  @for (doc of docs; track doc.id) {
+                    <div class="px-3 py-2" [class.border-bottom]="!$last" style="font-size:.85rem;">
+                      <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+                        <div>
+                          <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="font-monospace fw-semibold">{{ doc.full_number ?? '—' }}</span>
+                            <c-badge [color]="docStatusColor[doc.status]" style="font-size:.65rem;">
+                              {{ docStatusLabel[doc.status] }}
+                            </c-badge>
+                          </div>
+                          <div class="text-body-secondary" style="font-size:.75rem;">
+                            {{ docTypeLabel[doc.document_type] }}
+                            @if (doc.issue_date) { · {{ doc.issue_date | date:'dd/MM/yyyy' }} }
+                            · S/ {{ doc.total | number:'1.2-2' }}
+                          </div>
+                        </div>
+                        <div class="d-flex gap-1 flex-shrink-0">
+                          <button class="btn btn-sm btn-outline-success"
+                                  style="font-size:.75rem;"
+                                  title="Descargar PDF"
+                                  [disabled]="downloadingDocId() === doc.id"
+                                  (click)="downloadPdf(doc)">
+                            @if (downloadingDocId() === doc.id) {
+                              <c-spinner size="sm" />
+                            } @else {
+                              <fa-icon icon="file-pdf" class="me-1" />PDF
+                            }
+                          </button>
+                        </div>
+                      </div>
+
+                      @for (cn of doc.credit_notes ?? []; track cn.id) {
+                        <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mt-2 pt-2 border-top">
+                          <div class="text-success">
+                            <fa-icon icon="rotate-left" class="me-1" />
+                            Nota de Crédito{{ cn.is_internal ? ' (interna)' : '' }}
+                            <span class="font-monospace fw-semibold ms-1">{{ cn.full_number ?? '—' }}</span>
+                            <span class="text-body-secondary"> · S/ {{ cn.total | number:'1.2-2' }}</span>
+                          </div>
+                          <div class="d-flex gap-1 flex-shrink-0">
+                            <button class="btn btn-sm btn-outline-success"
+                                    style="font-size:.75rem;"
+                                    title="Descargar PDF"
+                                    [disabled]="downloadingNcId() === (cn.id + '-pdf')"
+                                    (click)="downloadCreditNoteFile(cn, 'pdf')">
+                              @if (downloadingNcId() === (cn.id + '-pdf')) {
+                                <c-spinner size="sm" />
+                              } @else {
+                                <fa-icon icon="file-pdf" class="me-1" />PDF
+                              }
+                            </button>
+                            @if (cn.xml_url) {
+                              <button class="btn btn-sm btn-outline-info"
+                                      style="font-size:.75rem;"
+                                      title="Descargar XML"
+                                      [disabled]="downloadingNcId() === (cn.id + '-xml')"
+                                      (click)="downloadCreditNoteFile(cn, 'xml')">
+                                @if (downloadingNcId() === (cn.id + '-xml')) {
+                                  <c-spinner size="sm" />
+                                } @else {
+                                  <fa-icon icon="file-code" class="me-1" />XML
+                                }
+                              </button>
+                            }
+                            @if (cn.cdr_url) {
+                              <button class="btn btn-sm btn-outline-warning"
+                                      style="font-size:.75rem;"
+                                      title="Descargar CDR"
+                                      [disabled]="downloadingNcId() === (cn.id + '-cdr')"
+                                      (click)="downloadCreditNoteFile(cn, 'cdr')">
+                                @if (downloadingNcId() === (cn.id + '-cdr')) {
+                                  <c-spinner size="sm" />
+                                } @else {
+                                  <fa-icon icon="file-zipper" class="me-1" />CDR
+                                }
+                              </button>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+                </c-card-body>
+              </c-card>
+            }
+
+          </div>
+
+          <!-- ── Columna derecha: productos ─────────────────────────────────── -->
+          <div class="col-lg-8">
+            <c-card>
+              <c-card-header class="py-2 d-flex justify-content-between align-items-center">
+                <strong>Productos</strong>
+                @let totalUnits = (o.items ?? []).reduce((s, i) => s + i.quantity, 0);
+                <span class="text-body-secondary small">
+                  {{ (o.items ?? []).length }} línea(s) · {{ totalUnits }} uds
+                </span>
+              </c-card-header>
+              <c-card-body class="p-0">
+
+                <!-- MOBILE: cards por producto -->
+                <div class="d-lg-none">
+                  @for (group of groupedItems(o.items ?? []); track group.productId) {
+                    <div class="border-bottom px-3 py-3">
+                      <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="d-flex align-items-center gap-2 flex-wrap lh-sm">
+                          @if (group.productLaboratory) {
+                            <span class="text-info me-1" style="font-size:.78rem;">{{ group.productLaboratory }}</span>
+                          }
+                          <span class="fw-semibold" style="font-size:.9rem;">{{ group.productName }}</span>
+                        </div>
+                        <span class="badge bg-primary-subtle text-primary-emphasis ms-2 flex-shrink-0" style="font-size:.68rem;">
+                          {{ group.lots.reduce((s, l) => s + l.quantity, 0) }} uds
+                        </span>
+                      </div>
+                      @for (lot of group.lots; track lot.id) {
+                        <div class="rounded bg-body-tertiary px-2 py-2 mb-2" style="font-size:.82rem;">
+                          <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                            @if (lot.lot_number) {
+                              <code class="text-body-secondary bg-body-secondary px-1 rounded" style="font-size:.78rem;">{{ lot.lot_number }}</code>
+                            } @else {
+                              <span class="badge bg-secondary fw-normal" style="font-size:.7rem;">SIN LOTE</span>
+                            }
+                            @if (lot.expiry_date) {
+                              <span class="badge {{ expiryClass(lot.expiry_date) }}" style="font-size:.68rem;">
+                                {{ lot.expiry_date | date:'dd/MM/yyyy' }}
+                              </span>
+                            }
+                          </div>
+                          <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-body-secondary">{{ lot.quantity }} u. × S/ {{ lot.unit_price | number:'1.2-2' }}</span>
+                            <span class="fw-semibold">S/ {{ lot.total | number:'1.2-2' }}</span>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  } @empty {
+                    <div class="text-center text-body-secondary py-4 small">Sin ítems</div>
+                  }
+                  <!-- Totales mobile -->
+                  <div class="px-3 py-2 d-flex flex-column gap-1" style="font-size:.85rem;">
+                    <div class="d-flex justify-content-between">
+                      <span class="text-body-secondary">Subtotal</span>
+                      <span>S/ {{ o.subtotal | number:'1.2-2' }}</span>
+                    </div>
+                    @if (+o.discount > 0) {
+                      <div class="d-flex justify-content-between text-success">
+                        <span>Descuento</span>
+                        <span>- S/ {{ o.discount | number:'1.2-2' }}</span>
+                      </div>
+                    }
+                    <div class="d-flex justify-content-between fw-bold border-top pt-1 mt-1">
+                      <span>Total</span>
+                      <span class="fs-6">S/ {{ o.total | number:'1.2-2' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- DESKTOP: tabla -->
+                <div class="d-none d-lg-block table-responsive">
+                  <table class="table mb-0 align-middle" style="font-size:.875rem">
+                    <thead style="font-size:.78rem">
+                      <tr>
+                        <th class="ps-3">Lote</th>
+                        <th>Vencimiento</th>
+                        <th class="text-end" style="width:60px">Cant.</th>
+                        <th class="text-end" style="width:90px">P. Unit.</th>
+                        <th class="text-end pe-3" style="width:90px">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (group of groupedItems(o.items ?? []); track group.productId) {
+                        <tr class="bg-body-secondary">
+                          <td colspan="5" class="ps-3 py-2">
+                            @if (group.productLaboratory) {
+                              <span class="text-info me-1" style="font-size:.78rem;">{{ group.productLaboratory }}</span>
+                            }
+                            <span class="fw-semibold">{{ group.productName }}</span>
+                            <span class="badge bg-primary-subtle text-primary-emphasis ms-2" style="font-size:.68rem;">
+                              {{ group.lots.reduce((s, l) => s + l.quantity, 0) }} uds
+                            </span>
+                          </td>
+                        </tr>
+                        @for (lot of group.lots; track lot.id) {
+                          <tr>
+                            <td class="ps-4">
+                              @if (lot.lot_number) {
+                                <code class="text-body-secondary bg-body-secondary px-1 rounded" style="font-size:.8rem;">{{ lot.lot_number }}</code>
+                              } @else {
+                                <span class="badge bg-secondary fw-normal" style="font-size:.72rem;">SIN LOTE</span>
+                              }
+                            </td>
+                            <td>
+                              @if (lot.expiry_date) {
+                                <span class="badge {{ expiryClass(lot.expiry_date) }}" style="font-size:.7rem;">
+                                  {{ lot.expiry_date | date:'dd/MM/yyyy' }}
+                                </span>
+                              } @else {
+                                <span class="text-body-secondary small">—</span>
+                              }
+                            </td>
+                            <td class="text-end">{{ lot.quantity }}</td>
+                            <td class="text-end">S/ {{ lot.unit_price | number:'1.2-2' }}</td>
+                            <td class="text-end pe-3 fw-medium">S/ {{ lot.total | number:'1.2-2' }}</td>
+                          </tr>
+                        }
+                      } @empty {
+                        <tr><td colspan="5" class="text-center text-body-secondary py-4">Sin ítems</td></tr>
+                      }
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="3"></td>
+                        <td class="text-end text-body-secondary small">Subtotal</td>
+                        <td class="text-end pe-3">S/ {{ o.subtotal | number:'1.2-2' }}</td>
+                      </tr>
+                      @if (+o.discount > 0) {
+                        <tr>
+                          <td colspan="3"></td>
+                          <td class="text-end text-success small">Descuento</td>
+                          <td class="text-end pe-3 text-success">- S/ {{ o.discount | number:'1.2-2' }}</td>
+                        </tr>
+                      }
+                      <tr>
+                        <td colspan="3"></td>
+                        <td class="text-end fw-bold">Total</td>
+                        <td class="text-end pe-3 fw-bold fs-5">S/ {{ o.total | number:'1.2-2' }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+              </c-card-body>
+            </c-card>
+          </div>
+
+        </div>
+      }
+    </c-modal-body>
+
+    <c-modal-footer class="py-2">
+      <button class="btn btn-secondary btn-sm" (click)="close()">Cerrar</button>
+    </c-modal-footer>
+
+  </c-modal>
+}

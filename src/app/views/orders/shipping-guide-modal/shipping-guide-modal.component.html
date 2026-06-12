@@ -1,0 +1,326 @@
+<c-modal [visible]="!!order()" size="xl" alignment="center" (visibleChange)="!$event && close()">
+  <c-modal-header>
+    <h5 cModalTitle>Generar Guía de Remisión</h5>
+  </c-modal-header>
+
+  <c-modal-body>
+    @if (loading()) {
+      <div class="text-center py-4">
+        <c-spinner color="primary" />
+        <p class="mt-2 text-body-secondary">Cargando pedido...</p>
+      </div>
+    } @else if (fullOrder()) {
+      <form #guideForm="ngForm">
+
+        <!-- ── Datos del traslado ─────────────────────────────────────────── -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">Datos del traslado</div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label">Fecha de traslado <span class="text-danger">*</span></label>
+                <input type="date" class="form-control" [(ngModel)]="form.transfer_date" name="transfer_date" required />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Motivo de traslado</label>
+                <p-select
+                  [options]="motivoOptions" optionLabel="label" optionValue="code"
+                  [(ngModel)]="form.transfer_reason" name="transfer_reason"
+                  appendTo="body" styleClass="w-100" />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Peso bruto <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" [(ngModel)]="form.peso_bruto" name="peso_bruto" min="0.001" step="0.001" placeholder="Kg" required />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">Unidad</label>
+                <p-select
+                  [options]="[{code:'KGM',label:'KGM'},{code:'TNE',label:'TNE'}]"
+                  optionLabel="label" optionValue="code"
+                  [(ngModel)]="form.unidad_peso" name="unidad_peso"
+                  appendTo="body" styleClass="w-100" />
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">Observaciones</label>
+                <input type="text" class="form-control" [(ngModel)]="form.notes" name="notes" placeholder="Observaciones opcionales" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Punto de partida ──────────────────────────────────────────── -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">Punto de partida (Origen)</div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Dirección de partida</label>
+                <input type="text" class="form-control" [(ngModel)]="form.partida_address" name="partida_address" placeholder="Dirección de origen" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Departamento</label>
+                <p-select
+                  [options]="departments()" optionLabel="name" optionValue="id"
+                  [ngModel]="partDeptId" (ngModelChange)="onPartDeptChange($event)" name="part_dept"
+                  placeholder="Seleccionar" [showClear]="true" filter
+                  appendTo="body" styleClass="w-100" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Provincia</label>
+                <p-select
+                  [options]="partProvinces()" optionLabel="name" optionValue="id"
+                  [ngModel]="partProvId" (ngModelChange)="onPartProvChange($event)" name="part_prov"
+                  placeholder="Seleccionar" [showClear]="true" filter
+                  [disabled]="!partDeptId"
+                  appendTo="body" styleClass="w-100" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Distrito</label>
+                <p-select
+                  [options]="partDistricts()" optionLabel="name" optionValue="id"
+                  [(ngModel)]="form.partida_district_id" name="part_dist"
+                  placeholder="Seleccionar" [showClear]="true" filter
+                  [disabled]="!partProvId"
+                  appendTo="body" styleClass="w-100" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Punto de llegada ──────────────────────────────────────────── -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">Punto de llegada (Destino) <span class="text-danger">*</span></div>
+          <div class="card-body">
+            @if (loadingGeo()) {
+              <div class="text-center py-2">
+                <c-spinner size="sm" color="secondary" />
+                <span class="ms-2 text-body-secondary small">Cargando ubigeo del cliente...</span>
+              </div>
+            }
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Dirección de destino <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" [(ngModel)]="form.destination_address" name="destination_address" placeholder="Dirección de destino" required />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Departamento</label>
+                <p-select
+                  [options]="departments()" optionLabel="name" optionValue="id"
+                  [ngModel]="llegDeptId" (ngModelChange)="onLlegDeptChange($event)" name="llega_dept"
+                  placeholder="Seleccionar" [showClear]="true" filter
+                  appendTo="body" styleClass="w-100" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Provincia</label>
+                <p-select
+                  [options]="llegProvinces()" optionLabel="name" optionValue="id"
+                  [ngModel]="llegProvId" (ngModelChange)="onLlegProvChange($event)" name="llega_prov"
+                  placeholder="Seleccionar" [showClear]="true" filter
+                  [disabled]="!llegDeptId"
+                  appendTo="body" styleClass="w-100" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Distrito <span class="text-danger">*</span></label>
+                <p-select
+                  [options]="llegDistricts()" optionLabel="name" optionValue="id"
+                  [(ngModel)]="form.destination_district_id" name="llega_dist"
+                  placeholder="Seleccionar" [showClear]="true" filter
+                  [disabled]="!llegProvId"
+                  appendTo="body" styleClass="w-100" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Transporte ─────────────────────────────────────────────────── -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">Transporte</div>
+          <div class="card-body">
+
+            <!-- Modalidad -->
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label">Modalidad de traslado</label>
+                <div class="btn-group w-100" role="group">
+                  <button type="button" class="btn"
+                    [class.btn-primary]="form.mod_traslado === '01'"
+                    [class.btn-outline-primary]="form.mod_traslado !== '01'"
+                    (click)="form.mod_traslado = '01'">
+                    Transporte público
+                  </button>
+                  <button type="button" class="btn"
+                    [class.btn-primary]="form.mod_traslado === '02'"
+                    [class.btn-outline-primary]="form.mod_traslado !== '02'"
+                    (click)="form.mod_traslado = '02'">
+                    Transporte privado
+                  </button>
+                </div>
+              </div>
+              <div class="col-md-3 d-flex align-items-end">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="esM1l"
+                    [(ngModel)]="form.es_m1l" name="es_m1l" />
+                  <label class="form-check-label" for="esM1l">Categoría M1/L</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Transportista asignado al pedido (siempre visible si existe) -->
+            @if (fullOrder()?.shipping?.carrier; as carrier) {
+              <hr class="my-3" />
+              <p class="fw-semibold text-body-secondary small mb-2 text-uppercase">Transportista del pedido</p>
+              <div class="d-flex align-items-center gap-3 p-3 rounded border border-primary-subtle bg-primary-subtle">
+                <fa-icon [icon]="['fas', 'truck']" class="text-primary fs-4 flex-shrink-0" />
+                <div class="flex-grow-1">
+                  <div class="fw-semibold">{{ carrier.name }}</div>
+                  <div class="small text-body-secondary d-flex flex-wrap gap-3 mt-1">
+                    @if (carrier.ruc) {
+                      <span><span class="text-body">RUC:</span> <span class="font-monospace">{{ carrier.ruc }}</span></span>
+                    }
+                    @if (carrier.phone) {
+                      <span><span class="text-body">Tel:</span> {{ carrier.phone }}</span>
+                    }
+                    @if (carrier.address) {
+                      <span><span class="text-body">Dir:</span> {{ carrier.address }}</span>
+                    }
+                    @if (carrier.district) {
+                      <span><span class="text-body">Ubigeo:</span> {{ carrier.district.name }}{{ carrier.district.province ? ', ' + carrier.district.province : '' }}{{ carrier.district.department ? ', ' + carrier.district.department : '' }}</span>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+
+            <!-- Transportista editable (solo modo público y no M1/L) -->
+            @if (needsTransportista) {
+              <hr class="my-3" />
+              <p class="fw-semibold text-body-secondary small mb-2 text-uppercase">Datos del transportista (SUNAT)</p>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Nombre / Razón social</label>
+                  <input type="text" class="form-control" [(ngModel)]="form.carrier_name" name="carrier_name" placeholder="Transportista" />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">RUC</label>
+                  <input type="text" class="form-control font-monospace" [(ngModel)]="form.carrier_ruc" name="carrier_ruc" maxlength="11" placeholder="20xxxxxxxxx" />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Nro MTC</label>
+                  <input type="text" class="form-control" [(ngModel)]="form.carrier_nro_mtc" name="carrier_nro_mtc" placeholder="Nro autorización MTC" />
+                </div>
+              </div>
+            }
+
+            <!-- Vehículo (cuando no es M1/L) -->
+            @if (needsVehicle) {
+              <hr class="my-3" />
+              <p class="fw-semibold text-body-secondary small mb-2 text-uppercase">Vehículo</p>
+              <div class="row g-3">
+                <div class="col-md-3">
+                  <label class="form-label">Placa</label>
+                  <input type="text" class="form-control font-monospace text-uppercase" [(ngModel)]="form.vehicle_plate" name="vehicle_plate" maxlength="8" placeholder="ABC-123" />
+                </div>
+              </div>
+            }
+
+            <!-- Conductor (cuando no es M1/L) -->
+            @if (needsVehicle) {
+              <hr class="my-3" />
+              <p class="fw-semibold text-body-secondary small mb-2 text-uppercase">Conductor</p>
+              <div class="row g-3">
+                <div class="col-md-3">
+                  <label class="form-label">Tipo de documento</label>
+                  <p-select
+                    [options]="tipoDocOptions" optionLabel="label" optionValue="code"
+                    [(ngModel)]="form.conductor_tipo_doc" name="conductor_tipo_doc"
+                    appendTo="body" styleClass="w-100" />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Nro de documento</label>
+                  <input type="text" class="form-control font-monospace" [(ngModel)]="form.driver_doc" name="driver_doc" maxlength="20" />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Nombres</label>
+                  <input type="text" class="form-control" [(ngModel)]="form.conductor_nombres" name="conductor_nombres" />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Apellidos</label>
+                  <input type="text" class="form-control" [(ngModel)]="form.conductor_apellidos" name="conductor_apellidos" />
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Licencia de conducir</label>
+                  <input type="text" class="form-control font-monospace" [(ngModel)]="form.conductor_licencia" name="conductor_licencia" maxlength="20" />
+                </div>
+              </div>
+            }
+
+          </div>
+        </div>
+
+        <!-- ── Productos ──────────────────────────────────────────────────── -->
+        <div class="card mb-0">
+          <div class="card-header fw-semibold">Productos</div>
+          <!-- Desktop -->
+          <div class="card-body p-0 d-none d-md-block">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th class="text-center">Lote</th>
+                  <th class="text-center">Vencimiento</th>
+                  <th class="text-end">Cantidad</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of fullOrder()!.items; track item.product_id) {
+                  <tr>
+                    <td>{{ item.product_name }}</td>
+                    <td class="text-center font-monospace">{{ item.lot_number ?? '—' }}</td>
+                    <td class="text-center">{{ item.expiry_date ? (item.expiry_date | date:'MM/yyyy') : '—' }}</td>
+                    <td class="text-end">{{ item.quantity }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="4" class="text-center text-body-secondary py-3">Sin productos</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <!-- Mobile -->
+          <div class="d-md-none">
+            @for (item of fullOrder()!.items; track item.product_id) {
+              <div class="d-flex justify-content-between align-items-start px-3 py-2 border-bottom">
+                <div class="flex-grow-1 me-2" style="font-size:.85rem;">{{ item.product_name }}</div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                  @if (item.lot_number) {
+                    <span class="badge bg-body-secondary text-body font-monospace" style="font-size:.7rem;">{{ item.lot_number }}</span>
+                  }
+                  @if (item.expiry_date) {
+                    <span class="badge bg-warning-subtle text-warning-emphasis" style="font-size:.7rem;">{{ item.expiry_date | date:'MM/yy' }}</span>
+                  }
+                  <span class="badge bg-primary rounded-pill" style="min-width:28px;">{{ item.quantity }}</span>
+                </div>
+              </div>
+            } @empty {
+              <p class="text-center text-body-secondary py-3 mb-0 small">Sin productos</p>
+            }
+          </div>
+        </div>
+
+      </form>
+    }
+  </c-modal-body>
+
+  <c-modal-footer>
+    <button type="button" class="btn btn-secondary" (click)="close()" [disabled]="submitting()">
+      Cancelar
+    </button>
+    <button type="button" class="btn btn-success" (click)="submit()"
+      [disabled]="loading() || loadingGeo() || submitting() || !canSubmit">
+      @if (submitting()) {
+        <c-spinner size="sm" class="me-1" /> Enviando...
+      } @else {
+        <fa-icon [icon]="['fas', 'paper-plane']" class="me-1" /> Generar y enviar a SUNAT
+      }
+    </button>
+  </c-modal-footer>
+</c-modal>

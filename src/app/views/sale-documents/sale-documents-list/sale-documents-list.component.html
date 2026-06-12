@@ -1,0 +1,723 @@
+<app-page-header title="Documentos emitidos">
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-outline-primary btn-sm" [disabled]="downloadingReport()" (click)="downloadReport()">
+      @if (downloadingReport()) {
+        <c-spinner size="sm" class="me-1" />Generando...
+      } @else {
+        <fa-icon icon="file-pdf" class="me-1" />Reporte PDF
+      }
+    </button>
+    <button class="btn btn-outline-primary btn-sm" [disabled]="downloadingGeneralReport()" (click)="downloadGeneralReport()">
+      @if (downloadingGeneralReport()) {
+        <c-spinner size="sm" class="me-1" />Generando...
+      } @else {
+        <fa-icon icon="file-lines" class="me-1" />Reporte de documentos
+      }
+    </button>
+    <button class="btn btn-outline-secondary btn-sm" (click)="load()">
+      <fa-icon icon="rotate" class="me-1" />Actualizar
+    </button>
+  </div>
+</app-page-header>
+
+<!-- ── Tabs por tipo ──────────────────────────────────────────────────────── -->
+<div class="d-flex gap-1 flex-wrap mb-3">
+  @for (tab of tabs; track tab.value) {
+    <button class="btn btn-sm fw-semibold px-3"
+            [class.btn-primary]="activeType() === tab.value"
+            [class.btn-outline-secondary]="activeType() !== tab.value"
+            (click)="setType(tab.value)">
+      <fa-icon [icon]="tab.icon" class="me-1" />{{ tab.label }}
+    </button>
+  }
+</div>
+
+<!-- ── Filtros ────────────────────────────────────────────────────────────── -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">N° de documento</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><fa-icon icon="search" /></span>
+          <input type="search" class="form-control" placeholder="Ej. 123"
+                 [(ngModel)]="filters.search"
+                 (search)="onSearch()" (keyup.enter)="onSearch()" />
+          @if (filters.search) {
+            <button class="btn btn-outline-secondary" type="button"
+                    (click)="filters.search = ''; onSearch()">
+              <fa-icon icon="xmark" />
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Cliente</label>
+        <app-client-select [value]="selectedClient" (valueChange)="onClientFilterChange($event)" />
+      </div>
+
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <p-select [options]="isShippingGuide ? guiaStatusOptions : statusOptions"
+                  [(ngModel)]="filters.status"
+                  optionLabel="label" optionValue="value"
+                  styleClass="w-100" (ngModelChange)="onSearch()" />
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Desde</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_from" (change)="onSearch()" />
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1 text-body-secondary">Hasta</label>
+        <input type="date" class="form-control form-control-sm"
+               [(ngModel)]="filters.date_to" (change)="onSearch()" />
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- ── Contenido ─────────────────────────────────────────────────────────── -->
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+
+} @else if (isCreditNote) {
+
+  <!-- ══ Notas de Crédito ════════════════════════════════════════════════════ -->
+
+  <!-- Móvil -->
+  <div class="d-md-none d-flex flex-column gap-2">
+    @if (!creditNotes().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        Sin notas de crédito para los filtros seleccionados.
+      </div>
+    }
+    @for (nc of creditNotes(); track nc.id) {
+      <c-card>
+        <c-card-header class="py-2 px-3 d-flex align-items-center justify-content-between gap-2">
+          <div>
+            <span class="font-monospace fw-bold me-2" style="font-size:.88rem;">
+              {{ nc.full_number ?? '—' }}
+            </span>
+            <span class="text-body-secondary" style="font-size:.75rem;">
+              Ref: {{ nc.sale_document?.full_number ?? '—' }}
+            </span>
+          </div>
+          <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+            <span class="text-body-secondary" style="font-size:.72rem;">{{ nc.issue_date | date:'dd/MM/yy' }}</span>
+            <c-badge [textBgColor]="displayStatusColor(nc)" style="font-size:.68rem;">{{ displayStatusLabel(nc) }}</c-badge>
+          </div>
+        </c-card-header>
+        <c-card-body class="px-3 py-2">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <div class="fw-semibold" style="font-size:.95rem;">{{ ncClientName(nc) }}</div>
+            <div class="fw-bold ms-2 text-nowrap">S/ {{ nc.total | number:'1.2-2' }}</div>
+          </div>
+          @if (nc.reason) {
+            <div class="text-body-secondary mb-1" style="font-size:.78rem;">{{ nc.reason }}</div>
+          }
+          <div class="d-flex gap-1 overflow-auto" style="scrollbar-width:none;">
+            @if (nc.pdf_url) {
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':pdf'"
+                      (click)="downloadDoc('credit-notes', nc.id, 'pdf', nc.full_number ?? nc.id)">
+                @if (downloadingKey() === 'credit-notes:' + nc.id + ':pdf') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-pdf" style="font-size:.9rem;" /> }
+                <small>PDF</small>
+              </button>
+            }
+            @if (nc.xml_url) {
+              <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':xml'"
+                      (click)="downloadDoc('credit-notes', nc.id, 'xml', nc.full_number ?? nc.id)">
+                @if (downloadingKey() === 'credit-notes:' + nc.id + ':xml') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-code" style="font-size:.9rem;" /> }
+                <small>XML</small>
+              </button>
+            }
+            @if (nc.cdr_url) {
+              <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':cdr'"
+                      (click)="downloadDoc('credit-notes', nc.id, 'cdr', nc.full_number ?? nc.id)">
+                @if (downloadingKey() === 'credit-notes:' + nc.id + ':cdr') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-zipper" style="font-size:.9rem;" /> }
+                <small>CDR</small>
+              </button>
+            }
+            @if (nc.status === 'sent') {
+              <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="consultingId() === nc.id" (click)="consultarEstadoNc(nc)">
+                @if (consultingId() === nc.id) { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="rotate" style="font-size:.9rem;" /> }
+                <small>Estado</small>
+              </button>
+            }
+            @if (nc.order_id) {
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      (click)="viewOrder(nc.order_id)">
+                <fa-icon icon="eye" style="font-size:.9rem;" /><small>Pedido</small>
+              </button>
+            }
+          </div>
+        </c-card-body>
+      </c-card>
+    }
+  </div>
+
+  <!-- Escritorio NC -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+      <table class="table mb-0 align-middle" style="font-size:.875rem;">
+        <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+          <tr>
+            <th class="ps-3" style="width:160px">N° NC</th>
+            <th style="width:140px">Referencia</th>
+            <th style="width:80px">Pedido</th>
+            <th>Cliente</th>
+            <th>Motivo</th>
+            <th style="width:90px">Fecha</th>
+            <th class="text-end" style="width:100px">Total</th>
+            <th style="width:170px">Estado</th>
+            <th style="width:220px">Archivos</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (!creditNotes().length) {
+            <tr><td colspan="9" class="text-center text-body-secondary py-5">Sin resultados.</td></tr>
+          }
+          @for (nc of creditNotes(); track nc.id) {
+            <tr>
+              <td class="ps-3 font-monospace fw-semibold" style="font-size:.82rem;">
+                {{ nc.full_number ?? '—' }}
+              </td>
+              <td class="font-monospace text-body-secondary small">
+                {{ nc.sale_document?.full_number ?? '—' }}
+              </td>
+              <td>
+                @if (nc.order_id) {
+                  <button type="button" class="btn btn-link p-0 font-monospace small" (click)="viewOrder(nc.order_id)">#{{ nc.order_id }}</button>
+                } @else {
+                  <span class="text-body-secondary">—</span>
+                }
+              </td>
+              <td class="fw-medium">{{ ncClientName(nc) }}</td>
+              <td class="small text-body-secondary">{{ nc.reason ?? '—' }}</td>
+              <td class="small text-body-secondary">{{ nc.issue_date | date:'dd/MM/yy' }}</td>
+              <td class="text-end fw-semibold">S/ {{ nc.total | number:'1.2-2' }}</td>
+              <td>
+                <c-badge [textBgColor]="displayStatusColor(nc)">{{ displayStatusLabel(nc) }}</c-badge>
+              </td>
+              <td (click)="$event.stopPropagation()">
+                <div class="d-flex gap-1 flex-nowrap overflow-auto" style="scrollbar-width:none;">
+                  @if (nc.pdf_url) {
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':pdf'"
+                            (click)="downloadDoc('credit-notes', nc.id, 'pdf', nc.full_number ?? nc.id)" title="PDF">
+                      @if (downloadingKey() === 'credit-notes:' + nc.id + ':pdf') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-pdf" /> }
+                      <small>PDF</small>
+                    </button>
+                  }
+                  @if (nc.xml_url) {
+                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':xml'"
+                            (click)="downloadDoc('credit-notes', nc.id, 'xml', nc.full_number ?? nc.id)" title="XML">
+                      @if (downloadingKey() === 'credit-notes:' + nc.id + ':xml') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-code" /> }
+                      <small>XML</small>
+                    </button>
+                  }
+                  @if (nc.cdr_url) {
+                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':cdr'"
+                            (click)="downloadDoc('credit-notes', nc.id, 'cdr', nc.full_number ?? nc.id)" title="CDR">
+                      @if (downloadingKey() === 'credit-notes:' + nc.id + ':cdr') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-zipper" /> }
+                      <small>CDR</small>
+                    </button>
+                  }
+                  @if (nc.status === 'sent') {
+                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="consultingId() === nc.id" (click)="consultarEstadoNc(nc)" title="Consultar">
+                      @if (consultingId() === nc.id) { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="rotate" /> }
+                      <small>Estado</small>
+                    </button>
+                  }
+                  @if (nc.order_id) {
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            (click)="viewOrder(nc.order_id)" title="Ver pedido">
+                      <fa-icon icon="eye" /><small>Pedido</small>
+                    </button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      </div>
+    </c-card-body>
+  </c-card>
+
+} @else if (isShippingGuide) {
+
+  <!-- ══ Guías de Remisión ══════════════════════════════════════════════════ -->
+
+  <!-- Móvil -->
+  <div class="d-md-none d-flex flex-column gap-2">
+    @if (!shippingGuides().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        Sin guías de remisión para los filtros seleccionados.
+      </div>
+    }
+    @for (g of shippingGuides(); track g.id) {
+      <c-card>
+        <c-card-header class="py-2 px-3 d-flex align-items-center justify-content-between gap-2">
+          <div>
+            <span class="font-monospace fw-bold me-2" style="font-size:.88rem;">
+              {{ g.full_number ?? '— Borrador —' }}
+            </span>
+            <span class="text-body-secondary" style="font-size:.75rem;">
+              Pedido #{{ g.order_id }}
+            </span>
+          </div>
+          <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+            <span class="text-body-secondary" style="font-size:.72rem;">{{ g.transfer_date | date:'dd/MM/yy' }}</span>
+            <c-badge [color]="guiaStatusColor[g.sunat_status]" style="font-size:.68rem;">{{ guiaStatusLabel[g.sunat_status] }}</c-badge>
+          </div>
+        </c-card-header>
+        <c-card-body class="px-3 py-2">
+          <div class="fw-semibold mb-1" style="font-size:.95rem;">{{ g.client?.name ?? '—' }}</div>
+          <div class="text-body-secondary mb-1" style="font-size:.78rem;">
+            {{ motivoLabel[g.transfer_reason] ?? g.transfer_reason }}
+            @if (g.carrier_name) { · {{ g.carrier_name }} }
+          </div>
+          <div class="d-flex gap-1 overflow-auto" style="scrollbar-width:none;">
+            @if (g.pdf_url) {
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':pdf'"
+                      (click)="downloadDoc('shipping-guides', g.id, 'pdf', g.full_number ?? g.id)">
+                @if (downloadingKey() === 'shipping-guides:' + g.id + ':pdf') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-pdf" style="font-size:.9rem;" /> }
+                <small>PDF</small>
+              </button>
+            }
+            @if (g.xml_url) {
+              <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':xml'"
+                      (click)="downloadDoc('shipping-guides', g.id, 'xml', g.full_number ?? g.id)">
+                @if (downloadingKey() === 'shipping-guides:' + g.id + ':xml') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-code" style="font-size:.9rem;" /> }
+                <small>XML</small>
+              </button>
+            }
+            @if (g.cdr_url) {
+              <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':cdr'"
+                      (click)="downloadDoc('shipping-guides', g.id, 'cdr', g.full_number ?? g.id)">
+                @if (downloadingKey() === 'shipping-guides:' + g.id + ':cdr') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-zipper" style="font-size:.9rem;" /> }
+                <small>CDR</small>
+              </button>
+            }
+            @if (g.sunat_status === 'sent') {
+              <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="consultingId() === g.id" (click)="consultarEstadoGuia(g)">
+                @if (consultingId() === g.id) { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="rotate" style="font-size:.9rem;" /> }
+                <small>Estado</small>
+              </button>
+            }
+            <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                    style="min-width:52px; font-size:.68rem;"
+                    (click)="viewOrder(g.order_id)">
+              <fa-icon icon="eye" style="font-size:.9rem;" /><small>Pedido</small>
+            </button>
+          </div>
+        </c-card-body>
+      </c-card>
+    }
+  </div>
+
+  <!-- Escritorio Guías -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+      <table class="table mb-0 align-middle" style="font-size:.875rem;">
+        <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+          <tr>
+            <th class="ps-3" style="width:160px">N° Guía</th>
+            <th>Cliente</th>
+            <th style="width:100px">F. Traslado</th>
+            <th style="width:130px">Motivo</th>
+            <th style="width:140px">Transportista</th>
+            <th style="width:160px">Estado SUNAT</th>
+            <th style="width:220px">Archivos</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (!shippingGuides().length) {
+            <tr><td colspan="7" class="text-center text-body-secondary py-5">Sin resultados.</td></tr>
+          }
+          @for (g of shippingGuides(); track g.id) {
+            <tr>
+              <td class="ps-3">
+                <div class="font-monospace fw-semibold" style="font-size:.82rem;">
+                  {{ g.full_number ?? '— Borrador —' }}
+                </div>
+                <div class="text-body-secondary" style="font-size:.72rem;">
+                  Pedido #{{ g.order_id }}
+                </div>
+              </td>
+              <td class="fw-medium">{{ g.client?.name ?? '—' }}</td>
+              <td class="small text-body-secondary">{{ g.transfer_date | date:'dd/MM/yy' }}</td>
+              <td class="small text-body-secondary">{{ motivoLabel[g.transfer_reason] ?? g.transfer_reason }}</td>
+              <td class="small text-body-secondary">{{ g.carrier_name ?? '—' }}</td>
+              <td>
+                <c-badge [color]="guiaStatusColor[g.sunat_status]">{{ guiaStatusLabel[g.sunat_status] }}</c-badge>
+              </td>
+              <td>
+                <div class="d-flex gap-1 align-items-center flex-nowrap overflow-auto" style="scrollbar-width:none;">
+                  @if (g.pdf_url) {
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':pdf'"
+                            (click)="downloadDoc('shipping-guides', g.id, 'pdf', g.full_number ?? g.id)" title="PDF">
+                      @if (downloadingKey() === 'shipping-guides:' + g.id + ':pdf') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-pdf" /> }
+                      <small>PDF</small>
+                    </button>
+                  }
+                  @if (g.xml_url) {
+                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':xml'"
+                            (click)="downloadDoc('shipping-guides', g.id, 'xml', g.full_number ?? g.id)" title="XML">
+                      @if (downloadingKey() === 'shipping-guides:' + g.id + ':xml') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-code" /> }
+                      <small>XML</small>
+                    </button>
+                  }
+                  @if (g.cdr_url) {
+                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':cdr'"
+                            (click)="downloadDoc('shipping-guides', g.id, 'cdr', g.full_number ?? g.id)" title="CDR">
+                      @if (downloadingKey() === 'shipping-guides:' + g.id + ':cdr') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-zipper" /> }
+                      <small>CDR</small>
+                    </button>
+                  }
+                  @if (g.sunat_status === 'sent') {
+                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="consultingId() === g.id" (click)="consultarEstadoGuia(g)" title="Consultar estado">
+                      @if (consultingId() === g.id) { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="rotate" /> }
+                      <small>Estado</small>
+                    </button>
+                  }
+                  <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                          style="min-width:40px; font-size:.68rem;"
+                          (click)="viewOrder(g.order_id)" title="Ver pedido">
+                    <fa-icon icon="eye" /><small>Pedido</small>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      </div>
+    </c-card-body>
+    @if (total() > 0) {
+      <div class="px-3 py-2 border-top">
+        <small class="text-body-secondary">{{ total() }} guías en total</small>
+      </div>
+    }
+  </c-card>
+
+} @else {
+
+  <!-- ══ Facturas / Boletas / Notas de Venta ════════════════════════════════ -->
+
+  <!-- Móvil -->
+  <div class="d-md-none d-flex flex-column gap-2">
+    @if (!documents().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        Sin documentos para los filtros seleccionados.
+      </div>
+    }
+    @for (doc of documents(); track doc.id) {
+      <c-card>
+        <c-card-header class="py-2 px-3 d-flex align-items-center justify-content-between gap-2">
+          <div>
+            <span class="font-monospace fw-bold me-2" style="font-size:.88rem;">
+              {{ doc.full_number ?? '— Borrador —' }}
+            </span>
+            <span class="text-body-secondary" style="font-size:.75rem;">
+              Pedido {{ '#' + doc.order_id }}
+            </span>
+          </div>
+          <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
+            <span class="text-body-secondary" style="font-size:.72rem;">{{ doc.issue_date | date:'dd/MM/yy' }}</span>
+            <c-badge [textBgColor]="displayStatusColor(doc)" style="font-size:.68rem;">{{ displayStatusLabel(doc) }}</c-badge>
+          </div>
+        </c-card-header>
+        <c-card-body class="px-3 py-2">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="fw-semibold" style="font-size:.95rem; line-height:1.2;">{{ clientName(doc) }}</div>
+              @if (clientId(doc)) {
+                <div class="text-body-secondary" style="font-size:.78rem;">{{ clientId(doc) }}</div>
+              }
+            </div>
+            <div class="fw-bold ms-2 text-nowrap">S/ {{ doc.total | number:'1.2-2' }}</div>
+          </div>
+          <div class="d-flex gap-1 overflow-auto" style="scrollbar-width:none;">
+            @if (doc.document_type === 'sale_note' || doc.pdf_url) {
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
+                      (click)="downloadDoc('sale-documents', doc.id, 'pdf', doc.full_number ?? doc.id)" title="PDF">
+                @if (downloadingKey() === 'sale-documents:' + doc.id + ':pdf') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-pdf" style="font-size:.9rem;" /> }
+                <small>PDF</small>
+              </button>
+            }
+            @if (doc.xml_url) {
+              <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':xml'"
+                      (click)="downloadDoc('sale-documents', doc.id, 'xml', doc.full_number ?? doc.id)" title="XML">
+                @if (downloadingKey() === 'sale-documents:' + doc.id + ':xml') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-code" style="font-size:.9rem;" /> }
+                <small>XML</small>
+              </button>
+            }
+            @if (doc.cdr_url) {
+              <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':cdr'"
+                      (click)="downloadDoc('sale-documents', doc.id, 'cdr', doc.full_number ?? doc.id)" title="CDR">
+                @if (downloadingKey() === 'sale-documents:' + doc.id + ':cdr') { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="file-zipper" style="font-size:.9rem;" /> }
+                <small>CDR</small>
+              </button>
+            }
+            @if (doc.status === 'sent') {
+              <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="consultingId() === doc.id" (click)="consultarEstado(doc)">
+                @if (consultingId() === doc.id) { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="rotate" style="font-size:.9rem;" /> }
+                <small>Estado</small>
+              </button>
+            }
+            @if (canVoid(doc)) {
+              <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      (click)="startVoid(doc)">
+                <fa-icon icon="ban" style="font-size:.9rem;" />
+                <small>Anular</small>
+              </button>
+            }
+            <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                    style="min-width:52px; font-size:.68rem;"
+                    (click)="viewOrder(doc.order_id)">
+              <fa-icon icon="eye" style="font-size:.9rem;" /><small>Pedido</small>
+            </button>
+          </div>
+        </c-card-body>
+      </c-card>
+    }
+  </div>
+
+  <!-- Escritorio -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+      <table class="table mb-0 align-middle" style="font-size:.875rem;">
+        <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+          <tr>
+            <th class="ps-3" style="width:175px">N° Documento</th>
+            <th>Cliente</th>
+            <th style="width:90px">Fecha</th>
+            <th class="text-end" style="width:105px">Total</th>
+            <th style="width:190px">Estado</th>
+            <th style="width:280px">Archivos</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (!documents().length) {
+            <tr><td colspan="6" class="text-center text-body-secondary py-5">Sin resultados.</td></tr>
+          }
+          @for (doc of documents(); track doc.id) {
+            <tr>
+              <td class="ps-3">
+                <div class="font-monospace fw-semibold" style="font-size:.82rem;">
+                  {{ doc.full_number ?? '—' }}
+                </div>
+                <div class="text-body-secondary" style="font-size:.72rem;">
+                  Pedido {{ '#' + doc.order_id }}
+                </div>
+              </td>
+              <td>
+                <div class="fw-medium">{{ clientName(doc) }}</div>
+                @if (clientId(doc)) {
+                  <div class="text-body-secondary" style="font-size:.75rem;">{{ clientId(doc) }}</div>
+                }
+              </td>
+              <td class="small text-body-secondary">{{ doc.issue_date | date:'dd/MM/yy' }}</td>
+              <td class="text-end fw-semibold">S/ {{ doc.total | number:'1.2-2' }}</td>
+              <td>
+                <c-badge [textBgColor]="displayStatusColor(doc)">{{ displayStatusLabel(doc) }}</c-badge>
+              </td>
+              <td (click)="$event.stopPropagation()">
+                <div class="d-flex gap-1 align-items-center flex-nowrap overflow-auto" style="scrollbar-width:none;">
+                  @if (doc.document_type === 'sale_note' || doc.pdf_url) {
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
+                            (click)="downloadDoc('sale-documents', doc.id, 'pdf', doc.full_number ?? doc.id)" title="PDF">
+                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':pdf') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-pdf" /> }
+                      <small>PDF</small>
+                    </button>
+                  }
+                  @if (doc.xml_url) {
+                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':xml'"
+                            (click)="downloadDoc('sale-documents', doc.id, 'xml', doc.full_number ?? doc.id)" title="XML">
+                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':xml') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-code" /> }
+                      <small>XML</small>
+                    </button>
+                  }
+                  @if (doc.cdr_url) {
+                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':cdr'"
+                            (click)="downloadDoc('sale-documents', doc.id, 'cdr', doc.full_number ?? doc.id)" title="CDR">
+                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':cdr') { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="file-zipper" /> }
+                      <small>CDR</small>
+                    </button>
+                  }
+                  @if (doc.status === 'sent') {
+                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            [disabled]="consultingId() === doc.id" (click)="consultarEstado(doc)" title="Consultar estado">
+                      @if (consultingId() === doc.id) { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="rotate" /> }
+                      <small>Estado</small>
+                    </button>
+                  }
+                  @if (canVoid(doc)) {
+                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-shrink-0"
+                            style="min-width:40px; font-size:.68rem;"
+                            title="Anular documento"
+                            (click)="startVoid(doc)">
+                      <fa-icon icon="ban" /><small>Anular</small>
+                    </button>
+                  }
+                  <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                          style="min-width:40px; font-size:.68rem;"
+                          (click)="viewOrder(doc.order_id)" title="Ver pedido">
+                    <fa-icon icon="eye" /><small>Pedido</small>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      </div>
+    </c-card-body>
+    @if (total() > 0) {
+      <div class="px-3 py-2 border-top">
+        <small class="text-body-secondary">{{ total() }} documentos en total</small>
+      </div>
+    }
+  </c-card>
+
+}
+
+<!-- Paginación -->
+<app-pagination
+  [currentPage]="filters.page!"
+  [lastPage]="lastPage()"
+  (pageChange)="goToPage($event)"
+/>
+
+<!-- ── Modal anular documento ─────────────────────────────────────────────── -->
+@if (voidDoc(); as doc) {
+  <c-modal [visible]="true" alignment="center" (visibleChange)="!$event && voidDoc.set(null)">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="ban" class="me-2 text-danger" />
+        Anular {{ docTypeLabel[doc.document_type] ?? 'Documento' }}
+      </h5>
+    </c-modal-header>
+    <c-modal-body>
+      <div class="mb-3 p-2 rounded bg-body-secondary border d-flex align-items-center gap-2" style="font-size:.85rem;">
+        <fa-icon icon="file-invoice" class="text-body-secondary" />
+        <span class="font-monospace fw-semibold">{{ doc.full_number ?? '—' }}</span>
+        <span class="text-body-secondary ms-auto">S/ {{ doc.total | number:'1.2-2' }}</span>
+      </div>
+
+      @if (isPriorPeriod(doc)) {
+        <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.82rem;">
+          <fa-icon icon="triangle-exclamation" class="me-1" />
+          Este documento es de un período anterior. SUNAT podría rechazar la anulación — en ese caso emite una Nota de Crédito.
+        </div>
+      }
+
+      <div class="mb-1">
+        <label class="form-label small mb-1">
+          Motivo de anulación <span class="text-danger">*</span>
+          <span class="text-body-secondary ms-1">(3–100 caracteres)</span>
+        </label>
+        <textarea class="form-control form-control-sm" rows="2"
+                  [maxlength]="100"
+                  [(ngModel)]="voidReason"
+                  placeholder="Ej: Error en datos del cliente, duplicado, etc."></textarea>
+        <div class="form-text text-end" style="font-size:.72rem;">{{ voidReason.length }}/100</div>
+      </div>
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" size="sm" [disabled]="voiding()" (click)="voidDoc.set(null)">Cancelar</button>
+      <button cButton color="danger" size="sm"
+              [disabled]="voiding() || voidReason.trim().length < 3"
+              (click)="doVoid()">
+        @if (voiding()) { <c-spinner size="sm" class="me-1" /> }
+        Anular documento
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- ── Modal ver pedido ───────────────────────────────────────────────────── -->
+<app-order-detail-modal [orderId]="previewOrderId()" [viewOnly]="true" (closed)="previewOrderId.set(null)" />

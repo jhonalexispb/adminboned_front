@@ -1,0 +1,393 @@
+<app-page-header title="Stock" subtitle="Inventario actual por producto">
+  <div class="d-flex gap-2">
+
+    <!-- Reportes -->
+    <c-dropdown alignment="end">
+      <button cDropdownToggle class="btn btn-sm btn-outline-primary"
+              [disabled]="!!downloadingReport()">
+        @if (downloadingReport()) {
+          <c-spinner size="sm" class="me-1" />Generando...
+        } @else {
+          <fa-icon icon="file-pdf" class="me-1" />Reportes
+          @if (selectedLaboratory()) {
+            <span class="badge text-bg-secondary ms-1 fw-normal" style="font-size:.65rem; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle">
+              {{ selectedLaboratory()!.name }}
+            </span>
+          }
+        }
+      </button>
+      <ul cDropdownMenu>
+        <li><h6 class="dropdown-header">Reportes de stock</h6></li>
+        @if (activeReportFiltersHint) {
+          <li>
+            <span class="dropdown-item-text text-body-secondary" style="font-size:.75rem">
+              <fa-icon icon="filter" class="me-1" />{{ activeReportFiltersHint }}
+            </span>
+          </li>
+          <li><hr class="dropdown-divider my-1" /></li>
+        }
+        <li>
+          <button cDropdownItem (click)="downloadReport('current')">
+            <fa-icon icon="boxes-stacked" class="me-2 text-secondary" />Stock actual
+          </button>
+        </li>
+        <li>
+          <button cDropdownItem (click)="downloadReport('low_stock')">
+            <fa-icon icon="triangle-exclamation" class="me-2 text-warning" />Stock bajo
+          </button>
+        </li>
+        <li>
+          <button cDropdownItem (click)="downloadReport('valuation')">
+            <fa-icon icon="dollar-sign" class="me-2 text-success" />Valorización de inventario
+          </button>
+        </li>
+      </ul>
+    </c-dropdown>
+
+    <a class="btn btn-outline-secondary btn-sm" routerLink="/inventory/kardex">
+      <fa-icon icon="list" class="me-1" />Kardex
+    </a>
+    <a class="btn btn-outline-secondary btn-sm" routerLink="/inventory/lots">
+      <fa-icon icon="layer-group" class="me-1" />Lotes
+    </a>
+    <a class="btn btn-outline-warning btn-sm" routerLink="/inventory/reservations">
+      <fa-icon icon="lock" class="me-1" />Reservas
+    </a>
+  </div>
+</app-page-header>
+
+<!-- Filtros -->
+<c-card class="mb-4">
+  <c-card-body>
+    <div class="row g-3 align-items-end">
+
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1 text-body-secondary">Producto</label>
+        <p-select
+          [options]="products()"
+          optionLabel="name"
+          [ngModel]="selectedProduct()"
+          (ngModelChange)="onProductSelect($event)"
+          [filter]="true"
+          filterBy="name,sku,laboratory.name"
+          placeholder="Todos los productos"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+          appendTo="body">
+          <ng-template #selectedItem let-p>
+            <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
+            @if (p.laboratory) {
+              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            }
+            {{ p.name }}
+          </ng-template>
+          <ng-template #item let-p>
+            <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
+            @if (p.laboratory) {
+              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            }
+            {{ p.name }}
+          </ng-template>
+        </p-select>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1 text-body-secondary">Laboratorio</label>
+        <p-select
+          [options]="laboratories()"
+          optionLabel="name"
+          [ngModel]="selectedLaboratory()"
+          (ngModelChange)="onLaboratorySelect($event)"
+          [filter]="true"
+          filterBy="name"
+          placeholder="Todos los laboratorios"
+          [showClear]="true"
+          [style]="{ width: '100%' }"
+          appendTo="body">
+        </p-select>
+      </div>
+
+      <div class="col-12 col-md-4 d-flex align-items-end justify-content-between">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="low_stock"
+                 [(ngModel)]="filters.low_stock" (change)="onSearch()" />
+          <label class="form-check-label fw-medium" for="low_stock">
+            <fa-icon icon="triangle-exclamation" class="text-warning me-1" />
+            Solo stock bajo
+          </label>
+        </div>
+        <span class="text-body-secondary small">{{ groupedStock.length }} producto(s) · {{ total() }} lotes</span>
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+<!-- Grupos por producto -->
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (groupedStock.length === 0) {
+  <c-card>
+    <c-card-body class="text-center text-body-secondary py-5">
+      <fa-icon icon="box-open" class="mb-2 d-block" style="font-size:2rem;opacity:.3" />
+      Sin stock para los filtros seleccionados.
+    </c-card-body>
+  </c-card>
+} @else {
+  @for (group of groupedStock; track group.product.id) {
+    <c-card class="mb-3" [class.border-warning]="isLowStock(group)">
+
+      <!-- Header del grupo -->
+      <c-card-header class="d-flex justify-content-between align-items-center py-2 px-3 flex-wrap gap-2"
+                     [class.bg-warning-subtle]="isLowStock(group)">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          @if (group.product.laboratory) {
+            <span class="text-info">{{ group.product.laboratory.name }}</span>
+          }
+          <span class="fw-semibold">{{ group.product.name }}</span>
+          @if (group.product.sku) {
+            <code class="small text-body-secondary bg-body-secondary px-1 rounded">{{ group.product.sku }}</code>
+          }
+          @if (isLowStock(group)) {
+            <c-badge color="warning" textColor="dark">
+              <fa-icon icon="triangle-exclamation" class="me-1" />Stock bajo
+            </c-badge>
+          }
+        </div>
+
+        <!-- Totales del producto -->
+        <div class="d-flex align-items-center gap-3 text-end small">
+          <div>
+            <div class="text-body-secondary" style="font-size:.72rem">EN ALMACÉN</div>
+            <strong class="fs-5" [class.text-success]="!isLowStock(group)"
+                    [class.text-warning]="isLowStock(group)">
+              {{ group.activeStock }}
+            </strong>
+          </div>
+          @if (group.reservedStock > 0) {
+            <div>
+              <div class="text-body-secondary" style="font-size:.72rem">RESERVADO</div>
+              <c-badge color="warning" textColor="dark" class="fs-6 fw-normal">{{ group.reservedStock }}</c-badge>
+            </div>
+          }
+          <div>
+            <div class="text-body-secondary" style="font-size:.72rem">LIBRE</div>
+            <strong class="fs-5" [class.text-success]="group.availableStock > 0"
+                    [class.text-danger]="group.availableStock <= 0">
+              {{ group.availableStock }}
+            </strong>
+          </div>
+          @if (group.blockedStock > 0) {
+            <div>
+              <div class="text-body-secondary" style="font-size:.72rem">BLOQUEADO</div>
+              <c-badge color="danger" class="fs-6 fw-normal">{{ group.blockedStock }}</c-badge>
+            </div>
+          }
+          @if (group.product.min_stock > 0) {
+            <div>
+              <div class="text-body-secondary" style="font-size:.72rem">MÍNIMO</div>
+              <span class="text-body-secondary fw-medium">{{ group.product.min_stock }}</span>
+            </div>
+          }
+        </div>
+      </c-card-header>
+
+      <!-- Vista mobile: cards -->
+      <c-card-body class="d-md-none p-2">
+        <div class="d-flex flex-column gap-2">
+          @for (item of group.lots; track item.lot_id) {
+            <div class="rounded border p-2"
+                 [class.bg-danger-subtle]="expiryStatus(item) === 'expired'"
+                 [class.bg-warning-subtle]="expiryStatus(item) === 'soon'"
+                 [class.opacity-75]="item.status === 'blocked'">
+
+              <div class="d-flex justify-content-between align-items-start mb-1">
+                <div>
+                  @if (item.is_default) {
+                    <span class="badge bg-secondary font-monospace fw-normal">SIN-LOTE</span>
+                  } @else if (item.lot_number) {
+                    <span class="font-monospace">{{ item.lot_number }}</span>
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </div>
+                <div>
+                  @if (item.status === 'blocked') {
+                    <c-badge color="danger">Bloqueado</c-badge>
+                  } @else {
+                    <c-badge color="success">Activo</c-badge>
+                  }
+                </div>
+              </div>
+
+              <div class="mb-2 small">
+                @if (item.expiry_date) {
+                  <div class="d-flex align-items-center gap-2">
+                    <span>{{ item.expiry_date | date:'dd/MM/yyyy' }}</span>
+                    @switch (expiryStatus(item)) {
+                      @case ('expired') { <c-badge color="danger">Vencido</c-badge> }
+                      @case ('soon')    { <c-badge color="warning">Próx. a vencer</c-badge> }
+                      @case ('ok')      { <c-badge color="success">Vigente</c-badge> }
+                    }
+                  </div>
+                } @else {
+                  <span class="text-body-secondary">Sin fecha de vencimiento</span>
+                }
+              </div>
+
+              <div class="d-flex justify-content-around text-center mb-2 small">
+                <div>
+                  <div class="text-body-secondary" style="font-size:.7rem">EN ALMACÉN</div>
+                  <strong [class.text-body-secondary]="item.status === 'blocked'">{{ item.quantity }}</strong>
+                </div>
+                <div>
+                  <div class="text-body-secondary" style="font-size:.7rem">RESERVADO</div>
+                  @if (item.reserved_stock > 0) {
+                    <c-badge color="warning" textColor="dark">{{ item.reserved_stock }}</c-badge>
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </div>
+                <div>
+                  <div class="text-body-secondary" style="font-size:.7rem">LIBRE</div>
+                  <strong [class.text-success]="item.available_stock > 0"
+                          [class.text-danger]="item.available_stock <= 0">
+                    {{ item.available_stock }}
+                  </strong>
+                </div>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-secondary flex-fill d-flex flex-column align-items-center"
+                        (click)="viewKardex(item)">
+                  <fa-icon icon="list" />
+                  <small>Kardex</small>
+                </button>
+                <button class="btn btn-sm btn-primary flex-fill d-flex flex-column align-items-center"
+                        (click)="openAdjust(item, 'adjust')">
+                  <fa-icon icon="sliders" />
+                  <small>Ajuste</small>
+                </button>
+                <button class="btn btn-sm btn-warning flex-fill d-flex flex-column align-items-center"
+                        (click)="openAdjust(item, 'physical')">
+                  <fa-icon icon="calculator" />
+                  <small>Conteo</small>
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      </c-card-body>
+
+      <!-- Tabla de lotes -->
+      <c-card-body class="d-none d-md-block p-0">
+        <div class="table-responsive">
+          <table cTable class="mb-0 align-middle" style="font-size:.85rem">
+            <thead style="font-size:.78rem">
+              <tr>
+                <th class="ps-3" style="width:160px">Lote</th>
+                <th style="width:200px">Vencimiento</th>
+                <th style="width:100px">Estado lote</th>
+                <th class="text-center" style="width:80px">En almacén</th>
+                <th class="text-center" style="width:80px">Reservado</th>
+                <th class="text-center" style="width:80px">Libre</th>
+                <th style="width:160px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of group.lots; track item.lot_id) {
+                <tr [class.bg-danger-subtle]="expiryStatus(item) === 'expired'"
+                    [class.bg-warning-subtle]="expiryStatus(item) === 'soon'"
+                    [class.opacity-75]="item.status === 'blocked'">
+
+                  <!-- Lote -->
+                  <td class="ps-3">
+                    @if (item.is_default) {
+                      <span class="badge bg-secondary font-monospace fw-normal">SIN-LOTE</span>
+                    } @else if (item.lot_number) {
+                      <span class="font-monospace">{{ item.lot_number }}</span>
+                    } @else {
+                      <span class="text-body-secondary">—</span>
+                    }
+                  </td>
+
+                  <!-- Vencimiento -->
+                  <td>
+                    @if (item.expiry_date) {
+                      <div class="d-flex align-items-center gap-2">
+                        <span>{{ item.expiry_date | date:'dd/MM/yyyy' }}</span>
+                        @switch (expiryStatus(item)) {
+                          @case ('expired') { <c-badge color="danger">Vencido</c-badge> }
+                          @case ('soon')    { <c-badge color="warning">Próx. a vencer</c-badge> }
+                          @case ('ok')      { <c-badge color="success">Vigente</c-badge> }
+                        }
+                      </div>
+                    } @else {
+                      <span class="text-body-secondary">Sin fecha</span>
+                    }
+                  </td>
+
+                  <!-- Estado del lote -->
+                  <td>
+                    @if (item.status === 'blocked') {
+                      <c-badge color="danger">Bloqueado</c-badge>
+                    } @else {
+                      <c-badge color="success">Activo</c-badge>
+                    }
+                  </td>
+
+                  <!-- Stock del lote -->
+                  <td class="text-center fw-semibold"
+                      [class.text-body-secondary]="item.status === 'blocked'">
+                    {{ item.quantity }}
+                  </td>
+                  <td class="text-center">
+                    @if (item.reserved_stock > 0) {
+                      <c-badge color="warning" textColor="dark">{{ item.reserved_stock }}</c-badge>
+                    } @else {
+                      <span class="text-body-secondary">—</span>
+                    }
+                  </td>
+                  <td class="text-center fw-semibold"
+                      [class.text-success]="item.available_stock > 0"
+                      [class.text-danger]="item.available_stock <= 0">
+                    {{ item.available_stock }}
+                  </td>
+
+                  <!-- Acciones -->
+                  <td>
+                    <div class="d-inline-flex gap-2">
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                              (click)="viewKardex(item)" title="Ver kardex">
+                        <fa-icon icon="list" />
+                        <small>Kardex</small>
+                      </button>
+                      <button class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                              (click)="openAdjust(item, 'adjust')" title="Ajuste manual">
+                        <fa-icon icon="sliders" />
+                        <small>Ajuste</small>
+                      </button>
+                      <button class="btn btn-sm btn-warning d-flex flex-column align-items-center"
+                              (click)="openAdjust(item, 'physical')" title="Conteo físico">
+                        <fa-icon icon="calculator" />
+                        <small>Conteo</small>
+                      </button>
+                    </div>
+                  </td>
+
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+
+  <app-pagination
+    [currentPage]="filters.page!"
+    [lastPage]="lastPage()"
+    wrapperClass="py-3"
+    (pageChange)="goToPage($event)"
+  />
+}

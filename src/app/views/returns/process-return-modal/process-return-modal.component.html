@@ -1,0 +1,66 @@
+<c-modal [visible]="visible()" (visibleChange)="!$event && cancel()" alignment="center" size="lg">
+  <c-modal-header>
+    <h5 cModalTitle><fa-icon icon="rotate-left" class="me-2 text-primary" />Procesar devolución</h5>
+  </c-modal-header>
+  <c-modal-body>
+
+    <div class="mb-4">
+      <label class="form-label fw-medium">¿Qué acción se tomará con el documento?</label>
+      <div class="d-flex flex-column gap-2">
+        @for (opt of actionOptions; track opt.value) {
+          <label class="d-flex align-items-start gap-3 border rounded p-3"
+                 style="cursor:pointer;"
+                 [style.borderColor]="actionType === opt.value ? 'var(--cui-primary)' : ''"
+                 [style.background]="actionType === opt.value ? 'var(--cui-primary-bg-subtle)' : ''">
+            <input type="radio" [(ngModel)]="actionType" [value]="opt.value"
+                   class="form-check-input mt-1 flex-shrink-0"
+                   [disabled]="opt.value === 'void' && !canVoid()" />
+            <div>
+              <div class="fw-semibold" style="font-size:.875rem;">{{ opt.label }}</div>
+              @switch (opt.value) {
+                @case ('credit_note') {
+                  <div class="text-body-secondary small">Emite una Nota de Crédito a SUNAT. Siempre disponible.</div>
+                }
+                @case ('void') {
+                  <div class="text-body-secondary small">
+                    @if (canVoid()) {
+                      Envía comunicación de baja a SUNAT. Solo disponible el mismo día de emisión.
+                    } @else {
+                      <span class="text-danger">No disponible — emitido en fecha anterior.</span>
+                    }
+                  </div>
+                }
+                @case ('internal') {
+                  <div class="text-body-secondary small">Solo gestiona el stock. Sin impacto en SUNAT.</div>
+                }
+              }
+            </div>
+          </label>
+        }
+      </div>
+    </div>
+
+    @if (actionType === 'credit_note') {
+      <div class="row g-3">
+        <div class="col-sm-6">
+          <label class="form-label fw-medium">Motivo SUNAT</label>
+          <p-select [options]="motivoOptions" [(ngModel)]="motivoCode"
+                    optionLabel="label" optionValue="value" styleClass="w-100" appendTo="body" />
+        </div>
+        <div class="col-sm-6">
+          <label class="form-label fw-medium">Fecha de emisión NC</label>
+          <input type="date" class="form-control" [(ngModel)]="issueDate" />
+        </div>
+      </div>
+    }
+
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" [disabled]="processing()" (click)="cancel()">Cancelar</button>
+    <button cButton color="primary" [disabled]="processing() || (actionType === 'void' && !canVoid())"
+            (click)="confirm()">
+      @if (processing()) { <c-spinner size="sm" class="me-1" /> }
+      <fa-icon icon="check" class="me-1" />Confirmar y procesar
+    </button>
+  </c-modal-footer>
+</c-modal>

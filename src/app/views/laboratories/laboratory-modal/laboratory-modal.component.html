@@ -1,0 +1,111 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form" id="labForm" (ngSubmit)="onSubmit()">
+
+    @if (error) {
+      <div class="alert alert-danger py-2">{{ error }}</div>
+    }
+
+    <!-- Nombre -->
+    <div class="mb-3">
+      <label class="form-label" for="name">
+        Nombre <span class="text-danger">*</span>
+      </label>
+      <input
+        cFormControl
+        id="name"
+        formControlName="name"
+        placeholder="Ej: Johnson & Johnson"
+        [class.is-invalid]="form.get('name')?.invalid && form.get('name')?.touched"
+      />
+      @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+        <div class="invalid-feedback">El nombre es obligatorio.</div>
+      }
+      @if (form.get('name')?.hasError('maxlength') && form.get('name')?.touched) {
+        <div class="invalid-feedback">Máximo 150 caracteres.</div>
+      }
+    </div>
+
+    <!-- Descripción -->
+    <div class="mb-3">
+      <label class="form-label" for="description">Descripción</label>
+      <textarea
+        cFormControl
+        id="description"
+        formControlName="description"
+        rows="2"
+        placeholder="Descripción opcional..."
+      ></textarea>
+    </div>
+
+    <!-- Activo -->
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" id="active" formControlName="active" />
+      <label class="form-check-label" for="active">Activo</label>
+    </div>
+
+    <hr class="my-3" />
+
+    <!-- Logo -->
+    <div class="mb-3">
+      <label class="form-label">
+        Logo
+        <span class="text-body-secondary fw-normal">(opcional · máx. 2 MB)</span>
+      </label>
+
+      @if (logoPreview) {
+        <div class="d-flex align-items-center gap-3 mb-2">
+          <img [src]="logoPreview" alt="Logo" class="rounded border"
+               style="height:64px; width:auto; max-width:160px; object-fit:contain;" />
+          <button type="button" class="btn btn-sm btn-outline-danger" (click)="clearLogo()">
+            Quitar
+          </button>
+        </div>
+      }
+
+      <input
+        type="file"
+        class="form-control"
+        accept="image/*"
+        (change)="onLogoChange($event)"
+      />
+    </div>
+
+    <!-- Banner -->
+    <div class="mb-1">
+      <label class="form-label">
+        Banner
+        <span class="text-body-secondary fw-normal">(opcional · máx. 4 MB · separador de catálogo)</span>
+      </label>
+
+      @if (bannerPreview) {
+        <div class="mb-2">
+          <img [src]="bannerPreview" alt="Banner" class="img-fluid rounded border"
+               style="max-height:120px; object-fit:cover; width:100%;" />
+          <button type="button" class="btn btn-sm btn-outline-danger mt-1" (click)="clearBanner()">
+            Quitar banner
+          </button>
+        </div>
+      }
+
+      <input
+        type="file"
+        class="form-control"
+        accept="image/*"
+        (change)="onBannerChange($event)"
+      />
+    </div>
+
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="submit" form="labForm" class="btn btn-primary" [disabled]="form.invalid">
+    {{ isEdit ? 'Guardar cambios' : 'Crear' }}
+  </button>
+</div>

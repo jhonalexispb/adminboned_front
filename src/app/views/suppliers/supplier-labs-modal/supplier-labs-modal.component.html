@@ -1,0 +1,66 @@
+<div class="modal-header">
+  <h5 class="modal-title">
+    <fa-icon icon="flask" class="me-2 text-primary" />Laboratorios — {{ supplier.name }}
+  </h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+
+  @if (loading()) {
+    <div class="text-center py-4"><c-spinner color="primary" /></div>
+  } @else {
+
+    <!-- Labs asignados actualmente -->
+    <div class="mb-3">
+      <p class="text-body-secondary small mb-2">Laboratorios asignados actualmente:</p>
+      @if (supplier.laboratories.length) {
+        <div class="d-flex flex-wrap gap-1">
+          @for (lab of supplier.laboratories; track lab.id) {
+            <span class="badge text-bg-primary">{{ lab.name }}</span>
+          }
+        </div>
+      } @else {
+        <p class="text-body-secondary fst-italic small">Sin laboratorios asignados.</p>
+      }
+    </div>
+
+    <hr class="my-3" />
+
+    <!-- Selector -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <label class="form-label fw-semibold mb-0">Seleccionar laboratorios</label>
+      <button type="button" class="btn btn-sm btn-outline-primary" (click)="openCreateLab()">
+        <fa-icon icon="plus" class="me-1" />Nuevo laboratorio
+      </button>
+    </div>
+    <p-multiselect
+      [(ngModel)]="selectedIds"
+      [options]="allLabs()"
+      optionLabel="name"
+      optionValue="id"
+      [filter]="true"
+      filterPlaceholder="Buscar laboratorio..."
+      placeholder="Seleccionar uno o más laboratorios"
+      emptyMessage="Sin resultados"
+      [style]="{ width: '100%' }"
+      appendTo="body"
+    />
+    <p class="text-body-secondary small mt-1">
+      Al guardar, la lista anterior será reemplazada por la selección actual.
+    </p>
+
+  }
+
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="button" class="btn btn-primary" [disabled]="loading() || saving()" (click)="save()">
+    @if (saving()) {
+      <c-spinner size="sm" class="me-1" />Guardando...
+    } @else {
+      Guardar
+    }
+  </button>
+</div>

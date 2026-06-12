@@ -1,0 +1,268 @@
+<app-page-header title="Orden de catálogo"
+  subtitle="Define el orden de laboratorios, categorías y productos que verán los vendedores en el catálogo de cotizaciones." />
+
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <button class="nav-link" [class.active]="activeTab() === 'laboratories'" (click)="setTab('laboratories')">
+      <fa-icon icon="industry" class="me-1" />Laboratorios
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" [class.active]="activeTab() === 'categories'" (click)="setTab('categories')">
+      <fa-icon icon="folder" class="me-1" />Categorías
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" [class.active]="activeTab() === 'category-override'" (click)="setTab('category-override')">
+      <fa-icon icon="sliders" class="me-1" />Categorías por laboratorio
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" [class.active]="activeTab() === 'products'" (click)="setTab('products')">
+      <fa-icon icon="box-open" class="me-1" />Productos
+    </button>
+  </li>
+</ul>
+
+<!-- ══ LABORATORIOS ════════════════════════════════════════════════════════ -->
+@if (activeTab() === 'laboratories') {
+  <c-card>
+    <c-card-body>
+      <p class="text-body-secondary small">
+        Arrastra para definir el orden en que aparecen los laboratorios en el catálogo.
+      </p>
+
+      @if (loadingLabs()) {
+        <div class="text-center py-5"><c-spinner color="primary" /></div>
+      } @else {
+        <div cdkDropList class="d-flex flex-column gap-2" (cdkDropListDropped)="dropLaboratory($event)">
+          @for (lab of laboratories(); track lab.id) {
+            <div cdkDrag class="d-flex align-items-center gap-3 p-2 border rounded-2 bg-body-tertiary">
+              <fa-icon icon="grip-vertical" class="text-body-secondary" cdkDragHandle style="cursor:grab;" />
+              <span class="fw-semibold">{{ lab.name }}</span>
+            </div>
+          } @empty {
+            <div class="text-center text-body-secondary py-4">No hay laboratorios activos.</div>
+          }
+        </div>
+
+        <div class="mt-3 text-end">
+          <button type="button" class="btn btn-primary" [disabled]="savingLabs() || laboratories().length === 0"
+                  (click)="saveLaboratoriesOrder()">
+            @if (savingLabs()) { <c-spinner size="sm" class="me-1" /> } @else { <fa-icon icon="save" class="me-1" /> }
+            Guardar orden
+          </button>
+        </div>
+      }
+    </c-card-body>
+  </c-card>
+}
+
+<!-- ══ CATEGORÍAS (orden global) ══════════════════════════════════════════ -->
+@if (activeTab() === 'categories') {
+  <c-card>
+    <c-card-body>
+      <p class="text-body-secondary small">
+        Orden global de categorías. Se usa para todo el catálogo, salvo en laboratorios con un orden
+        personalizado (pestaña "Categorías por laboratorio"). El color se usa como cinta identificadora
+        de la categoría en el catálogo de cotizaciones.
+      </p>
+
+      @if (loadingCats()) {
+        <div class="text-center py-5"><c-spinner color="primary" /></div>
+      } @else {
+        <div cdkDropList class="d-flex flex-column gap-2" (cdkDropListDropped)="dropCategory($event)">
+          @for (cat of categories(); track cat.id) {
+            <div cdkDrag class="d-flex align-items-center gap-3 p-2 border rounded-2 bg-body-tertiary">
+              <fa-icon icon="grip-vertical" class="text-body-secondary" cdkDragHandle style="cursor:grab;" />
+              <span class="fw-semibold flex-grow-1">{{ cat.name }}</span>
+              @if (savingColorId() === cat.id) {
+                <c-spinner size="sm" />
+              }
+              <div class="d-flex align-items-center gap-1" (click)="$event.stopPropagation()">
+                <input type="color" class="form-control form-control-color p-0"
+                       style="width:2.2rem; height:2.2rem;"
+                       title="Color de la cinta de categoría"
+                       [value]="cat.color || '#6c757d'"
+                       [disabled]="savingColorId() === cat.id"
+                       (change)="onCategoryColorChange(cat, $any($event.target).value)">
+                @if (cat.color) {
+                  <button type="button" class="btn btn-sm btn-outline-secondary"
+                          [disabled]="savingColorId() === cat.id"
+                          title="Quitar color"
+                          (click)="clearCategoryColor(cat)">
+                    <fa-icon icon="xmark" />
+                  </button>
+                }
+              </div>
+            </div>
+          } @empty {
+            <div class="text-center text-body-secondary py-4">No hay categorías activas.</div>
+          }
+        </div>
+
+        <div class="mt-3 text-end">
+          <button type="button" class="btn btn-primary" [disabled]="savingCats() || categories().length === 0"
+                  (click)="saveCategoriesOrder()">
+            @if (savingCats()) { <c-spinner size="sm" class="me-1" /> } @else { <fa-icon icon="save" class="me-1" /> }
+            Guardar orden
+          </button>
+        </div>
+      }
+    </c-card-body>
+  </c-card>
+}
+
+<!-- ══ CATEGORÍAS POR LABORATORIO (override) ══════════════════════════════ -->
+@if (activeTab() === 'category-override') {
+  <c-card>
+    <c-card-body>
+      <p class="text-body-secondary small">
+        Define un orden de categorías propio para un laboratorio específico. Si no se configura, ese
+        laboratorio usa el orden global de categorías.
+      </p>
+
+      <div class="row g-2 mb-3">
+        <div class="col-12 col-md-5">
+          <label class="form-label small mb-1 text-body-secondary">Laboratorio</label>
+          <p-select
+            [options]="laboratories()"
+            optionLabel="name" optionValue="id"
+            [ngModel]="overrideLabId()"
+            (ngModelChange)="onOverrideLabChange($event)"
+            [filter]="true" filterBy="name"
+            placeholder="Selecciona un laboratorio..."
+            [showClear]="true"
+            [style]="{ width: '100%' }" appendTo="body">
+          </p-select>
+        </div>
+      </div>
+
+      @if (overrideLabId()) {
+        @if (loadingOverride()) {
+          <div class="text-center py-5"><c-spinner color="primary" /></div>
+        } @else {
+          <div class="mb-2">
+            @if (overrideHasOverride()) {
+              <span class="badge bg-warning-subtle text-warning-emphasis">
+                <fa-icon icon="sliders" class="me-1" />Orden personalizado activo
+              </span>
+            } @else {
+              <span class="badge bg-secondary-subtle text-body-secondary">
+                Usando el orden global de categorías
+              </span>
+            }
+          </div>
+
+          <div cdkDropList class="d-flex flex-column gap-2" (cdkDropListDropped)="dropOverrideCategory($event)">
+            @for (cat of overrideCategories(); track cat.id) {
+              <div cdkDrag class="d-flex align-items-center gap-3 p-2 border rounded-2 bg-body-tertiary">
+                <fa-icon icon="grip-vertical" class="text-body-secondary" cdkDragHandle style="cursor:grab;" />
+                <span class="fw-semibold">{{ cat.name }}</span>
+              </div>
+            } @empty {
+              <div class="text-center text-body-secondary py-4">
+                Este laboratorio no tiene productos asignados a ninguna categoría.
+              </div>
+            }
+          </div>
+
+          <div class="mt-3 d-flex justify-content-end gap-2">
+            @if (overrideHasOverride()) {
+              <button type="button" class="btn btn-outline-secondary" [disabled]="savingOverride()"
+                      (click)="resetOverrideOrder()">
+                <fa-icon icon="rotate" class="me-1" />Usar orden global
+              </button>
+            }
+            <button type="button" class="btn btn-primary" [disabled]="savingOverride() || overrideCategories().length === 0"
+                    (click)="saveOverrideOrder()">
+              @if (savingOverride()) { <c-spinner size="sm" class="me-1" /> } @else { <fa-icon icon="save" class="me-1" /> }
+              Guardar orden para este laboratorio
+            </button>
+          </div>
+        }
+      }
+    </c-card-body>
+  </c-card>
+}
+
+<!-- ══ ORDEN DE PRODUCTOS ══════════════════════════════════════════════════ -->
+@if (activeTab() === 'products') {
+  <c-card>
+    <c-card-body>
+      <p class="text-body-secondary small">
+        Define el orden en que se muestran los productos dentro de un laboratorio y categoría específicos.
+      </p>
+
+      <div class="row g-2 mb-3">
+        <div class="col-12 col-md-5">
+          <label class="form-label small mb-1 text-body-secondary">Laboratorio</label>
+          <p-select
+            [options]="laboratories()"
+            optionLabel="name" optionValue="id"
+            [ngModel]="productsLabId()"
+            (ngModelChange)="onProductsLabChange($event)"
+            [filter]="true" filterBy="name"
+            placeholder="Selecciona un laboratorio..."
+            [showClear]="true"
+            [style]="{ width: '100%' }" appendTo="body">
+          </p-select>
+        </div>
+        <div class="col-12 col-md-5">
+          <label class="form-label small mb-1 text-body-secondary">Categoría</label>
+          <p-select
+            [options]="productsLabCategories()"
+            optionLabel="name" optionValue="id"
+            [ngModel]="productsCatId()"
+            (ngModelChange)="onProductsCatChange($event)"
+            [disabled]="!productsLabId()"
+            [filter]="true" filterBy="name"
+            placeholder="Selecciona una categoría..."
+            [showClear]="true"
+            [style]="{ width: '100%' }" appendTo="body">
+          </p-select>
+        </div>
+      </div>
+
+      @if (productsCatId()) {
+        @if (loadingProducts()) {
+          <div class="text-center py-5"><c-spinner color="primary" /></div>
+        } @else {
+          <div cdkDropList class="d-flex flex-column gap-2" (cdkDropListDropped)="dropProduct($event)">
+            @for (product of groupProducts(); track product.id) {
+              <div cdkDrag class="d-flex align-items-center gap-3 p-2 border rounded-2 bg-body-tertiary">
+                <fa-icon icon="grip-vertical" class="text-body-secondary" cdkDragHandle style="cursor:grab;" />
+                <div class="rounded-2 overflow-hidden flex-shrink-0 bg-body-secondary d-flex align-items-center justify-content-center"
+                     style="width:40px;height:40px;">
+                  @if (product.primary_image_url) {
+                    <img [src]="product.primary_image_url" alt="" style="width:100%;height:100%;object-fit:cover;">
+                  } @else {
+                    <fa-icon icon="box-open" class="text-body-secondary" />
+                  }
+                </div>
+                <div class="flex-grow-1 min-width-0">
+                  <div class="fw-semibold text-truncate">{{ product.name }}</div>
+                  @if (product.sku) {
+                    <div class="text-body-secondary small">{{ product.sku }}</div>
+                  }
+                </div>
+              </div>
+            } @empty {
+              <div class="text-center text-body-secondary py-4">
+                No hay productos en este laboratorio y categoría.
+              </div>
+            }
+          </div>
+
+          <div class="mt-3 text-end">
+            <button type="button" class="btn btn-primary" [disabled]="savingProducts() || groupProducts().length === 0"
+                    (click)="saveProductsOrder()">
+              @if (savingProducts()) { <c-spinner size="sm" class="me-1" /> } @else { <fa-icon icon="save" class="me-1" /> }
+              Guardar orden
+            </button>
+          </div>
+        }
+      }
+    </c-card-body>
+  </c-card>
+}

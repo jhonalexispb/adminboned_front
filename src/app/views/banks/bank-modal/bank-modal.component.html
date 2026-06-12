@@ -1,0 +1,23 @@
+@if (open() || bank()) {
+  <c-modal [visible]="true" alignment="center" (visibleChange)="!$event && cancel()">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="building-columns" class="me-2 text-primary" />
+        {{ isEditMode ? 'Editar banco' : 'Nuevo banco / medio de pago' }}
+      </h5>
+    </c-modal-header>
+    <c-modal-body>
+      <label class="form-label small mb-1">Nombre <span class="text-danger">*</span></label>
+      <input type="text" class="form-control"
+             placeholder="Ej: Yape, BCP, Plin..."
+             [(ngModel)]="name" />
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="saving()" (click)="cancel()">Cancelar</button>
+      <button cButton color="primary" [disabled]="saving() || !isValid" (click)="submit()">
+        @if (saving()) { <c-spinner size="sm" class="me-1" /> }
+        {{ isEditMode ? 'Guardar cambios' : 'Crear banco' }}
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}

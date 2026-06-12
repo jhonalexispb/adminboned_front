@@ -1,0 +1,280 @@
+<app-page-header
+  [title]="ret()?.code ?? 'Devolución'"
+  subtitle="Detalle de solicitud de devolución">
+  <button class="btn btn-outline-secondary btn-sm" routerLink="/returns">
+    <fa-icon icon="arrow-left" class="me-1" />Volver
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (ret(); as r) {
+
+  <div class="row g-4">
+
+    <!-- Columna izquierda -->
+    <div class="col-lg-4 d-flex flex-column gap-3">
+
+      <!-- Info de la solicitud -->
+      <c-card>
+        <c-card-header class="py-2"><strong>Solicitud</strong></c-card-header>
+        <c-card-body class="p-0">
+          <dl class="mb-0" style="font-size:.875rem">
+
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+              <span class="font-monospace fw-semibold">{{ r.code }}</span>
+              <c-badge [textBgColor]="statusColors[r.status]">{{ statusLabels[r.status] }}</c-badge>
+            </div>
+
+            <div class="px-3 py-2 border-bottom">
+              <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;">Cliente</div>
+              <div class="fw-semibold">{{ clientName() }}</div>
+              <div class="text-body-secondary small">Pedido: <a [routerLink]="['/orders', r.order_id]">{{ r.order?.code }}</a></div>
+            </div>
+
+            <div class="px-3 py-2 border-bottom">
+              <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Tipo</div>
+              <span class="badge bg-secondary-subtle text-secondary-emphasis">
+                {{ r.type === 'full' ? 'Devolución total' : 'Devolución parcial' }}
+              </span>
+            </div>
+
+            <div class="px-3 py-2 border-bottom">
+              <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Motivo</div>
+              <div class="small">{{ r.reason }}</div>
+            </div>
+
+            @if (r.notes) {
+              <div class="px-3 py-2 border-bottom">
+                <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Notas</div>
+                <div class="small text-body-secondary">{{ r.notes }}</div>
+              </div>
+            }
+
+            <div class="px-3 py-2">
+              <div class="row g-0">
+                <div class="col-6">
+                  <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Solicitado por</div>
+                  <div class="small">{{ r.created_by ?? '—' }}</div>
+                </div>
+                <div class="col-6">
+                  <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Fecha</div>
+                  <div class="small">{{ r.created_at | date:'dd/MM/yyyy HH:mm' }}</div>
+                </div>
+              </div>
+            </div>
+
+            @if (r.processed_by) {
+              <div class="px-3 py-2 border-top bg-body-secondary">
+                <div class="row g-0">
+                  <div class="col-6">
+                    <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Procesado por</div>
+                    <div class="small">{{ r.processed_by }}</div>
+                  </div>
+                  <div class="col-6">
+                    <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Acción</div>
+                    <div class="small">
+                      @switch (r.action_type) {
+                        @case ('credit_note') { <span class="text-success">Nota de Crédito</span> }
+                        @case ('void')        { <span class="text-info">Anulación SUNAT</span> }
+                        @case ('internal')    { <span class="text-secondary">Interno</span> }
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+
+          </dl>
+        </c-card-body>
+      </c-card>
+
+      <!-- Documento de venta -->
+      @if (r.sale_document) {
+        <c-card>
+          <c-card-header class="py-2"><strong>Documento de venta</strong></c-card-header>
+          <c-card-body class="p-0">
+            <dl class="mb-0" style="font-size:.875rem">
+              <div class="px-3 py-2 border-bottom">
+                <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Número</div>
+                <div class="font-monospace fw-semibold">{{ r.sale_document.full_number }}</div>
+              </div>
+              <div class="px-3 py-2 border-bottom">
+                <div class="row g-0">
+                  <div class="col-6">
+                    <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Tipo</div>
+                    <div class="small">
+                      {{ r.sale_document.document_type === 'invoice' ? 'Factura' :
+                         r.sale_document.document_type === 'receipt' ? 'Boleta' : 'Nota de venta' }}
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Emisión</div>
+                    <div class="small">{{ r.sale_document.issue_date | date:'dd/MM/yyyy' }}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="px-3 py-2">
+                <div class="text-body-secondary small" style="font-size:.72rem; text-transform:uppercase;">Total doc.</div>
+                <div class="fw-bold">S/ {{ r.sale_document.total | number:'1.2-2' }}</div>
+              </div>
+            </dl>
+          </c-card-body>
+        </c-card>
+      }
+
+      <!-- Nota de crédito emitida -->
+      @if (r.credit_note) {
+        <c-card>
+          <c-card-header class="py-2"><strong>Nota de Crédito emitida</strong></c-card-header>
+          <c-card-body>
+            <div class="font-monospace fw-bold text-success mb-1">{{ r.credit_note.full_number }}</div>
+            <div class="small text-body-secondary mb-1">Total: S/ {{ r.credit_note.total | number:'1.2-2' }}</div>
+            <c-badge textBgColor="success" class="mb-3">Aceptada por SUNAT</c-badge>
+
+            <div class="d-flex gap-2 mt-2">
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                      style="min-width:42px; font-size:.68rem;"
+                      (click)="openNcFile('pdf')" title="Descargar PDF">
+                <fa-icon icon="file-pdf" />
+                <small>PDF</small>
+              </button>
+              @if (r.credit_note.has_xml) {
+                <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                        style="min-width:42px; font-size:.68rem;"
+                        (click)="openNcFile('xml')" title="Descargar XML firmado">
+                  <fa-icon icon="file-code" /><small>XML</small>
+                </button>
+                <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                        style="min-width:42px; font-size:.68rem;"
+                        (click)="openNcFile('zip')" title="Descargar ZIP (XML + PDF)">
+                  <fa-icon icon="file-zipper" /><small>ZIP</small>
+                </button>
+              }
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+
+      <!-- Panel condiciones SUNAT (solo si hay documento aceptado y está pendiente) -->
+      @if (r.status === 'pending' && r.sale_document && r.sale_document.status === 'accepted' && r.sale_document.document_type !== 'sale_note') {
+        <c-card>
+          <c-card-header class="py-2 d-flex align-items-center gap-2">
+            <fa-icon icon="circle-info" class="text-primary" />
+            <strong>Condiciones SUNAT</strong>
+          </c-card-header>
+          <c-card-body style="font-size:.875rem;">
+            <div class="mb-2 text-body-secondary small">
+              Emisión: <strong>{{ r.sale_document.issue_date | date:'dd/MM/yyyy' }}</strong>
+              &nbsp;·&nbsp; Hoy: <strong>{{ '19/05/2026' }}</strong>
+            </div>
+            <ul class="list-unstyled mb-0">
+              <li class="d-flex align-items-start gap-2 mb-2">
+                @if (canVoid) {
+                  <fa-icon icon="check-circle" class="text-success flex-shrink-0 mt-1" />
+                  <span><strong>Anulación disponible</strong> — el documento fue emitido hoy. Puedes anularlo o emitir NC.</span>
+                } @else {
+                  <fa-icon icon="xmark-circle" class="text-danger flex-shrink-0 mt-1" />
+                  <span><strong>Anulación no disponible</strong> — solo se puede anular el mismo día de emisión.</span>
+                }
+              </li>
+              <li class="d-flex align-items-start gap-2">
+                <fa-icon icon="check-circle" class="text-success flex-shrink-0 mt-1" />
+                <span><strong>Nota de Crédito disponible</strong> — siempre disponible para reversar o acreditar.</span>
+              </li>
+            </ul>
+          </c-card-body>
+        </c-card>
+      }
+
+    </div>
+
+    <!-- Columna derecha -->
+    <div class="col-lg-8 d-flex flex-column gap-3">
+
+      <!-- Ítems a devolver -->
+      <c-card>
+        <c-card-header class="py-2"><strong>Productos a devolver</strong></c-card-header>
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.875rem">
+            <thead style="font-size:.78rem">
+              <tr>
+                <th class="ps-3">Producto</th>
+                <th style="width:90px">Lote</th>
+                <th class="text-end pe-3" style="width:80px">Cantidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of r.items; track item.id) {
+                <tr>
+                  <td class="ps-3 fw-medium">{{ item.product_name ?? '—' }}</td>
+                  <td>
+                    @if (item.lot_number) {
+                      <code class="text-body-secondary" style="font-size:.8rem;">{{ item.lot_number }}</code>
+                    } @else {
+                      <span class="text-body-secondary">—</span>
+                    }
+                  </td>
+                  <td class="text-end pe-3 fw-semibold">{{ item.quantity }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="3" class="text-center text-body-secondary py-3">Sin ítems</td></tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+
+      <!-- Acciones del admin (solo si pendiente) -->
+      @if (r.status === 'pending') {
+        <c-card>
+          <c-card-header class="py-2"><strong>Decisión del administrador</strong></c-card-header>
+          <c-card-body>
+            <p class="text-body-secondary small mb-3">
+              Revisa los detalles de la solicitud y las condiciones SUNAT antes de proceder.
+            </p>
+            <div class="d-flex gap-2">
+              <button class="btn btn-success fw-semibold flex-grow-1"
+                      (click)="showActionModal.set(true)">
+                <fa-icon icon="check" class="me-1" />Procesar devolución
+              </button>
+              <button class="btn btn-outline-danger"
+                      (click)="showRejectModal.set(true)">
+                <fa-icon icon="xmark" class="me-1" />Rechazar solicitud
+              </button>
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+
+    </div>
+  </div>
+}
+
+<!-- Modales extraídos como componentes -->
+<app-process-return-modal
+  [visible]="showActionModal()"
+  [processing]="processing()"
+  [canVoid]="canVoid"
+  (confirmed)="onProcessConfirmed($event)"
+  (cancelled)="showActionModal.set(false)" />
+
+<!-- Modal rechazar (simple, queda inline por tamaño pequeño) -->
+<c-modal [visible]="showRejectModal()" (visibleChange)="!$event && showRejectModal.set(false)" alignment="center">
+  <c-modal-header>
+    <h5 cModalTitle><fa-icon icon="xmark" class="me-2 text-danger" />Rechazar solicitud</h5>
+  </c-modal-header>
+  <c-modal-body>
+    <p class="mb-3">¿Rechazar la solicitud <strong>{{ ret()?.code }}</strong>?</p>
+    <label class="form-label fw-medium">Motivo del rechazo (opcional)</label>
+    <textarea class="form-control" rows="3" placeholder="Explica por qué se rechaza..."
+              [(ngModel)]="rejectNotes"></textarea>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" [disabled]="processing()" (click)="showRejectModal.set(false)">Volver</button>
+    <button cButton color="danger" [disabled]="processing()" (click)="reject()">
+      @if (processing()) { <c-spinner size="sm" class="me-1" /> }
+      <fa-icon icon="xmark" class="me-1" />Rechazar
+    </button>
+  </c-modal-footer>
+</c-modal>
