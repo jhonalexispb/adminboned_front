@@ -60,6 +60,16 @@
                [(ngModel)]="filters.date_to" (change)="onSearch()" />
       </div>
 
+      <div class="col-12 col-md-auto d-flex align-items-center">
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" id="awaitingApproval"
+                 [(ngModel)]="filters.awaiting_approval" (change)="onSearch()" />
+          <label class="form-check-label small" for="awaitingApproval">
+            Esperando aprobación (catálogo)
+          </label>
+        </div>
+      </div>
+
       <div class="col-12 col-md-auto ms-md-auto d-flex align-items-center justify-content-end">
         <span class="text-body-secondary small">
           {{ total() }} cotización{{ total() !== 1 ? 'es' : '' }}
@@ -117,6 +127,12 @@
                     <fa-icon [icon]="q.order_status === 'paid' ? 'circle-check' : 'truck'"
                              class="me-1" style="font-size:.6rem;" />
                     {{ orderStatusLabels[q.order_status] ?? q.order_status }}
+                  </c-badge>
+                }
+                @if (isAwaitingApproval(q)) {
+                  <c-badge color="warning" style="font-size:.65rem;">
+                    <fa-icon icon="clock" class="me-1" style="font-size:.6rem;" />
+                    Esperando aprobación · {{ daysWaiting(q) }} días
                   </c-badge>
                 }
               </div>
@@ -226,8 +242,27 @@
 
             </div>
 
-            @if (q.order_sale_document || q.order_shipping_guide) {
+            @if (q.order_sale_document || q.order_shipping_guide || q.document_type) {
               <div class="d-flex flex-column gap-1 border-top pt-2 mt-2" style="font-size:.75rem;">
+                @if (!q.order_sale_document && !q.order_shipping_guide && q.document_type) {
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="badge rounded-pill"
+                          style="font-size:.6rem; font-weight:500; opacity:.65;"
+                          [style.background]="q.document_type === 'invoice' ? 'var(--cui-primary-bg-subtle)' :
+                                              q.document_type === 'receipt' ? 'var(--cui-success-bg-subtle)' :
+                                              'var(--cui-secondary-bg)'"
+                          [style.color]="q.document_type === 'invoice' ? 'var(--cui-primary-text-emphasis)' :
+                                         q.document_type === 'receipt' ? 'var(--cui-success-text-emphasis)' :
+                                         'var(--cui-secondary-color)'">
+                      <fa-icon [icon]="q.document_type === 'invoice' ? 'file-invoice' :
+                                       q.document_type === 'receipt' ? 'receipt' : 'file-lines'"
+                               class="me-1" style="font-size:.5rem;" />
+                      {{ q.document_type === 'invoice' ? 'Factura' :
+                         q.document_type === 'receipt' ? 'Boleta' : 'N. Venta' }}
+                    </span>
+                    <span class="text-body-secondary" style="font-size:.67rem;">Sin emitir</span>
+                  </div>
+                }
                 @if (q.order_sale_document) {
                   <div class="d-flex align-items-center gap-1">
                     <span class="badge rounded-pill"
@@ -375,7 +410,24 @@
                     </div>
                   }
                   @if (!q.order_sale_document && !q.order_shipping_guide) {
-                    <span class="text-body-secondary">—</span>
+                    @if (q.document_type) {
+                      <span class="badge rounded-pill"
+                            style="font-size:.6rem; font-weight:500; opacity:.65;"
+                            [style.background]="q.document_type === 'invoice' ? 'var(--cui-primary-bg-subtle)' :
+                                                q.document_type === 'receipt' ? 'var(--cui-success-bg-subtle)' :
+                                                'var(--cui-secondary-bg)'"
+                            [style.color]="q.document_type === 'invoice' ? 'var(--cui-primary-text-emphasis)' :
+                                           q.document_type === 'receipt' ? 'var(--cui-success-text-emphasis)' :
+                                           'var(--cui-secondary-color)'">
+                        <fa-icon [icon]="q.document_type === 'invoice' ? 'file-invoice' :
+                                         q.document_type === 'receipt' ? 'receipt' : 'file-lines'"
+                                 class="me-1" style="font-size:.5rem;" />
+                        {{ q.document_type === 'invoice' ? 'Factura' :
+                           q.document_type === 'receipt' ? 'Boleta' : 'N. Venta' }}
+                      </span>
+                    } @else {
+                      <span class="text-body-secondary">—</span>
+                    }
                   }
                 </td>
 
@@ -398,6 +450,14 @@
                         <fa-icon [icon]="q.order_status === 'paid' ? 'circle-check' : 'truck'"
                                  class="me-1" style="font-size:.6rem;" />
                         {{ orderStatusLabels[q.order_status] ?? q.order_status }}
+                      </c-badge>
+                    </div>
+                  }
+                  @if (isAwaitingApproval(q)) {
+                    <div class="mt-1">
+                      <c-badge color="warning" style="font-size:.68rem;">
+                        <fa-icon icon="clock" class="me-1" style="font-size:.6rem;" />
+                        Esperando aprobación · {{ daysWaiting(q) }} días
                       </c-badge>
                     </div>
                   }
@@ -546,151 +606,200 @@
       @if (loadingDocs()) {
         <div class="text-center py-4"><c-spinner color="primary" /></div>
       } @else if (docsOrder(); as o) {
+
+        <!-- Documentos de venta -->
         <div class="mb-4">
           <div class="d-flex align-items-center gap-2 mb-3">
             <fa-icon icon="file-invoice" class="text-body-secondary" />
-            <span class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing:.06em;">Documento de venta</span>
+            <span class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing:.06em;">Documentos de venta</span>
           </div>
-          @if (o.sale_document; as doc) {
-            <div class="border rounded-3 p-3">
-              <div class="d-flex flex-column flex-md-row gap-3">
-                <div class="d-flex gap-3 flex-wrap flex-grow-1" style="font-size:.875rem; min-width:0;">
-                  <div>
-                    <div class="text-body-secondary small mb-1">Tipo</div>
-                    <div class="fw-medium">{{ docTypeLabels[doc.document_type] }}</div>
+          @if (o.sale_documents?.length) {
+            <div class="d-flex flex-column gap-2">
+              @for (doc of o.sale_documents; track doc.id) {
+                <div class="border rounded-3 p-3"
+                     [class.border-danger]="doc.status === 'rejected'"
+                     [class.border-secondary]="doc.status === 'voided'">
+                  <div class="d-flex flex-column flex-md-row gap-3">
+                    <div class="d-flex gap-3 flex-wrap flex-grow-1 align-items-start" style="font-size:.875rem; min-width:0;">
+                      <div>
+                        <div class="text-body-secondary small mb-1">Tipo</div>
+                        <div class="fw-medium">{{ docTypeLabels[doc.document_type] }}</div>
+                      </div>
+                      <div>
+                        <div class="text-body-secondary small mb-1">Número</div>
+                        <div class="fw-bold font-monospace">{{ doc.full_number ?? '—' }}</div>
+                      </div>
+                      <div>
+                        <div class="text-body-secondary small mb-1">Estado</div>
+                        <c-badge [color]="docStatusColors[doc.status]">{{ docStatusLabels[doc.status] }}</c-badge>
+                      </div>
+                      <div>
+                        <div class="text-body-secondary small mb-1">Total</div>
+                        <div class="fw-bold">S/ {{ doc.total | number:'1.2-2' }}</div>
+                      </div>
+                      @if (doc.issue_date) {
+                        <div>
+                          <div class="text-body-secondary small mb-1">Fecha</div>
+                          <div>{{ doc.issue_date | date:'dd/MM/yyyy' }}</div>
+                        </div>
+                      }
+                    </div>
+                    <div class="d-flex gap-2 flex-shrink-0 align-self-end align-self-md-center flex-wrap">
+                      @if (doc.document_type === 'sale_note') {
+                        <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                                style="min-width:48px; font-size:.72rem;"
+                                [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
+                                (click)="openDocFile(doc, 'pdf')">
+                          @if (downloadingKey() === 'sale-documents:' + doc.id + ':pdf') { <c-spinner size="sm" /> }
+                          @else { <fa-icon icon="file-pdf" style="font-size:.95rem;" /> }
+                          <small>PDF</small>
+                        </button>
+                      } @else {
+                        @if (doc.pdf_url) {
+                          <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                                  style="min-width:48px; font-size:.72rem;" (click)="openDocFile(doc, 'pdf')">
+                            <fa-icon icon="file-pdf" style="font-size:.95rem;" /><small>PDF</small>
+                          </button>
+                        }
+                        @if (doc.xml_url) {
+                          <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                                  style="min-width:48px; font-size:.72rem;" (click)="openDocFile(doc, 'xml')">
+                            <fa-icon icon="file-code" style="font-size:.95rem;" /><small>XML</small>
+                          </button>
+                        }
+                        @if (doc.cdr_url) {
+                          <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                                  style="min-width:48px; font-size:.72rem;" (click)="openDocFile(doc, 'cdr')">
+                            <fa-icon icon="file-zipper" style="font-size:.95rem;" /><small>CDR</small>
+                          </button>
+                        }
+                        @if (!doc.pdf_url && !doc.xml_url) {
+                          <span class="text-body-secondary small align-self-center">Sin archivos SUNAT</span>
+                        }
+                      }
+                    </div>
                   </div>
-                  <div>
-                    <div class="text-body-secondary small mb-1">Número</div>
-                    <div class="fw-bold font-monospace">{{ doc.full_number ?? '—' }}</div>
-                  </div>
-                  <div>
-                    <div class="text-body-secondary small mb-1">Estado</div>
-                    <c-badge [color]="docStatusColors[doc.status]">{{ docStatusLabels[doc.status] }}</c-badge>
-                  </div>
-                  <div>
-                    <div class="text-body-secondary small mb-1">Total</div>
-                    <div class="fw-bold">S/ {{ doc.total | number:'1.2-2' }}</div>
-                  </div>
+
+                  <!-- Notas de crédito -->
+                  @if (doc.credit_notes?.length) {
+                    <div class="mt-3 ps-3 border-start border-2">
+                      <div class="small text-body-secondary mb-2 fw-semibold">Notas de crédito</div>
+                      @for (cn of doc.credit_notes; track cn.id) {
+                        <div class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom" style="font-size:.82rem;">
+                          <div class="d-flex gap-3 flex-wrap">
+                            <span class="font-monospace fw-semibold">{{ cn.full_number ?? '—' }}</span>
+                            <c-badge [color]="cn.is_internal ? 'secondary' : 'info'">
+                              {{ cn.is_internal ? 'NC interna' : 'NC SUNAT' }}
+                            </c-badge>
+                            <span class="text-body-secondary">S/ {{ cn.total | number:'1.2-2' }}</span>
+                            @if (cn.reason) { <span class="text-body-secondary fst-italic">{{ cn.reason }}</span> }
+                          </div>
+                          <div class="d-flex gap-1">
+                            @if (cn.is_internal) {
+                              <button class="btn btn-xs btn-secondary" style="font-size:.68rem; padding:2px 6px;"
+                                      [disabled]="downloadingKey() === 'credit-notes:' + cn.id + ':pdf'"
+                                      (click)="openCreditNoteFile(cn, 'pdf')">
+                                @if (downloadingKey() === 'credit-notes:' + cn.id + ':pdf') { <c-spinner size="sm" /> }
+                                @else { PDF }
+                              </button>
+                            } @else {
+                              @if (cn.pdf_url) {
+                                <button class="btn btn-xs btn-secondary" style="font-size:.68rem; padding:2px 6px;"
+                                        (click)="openCreditNoteFile(cn, 'pdf')">PDF</button>
+                              }
+                              @if (cn.xml_url) {
+                                <button class="btn btn-xs btn-info text-white" style="font-size:.68rem; padding:2px 6px;"
+                                        (click)="openCreditNoteFile(cn, 'xml')">XML</button>
+                              }
+                              @if (cn.cdr_url) {
+                                <button class="btn btn-xs btn-warning text-dark" style="font-size:.68rem; padding:2px 6px;"
+                                        (click)="openCreditNoteFile(cn, 'cdr')">CDR</button>
+                              }
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
                 </div>
-                <div class="d-flex gap-2 flex-shrink-0 align-self-end align-self-md-center">
-                  @if (doc.document_type === 'sale_note' || doc.pdf_url) {
-                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
-                            style="min-width:52px; font-size:.75rem;"
-                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
-                            (click)="openDocFile('pdf')" title="Descargar PDF">
-                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':pdf') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-pdf" style="font-size:1rem;" /> }
-                      <small>PDF</small>
-                    </button>
-                  }
-                  @if (doc.xml_url) {
-                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
-                            style="min-width:52px; font-size:.75rem;"
-                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':xml'"
-                            (click)="openDocFile('xml')" title="Descargar XML">
-                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':xml') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-code" style="font-size:1rem;" /> }
-                      <small>XML</small>
-                    </button>
-                  }
-                  @if (doc.cdr_url) {
-                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
-                            style="min-width:52px; font-size:.75rem;"
-                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':cdr'"
-                            (click)="openDocFile('cdr')" title="Descargar CDR">
-                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':cdr') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-zipper" style="font-size:1rem;" /> }
-                      <small>CDR</small>
-                    </button>
-                  }
-                  @if (doc.document_type !== 'sale_note' && !doc.pdf_url && !doc.xml_url) {
-                    <span class="text-body-secondary small align-self-center">Sin archivos SUNAT aún</span>
-                  }
-                </div>
-              </div>
+              }
             </div>
           } @else {
             <div class="bg-body-tertiary rounded-3 px-3 py-3 small text-body-secondary">
-              Sin documento de venta generado.
+              Sin documentos de venta generados.
             </div>
           }
         </div>
 
-        <!-- Guía de remisión -->
+        <!-- Guías de remisión -->
         <div>
           <div class="d-flex align-items-center gap-2 mb-3">
             <fa-icon icon="truck" class="text-body-secondary" />
             <span class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing:.06em;">
-              Guía de remisión
+              Guías de remisión
             </span>
           </div>
-          @if (o.shipping_guide; as guide) {
-            <div class="border rounded-3 p-3">
-              <div class="d-flex flex-column flex-md-row gap-3">
-                <div class="d-flex gap-3 flex-wrap flex-grow-1" style="font-size:.875rem; min-width:0;">
-                  <div>
-                    <div class="text-body-secondary small mb-1">Número</div>
-                    <div class="fw-bold font-monospace lh-sm">{{ guide.full_number ?? '—' }}</div>
-                  </div>
-                  <div>
-                    <div class="text-body-secondary small mb-1">Estado</div>
-                    <c-badge [color]="{ draft:'secondary', sent:'info', accepted:'success', rejected:'danger', voided:'dark' }[guide.sunat_status]">
-                      {{ { draft:'Borrador', sent:'Enviada', accepted:'Aceptada', rejected:'Rechazada', voided:'Anulada' }[guide.sunat_status] }}
-                    </c-badge>
-                  </div>
-                  <div>
-                    <div class="text-body-secondary small mb-1">Transportista</div>
-                    <div class="fw-medium lh-sm">{{ guide.carrier_name }}</div>
-                    @if (guide.carrier_ruc) {
-                      <div class="text-body-secondary small font-monospace">{{ guide.carrier_ruc }}</div>
-                    }
-                  </div>
-                  <div>
-                    <div class="text-body-secondary small mb-1">Fecha traslado</div>
-                    <div class="fw-medium">{{ guide.transfer_date | date:'dd/MM/yyyy' }}</div>
+          @let guides = o.shipping_guides ?? (o.shipping_guide ? [o.shipping_guide] : []);
+          @if (guides.length) {
+            <div class="d-flex flex-column gap-2">
+              @for (guide of guides; track guide.id) {
+                <div class="border rounded-3 p-3">
+                  <div class="d-flex flex-column flex-md-row gap-3">
+                    <div class="d-flex gap-3 flex-wrap flex-grow-1" style="font-size:.875rem; min-width:0;">
+                      <div>
+                        <div class="text-body-secondary small mb-1">Número</div>
+                        <div class="fw-bold font-monospace lh-sm">{{ guide.full_number ?? '—' }}</div>
+                      </div>
+                      <div>
+                        <div class="text-body-secondary small mb-1">Estado</div>
+                        <c-badge [color]="{ draft:'secondary', sent:'info', accepted:'success', rejected:'danger', voided:'dark' }[guide.sunat_status]">
+                          {{ { draft:'Borrador', sent:'Enviada', accepted:'Aceptada', rejected:'Rechazada', voided:'Anulada' }[guide.sunat_status] }}
+                        </c-badge>
+                      </div>
+                      <div>
+                        <div class="text-body-secondary small mb-1">Transportista</div>
+                        <div class="fw-medium lh-sm">{{ guide.carrier_name }}</div>
+                        @if (guide.carrier_ruc) {
+                          <div class="text-body-secondary small font-monospace">{{ guide.carrier_ruc }}</div>
+                        }
+                      </div>
+                      @if (guide.transfer_date) {
+                        <div>
+                          <div class="text-body-secondary small mb-1">Fecha traslado</div>
+                          <div class="fw-medium">{{ guide.transfer_date | date:'dd/MM/yyyy' }}</div>
+                        </div>
+                      }
+                    </div>
+                    <div class="d-flex gap-2 flex-shrink-0 align-self-end align-self-md-center">
+                      @if (guide.pdf_url) {
+                        <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                                style="min-width:48px; font-size:.72rem;" (click)="openGuideFile(guide, 'pdf')">
+                          <fa-icon icon="file-pdf" style="font-size:.95rem;" /><small>PDF</small>
+                        </button>
+                      }
+                      @if (guide.xml_url) {
+                        <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                                style="min-width:48px; font-size:.72rem;" (click)="openGuideFile(guide, 'xml')">
+                          <fa-icon icon="file-code" style="font-size:.95rem;" /><small>XML</small>
+                        </button>
+                      }
+                      @if (guide.cdr_url) {
+                        <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                                style="min-width:48px; font-size:.72rem;" (click)="openGuideFile(guide, 'cdr')">
+                          <fa-icon icon="file-zipper" style="font-size:.95rem;" /><small>CDR</small>
+                        </button>
+                      }
+                      @if (!guide.pdf_url && !guide.xml_url && guide.sunat_status !== 'draft') {
+                        <span class="text-body-secondary small align-self-center">Sin archivos SUNAT</span>
+                      }
+                    </div>
                   </div>
                 </div>
-                <!-- Descargas guía (URLs de ApiSunat) -->
-                <div class="d-flex gap-2 flex-shrink-0 align-self-end align-self-md-center">
-                  @if (guide.pdf_url) {
-                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
-                            style="min-width:52px; font-size:.75rem;"
-                            [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':pdf'"
-                            (click)="openGuideFile('pdf')" title="Descargar PDF">
-                      @if (downloadingKey() === 'shipping-guides:' + guide.id + ':pdf') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-pdf" style="font-size:1rem;" /> }
-                      <small>PDF</small>
-                    </button>
-                  }
-                  @if (guide.xml_url) {
-                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
-                            style="min-width:52px; font-size:.75rem;"
-                            [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':xml'"
-                            (click)="openGuideFile('xml')" title="Descargar XML">
-                      @if (downloadingKey() === 'shipping-guides:' + guide.id + ':xml') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-code" style="font-size:1rem;" /> }
-                      <small>XML</small>
-                    </button>
-                  }
-                  @if (guide.cdr_url) {
-                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
-                            style="min-width:52px; font-size:.75rem;"
-                            [disabled]="downloadingKey() === 'shipping-guides:' + guide.id + ':cdr'"
-                            (click)="openGuideFile('cdr')" title="Descargar CDR">
-                      @if (downloadingKey() === 'shipping-guides:' + guide.id + ':cdr') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-zipper" style="font-size:1rem;" /> }
-                      <small>CDR</small>
-                    </button>
-                  }
-                  @if (!guide.pdf_url && !guide.xml_url && guide.sunat_status !== 'draft') {
-                    <span class="text-body-secondary small align-self-center">Sin archivos SUNAT aún</span>
-                  }
-                </div>
-              </div>
+              }
             </div>
           } @else {
             <div class="bg-body-tertiary rounded-3 px-3 py-3 small text-body-secondary">
-              Sin guía de remisión generada.
+              Sin guías de remisión generadas.
             </div>
           }
         </div>

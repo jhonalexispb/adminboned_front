@@ -7,7 +7,7 @@ import { FaIconComponent } from '@fortawesome/angular-fontawesome';
   standalone: true,
   imports: [FaIconComponent],
   template: `
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:9998">
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:99999">
       @for (toast of toastService.toasts(); track toast.id) {
         <div
           class="toast show align-items-center text-white border-0 mb-2"

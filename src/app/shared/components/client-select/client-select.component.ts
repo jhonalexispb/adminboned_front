@@ -25,4 +25,9 @@ export class ClientSelectComponent implements OnInit {
       this.clients.set(res.data.map(toClientOption));
     });
   }
+
+  addAndSelect(client: ClientOption): void {
+    this.clients.update(list => [client, ...list]);
+    this.value.set(client);
+  }
 }

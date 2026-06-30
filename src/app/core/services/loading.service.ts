@@ -1,4 +1,7 @@
+import { HttpContextToken } from '@angular/common/http';
 import { Injectable, signal } from '@angular/core';
+
+export const SKIP_LOADING = new HttpContextToken<boolean>(() => false);
 
 @Injectable({ providedIn: 'root' })
 export class LoadingService {

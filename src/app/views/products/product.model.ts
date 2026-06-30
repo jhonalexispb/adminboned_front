@@ -73,6 +73,26 @@ export interface PriceHistoryEntry {
   user: string | null;
 }
 
+export interface SalesMonthly {
+  month: string;
+  units: number;
+  revenue: number;
+}
+
+export interface SalesAnalysis {
+  monthly: SalesMonthly[];
+  summary: {
+    units_30d: number;
+    units_90d: number;
+    revenue_90d: number;
+    avg_price_90d: number | null;
+    current_stock: number;
+    avg_monthly_units: number;
+    rotation_months: number | null;
+    last_sale_date: string | null;
+  };
+}
+
 export interface PricingData {
   product: {
     id: number;
@@ -87,6 +107,7 @@ export interface PricingData {
   price_history: PriceHistoryEntry[];
   cost_history: PriceHistoryEntry[];
   timeline: PriceHistoryEntry[];
+  sales_analysis: SalesAnalysis;
 }
 
 export interface ProductImportSummary {

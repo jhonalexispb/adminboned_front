@@ -92,7 +92,7 @@ export class KardexListComponent implements OnInit {
     const pid = this.route.snapshot.queryParamMap.get('product_id');
     const lid = this.route.snapshot.queryParamMap.get('lot_id');
 
-    this.productService.list({ active: true, per_page: 500 }).subscribe(r => {
+    this.productService.list({ active: true, per_page: 100000 }).subscribe(r => {
       this.products.set(r.data);
       if (pid) {
         this.filters.product_id = Number(pid);
@@ -218,7 +218,7 @@ export class KardexListComponent implements OnInit {
 
   /** Usuario a mostrar: para movimientos de venta, el vendedor que creó el pedido/cotización; si no, quien ejecutó el movimiento. */
   userDisplay(entry: KardexEntry): string {
-    return this.saleRefMeta(entry)?.seller?.name ?? entry.user?.name ?? '—';
+    return entry.user?.name ?? this.saleRefMeta(entry)?.seller?.name ?? '—';
   }
 
   /** Devuelve el meta de recepción de compra para reference_type === 'purchase_receipt' */

@@ -10,8 +10,10 @@ export class TrendsService {
 
   constructor(private http: HttpClient) {}
 
-  get(year?: number): Observable<TrendsData> {
-    const params = year ? new HttpParams().set('year', year) : undefined;
+  get(year?: number, month?: number | null): Observable<TrendsData> {
+    let params = new HttpParams();
+    if (year)  params = params.set('year', year);
+    if (month) params = params.set('month', month);
     return this.http.get<TrendsData>(this.url, { params });
   }
 

@@ -293,7 +293,7 @@
           <thead style="font-size:.76rem">
             <tr>
               <th class="ps-3" style="width:85px">Fecha</th>
-              <th style="width:175px">Producto / Lote</th>
+              <th>Producto / Lote</th>
               <th class="text-center" style="width:90px">Tipo</th>
               <th class="text-end" style="width:75px">Cantidad</th>
               <th class="text-end" style="width:90px">Stock post</th>
@@ -322,7 +322,7 @@
 
                 <!-- Producto + Lote fusionados -->
                 <td>
-                  <div class="fw-medium text-truncate" style="max-width:170px">
+                  <div class="fw-medium">
                     @if (e.product?.laboratory) {
                       <span class="text-info">{{ e.product!.laboratory!.name }}</span>
                     }

@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -24,7 +24,8 @@ import { ReturnRecord, RETURN_STATUS_LABELS, RETURN_STATUS_COLORS, MOTIVO_OPTION
   templateUrl: './manage-return-modal.component.html',
 })
 export class ManageReturnModalComponent {
-  return_ = input<ReturnRecord | null>(null);
+  return_       = input<ReturnRecord | null>(null);
+  loadingDetail = input(false);
 
   processed = output<ReturnRecord>();
   rejected  = output<ReturnRecord>();
@@ -35,8 +36,11 @@ export class ManageReturnModalComponent {
   processing = signal(false);
   showReject = signal(false);
 
+  busy = computed(() => this.loadingDetail() || this.processing());
+
   actionType  = 'credit_note';
   motivoCode  = '07';
+  motivoDesc  = '';
   issueDate   = new Date().toISOString().slice(0, 10);
   rejectNotes = '';
 
@@ -64,15 +68,11 @@ export class ManageReturnModalComponent {
                          (doc.document_type === 'invoice' || doc.document_type === 'receipt'))
                         ? 'credit_note' : 'internal';
       this.motivoCode  = '07';
+      this.motivoDesc  = '';
       this.issueDate   = new Date().toISOString().slice(0, 10);
       this.showReject.set(false);
       this.rejectNotes = '';
     });
-  }
-
-  canVoid(): boolean {
-    const d = this.return_()?.sale_document?.issue_date;
-    return !!d && d === new Date().toISOString().slice(0, 10);
   }
 
   isSunatDoc(): boolean {
@@ -92,7 +92,6 @@ export class ManageReturnModalComponent {
     if (!r || this.processing()) return;
 
     const actionLabel = this.actionType === 'credit_note' ? 'emitir la Nota de Crédito'
-      : this.actionType === 'void' ? 'anular el documento'
       : 'procesar la devolución de forma interna';
 
     const warning = this.actionType === 'internal'
@@ -114,8 +113,9 @@ export class ManageReturnModalComponent {
     this.processing.set(true);
     this.svc.accept(r.id, {
       action_type: this.actionType as any,
-      motivo_code: this.actionType === 'credit_note' ? this.motivoCode : undefined,
-      issue_date:  this.actionType === 'credit_note' ? this.issueDate  : undefined,
+      motivo_code: this.actionType === 'credit_note' ? this.motivoCode        : undefined,
+      motivo_desc: this.actionType === 'credit_note' ? this.motivoDesc.trim() : undefined,
+      issue_date:  this.actionType === 'credit_note' ? this.issueDate         : undefined,
     }).subscribe({
       next: res => {
         this.toast.success(res.message);

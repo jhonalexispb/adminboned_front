@@ -1,0 +1,384 @@
+<app-page-header title="Apariencia del catálogo" subtitle="Eventos especiales, banners promocionales y mensajes de carga">
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ Configuración general ════════════════════════════════════════════ -->
+  <c-card class="mb-3">
+    <c-card-header>Configuración general</c-card-header>
+    <c-card-body>
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label">Duración de cada slide del carrusel (segundos)</label>
+          <input type="number" step="0.5" min="1" max="30" class="form-control" [(ngModel)]="bannerDurationSeconds" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Frecuencia del evento especial</label>
+          <select class="form-select" [(ngModel)]="eventDisplayFrequency">
+            <option value="always">Cada vez que se actualiza la pantalla</option>
+            <option value="daily">Una vez al día</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label d-flex justify-content-between">
+            <span>Relación imagen / info (tablet)</span>
+            <span class="badge bg-secondary ms-2">{{ cardImageRatio }}% / {{ 100 - cardImageRatio }}%</span>
+          </label>
+          <input type="range" class="form-range" min="30" max="70" step="5" [(ngModel)]="cardImageRatio" />
+          <div class="d-flex justify-content-between" style="font-size:.75rem; color:var(--bs-secondary-color);">
+            <span>Imagen más pequeña</span>
+            <span>Imagen más grande</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <button class="btn btn-primary" [disabled]="savingSettings()" (click)="saveSettings()">
+            @if (savingSettings()) {
+              <c-spinner size="sm" class="me-1" />Guardando...
+            } @else {
+              Guardar
+            }
+          </button>
+        </div>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- ══ Eventos especiales ═══════════════════════════════════════════════ -->
+  <c-card class="mb-3">
+    <c-card-header class="d-flex align-items-center justify-content-between">
+      <span>Eventos especiales</span>
+      <button class="btn btn-sm btn-primary" (click)="openCreateEvent()">
+        <fa-icon icon="plus" class="me-1" />Agregar evento
+      </button>
+    </c-card-header>
+    <c-card-body class="p-0">
+
+      <div class="text-body-secondary small p-2 pb-0">
+        Usa imágenes horizontales tipo banner (proporción 3:1, ej. 1500 × 500 px).
+      </div>
+
+      <!-- MOBILE: cards -->
+      <div class="d-md-none d-flex flex-column gap-2 p-2">
+        @for (ev of events; track ev.id) {
+          <div class="border rounded p-2">
+            <div class="d-flex gap-2">
+              <img [src]="ev.image_url" class="rounded" style="width:90px;height:30px;object-fit:cover;flex-shrink:0;" alt="" />
+              <div class="flex-grow-1 min-width-0">
+                <div class="fw-semibold">{{ ev.label || 'Sin etiqueta' }}</div>
+                <div class="text-body-secondary small">{{ ev.starts_at || '—' }} → {{ ev.ends_at || '—' }}</div>
+              </div>
+              @if (isEventActive(ev)) {
+                <span class="badge bg-success align-self-start">Vigente</span>
+              } @else {
+                <span class="badge bg-secondary align-self-start">{{ ev.active ? 'Programado' : 'Inactivo' }}</span>
+              }
+            </div>
+            <div class="d-flex gap-2 mt-2 pt-2 border-top">
+              <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" (click)="openEditEvent(ev)">
+                <fa-icon icon="pencil" style="font-size:.85rem;" /><small>Editar</small>
+              </button>
+              <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" (click)="confirmDeleteEvent(ev)">
+                <fa-icon icon="trash" style="font-size:.85rem;" /><small>Eliminar</small>
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <div class="text-center text-body-secondary py-4">
+            No hay eventos especiales registrados.
+          </div>
+        }
+      </div>
+
+      <!-- DESKTOP: tabla -->
+      <div class="table-responsive d-none d-md-block">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th style="width:120px">Imagen</th>
+              <th>Etiqueta</th>
+              <th>Vigencia</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:100px" class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ev of events; track ev.id) {
+              <tr>
+                <td><img [src]="ev.image_url" class="rounded" style="width:120px;height:40px;object-fit:cover;" alt="" /></td>
+                <td class="fw-medium">{{ ev.label || '—' }}</td>
+                <td class="text-body-secondary small">{{ ev.starts_at || '—' }} → {{ ev.ends_at || '—' }}</td>
+                <td>
+                  @if (isEventActive(ev)) {
+                    <span class="badge bg-success">Vigente</span>
+                  } @else {
+                    <span class="badge bg-secondary">{{ ev.active ? 'Programado' : 'Inactivo' }}</span>
+                  }
+                </td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2">
+                    <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEditEvent(ev)">
+                      <fa-icon icon="pencil" /><small>Editar</small>
+                    </button>
+                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDeleteEvent(ev)">
+                      <fa-icon icon="trash" /><small>Eliminar</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="text-center py-4 text-body-secondary">
+                  No hay eventos especiales registrados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+    </c-card-body>
+  </c-card>
+
+  <!-- ══ Banners promocionales ═══════════════════════════════════════════════ -->
+  <c-card class="mb-3">
+    <c-card-header class="d-flex align-items-center justify-content-between">
+      <span>Banners promocionales</span>
+      <button class="btn btn-sm btn-primary" (click)="openCreateBanner()">
+        <fa-icon icon="plus" class="me-1" />Agregar banner
+      </button>
+    </c-card-header>
+    <c-card-body class="p-0">
+
+      <div class="text-body-secondary small p-2 pb-0">
+        Imágenes horizontales tipo banner, proporción 3:1 (ej. 1500 × 500 px).
+      </div>
+
+      <!-- MOBILE: cards -->
+      <div class="d-md-none d-flex flex-column gap-2 p-2">
+        @for (b of sortedBanners; track b.id) {
+          <div class="border rounded p-2">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <div class="fw-semibold text-truncate me-2">{{ b.title || 'Sin título' }}</div>
+              @if (b.active) {
+                <span class="badge bg-success" style="flex-shrink:0;">Activo</span>
+              } @else {
+                <span class="badge bg-secondary" style="flex-shrink:0;">Inactivo</span>
+              }
+            </div>
+            <div class="d-flex gap-2 align-items-start">
+              <img [src]="b.image_url" class="rounded" style="width:80px;height:27px;object-fit:cover;flex-shrink:0;" alt="" />
+              <div class="flex-grow-1 min-width-0">
+                @if (b.product_name) {
+                  <div class="small" style="line-height:1.3;">
+                    <div class="text-primary fw-semibold text-truncate" style="font-size:.7rem;">{{ b.product_lab_name }}</div>
+                    <div class="text-truncate">{{ b.product_name }}</div>
+                  </div>
+                } @else {
+                  <div class="text-body-secondary small">Sin producto vinculado</div>
+                }
+                <div class="text-body-secondary small">{{ b.starts_at || '—' }} → {{ b.ends_at || '—' }}</div>
+              </div>
+            </div>
+            <div class="d-flex gap-2 mt-2 pt-2 border-top">
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" [disabled]="reorderingId() === b.id" (click)="moveBanner(b, -1)">
+                <fa-icon icon="arrow-up" style="font-size:.85rem;" /><small>Subir</small>
+              </button>
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" [disabled]="reorderingId() === b.id" (click)="moveBanner(b, 1)">
+                <fa-icon icon="arrow-down" style="font-size:.85rem;" /><small>Bajar</small>
+              </button>
+              <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" (click)="openEditBanner(b)">
+                <fa-icon icon="pencil" style="font-size:.85rem;" /><small>Editar</small>
+              </button>
+              <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" (click)="confirmDeleteBanner(b)">
+                <fa-icon icon="trash" style="font-size:.85rem;" /><small>Eliminar</small>
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <div class="text-center text-body-secondary py-4">
+            No hay banners registrados.
+          </div>
+        }
+      </div>
+
+      <!-- DESKTOP: tabla -->
+      <div class="table-responsive d-none d-md-block">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th style="width:120px">Imagen</th>
+              <th>Título</th>
+              <th>Producto vinculado</th>
+              <th>Vigencia</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:160px" class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (b of sortedBanners; track b.id) {
+              <tr>
+                <td><img [src]="b.image_url" class="rounded" style="width:120px;height:40px;object-fit:cover;" alt="" /></td>
+                <td class="fw-medium">{{ b.title || '—' }}</td>
+                <td style="max-width:220px;">
+                  @if (b.product_name) {
+                    <div style="line-height:1.3;">
+                      <div class="text-primary fw-semibold" style="font-size:.75rem;">{{ b.product_lab_name }}</div>
+                      <div style="font-size:.85rem;">{{ b.product_name }}</div>
+                    </div>
+                  } @else {
+                    <span class="text-body-secondary small">—</span>
+                  }
+                </td>
+                <td class="text-body-secondary small">{{ b.starts_at || '—' }} → {{ b.ends_at || '—' }}</td>
+                <td>
+                  @if (b.active) {
+                    <span class="badge bg-success">Activo</span>
+                  } @else {
+                    <span class="badge bg-secondary">Inactivo</span>
+                  }
+                </td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2">
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center" [disabled]="reorderingId() === b.id" (click)="moveBanner(b, -1)">
+                      <fa-icon icon="arrow-up" /><small>Subir</small>
+                    </button>
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center" [disabled]="reorderingId() === b.id" (click)="moveBanner(b, 1)">
+                      <fa-icon icon="arrow-down" /><small>Bajar</small>
+                    </button>
+                    <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEditBanner(b)">
+                      <fa-icon icon="pencil" /><small>Editar</small>
+                    </button>
+                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDeleteBanner(b)">
+                      <fa-icon icon="trash" /><small>Eliminar</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="text-center py-4 text-body-secondary">
+                  No hay banners registrados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+    </c-card-body>
+  </c-card>
+
+  <!-- ══ Mensajes de carga ═══════════════════════════════════════════════ -->
+  <c-card class="mb-3">
+    <c-card-header class="d-flex align-items-center justify-content-between">
+      <span>Mensajes de carga</span>
+      <button class="btn btn-sm btn-primary" (click)="openCreateLoadingMessage()">
+        <fa-icon icon="plus" class="me-1" />Agregar mensaje
+      </button>
+    </c-card-header>
+    <c-card-body class="p-0">
+
+      <div class="text-body-secondary small p-2 pb-0">
+        Estos mensajes se muestran en la pantalla de carga del catálogo mientras se cargan los productos.
+      </div>
+
+      <!-- MOBILE: cards -->
+      <div class="d-md-none d-flex flex-column gap-2 p-2">
+        @for (m of sortedLoadingMessages; track m.id) {
+          <div class="border rounded p-2">
+            <div class="d-flex gap-2">
+              <div class="flex-grow-1 min-width-0">
+                <div class="fw-semibold">{{ m.message }}</div>
+              </div>
+              @if (m.active) {
+                <span class="badge bg-success align-self-start">Activo</span>
+              } @else {
+                <span class="badge bg-secondary align-self-start">Inactivo</span>
+              }
+            </div>
+            <div class="d-flex gap-2 mt-2 pt-2 border-top">
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" [disabled]="reorderingId() === m.id" (click)="moveLoadingMessage(m, -1)">
+                <fa-icon icon="arrow-up" style="font-size:.85rem;" /><small>Subir</small>
+              </button>
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" [disabled]="reorderingId() === m.id" (click)="moveLoadingMessage(m, 1)">
+                <fa-icon icon="arrow-down" style="font-size:.85rem;" /><small>Bajar</small>
+              </button>
+              <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" (click)="openEditLoadingMessage(m)">
+                <fa-icon icon="pencil" style="font-size:.85rem;" /><small>Editar</small>
+              </button>
+              <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-grow-1" style="font-size:.68rem;" (click)="confirmDeleteLoadingMessage(m)">
+                <fa-icon icon="trash" style="font-size:.85rem;" /><small>Eliminar</small>
+              </button>
+            </div>
+          </div>
+        } @empty {
+          <div class="text-center text-body-secondary py-4">
+            No hay mensajes de carga registrados.
+          </div>
+        }
+      </div>
+
+      <!-- DESKTOP: tabla -->
+      <div class="table-responsive d-none d-md-block">
+        <table cTable hover>
+          <thead>
+            <tr>
+              <th>Mensaje</th>
+              <th style="width:110px">Estado</th>
+              <th style="width:200px" class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (m of sortedLoadingMessages; track m.id) {
+              <tr>
+                <td class="fw-medium">{{ m.message }}</td>
+                <td>
+                  @if (m.active) {
+                    <span class="badge bg-success">Activo</span>
+                  } @else {
+                    <span class="badge bg-secondary">Inactivo</span>
+                  }
+                </td>
+                <td class="text-end">
+                  <div class="d-inline-flex gap-2">
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center" [disabled]="reorderingId() === m.id" (click)="moveLoadingMessage(m, -1)">
+                      <fa-icon icon="arrow-up" /><small>Subir</small>
+                    </button>
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center" [disabled]="reorderingId() === m.id" (click)="moveLoadingMessage(m, 1)">
+                      <fa-icon icon="arrow-down" /><small>Bajar</small>
+                    </button>
+                    <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEditLoadingMessage(m)">
+                      <fa-icon icon="pencil" /><small>Editar</small>
+                    </button>
+                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDeleteLoadingMessage(m)">
+                      <fa-icon icon="trash" /><small>Eliminar</small>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="3" class="text-center py-4 text-body-secondary">
+                  No hay mensajes de carga registrados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+    </c-card-body>
+  </c-card>
+
+} <!-- /loading -->
+
+<app-confirm-modal
+  [visible]="showConfirm()"
+  title="Confirmar eliminación"
+  [message]="'¿Eliminar &quot;' + (confirmTarget?.name ?? '') + '&quot;? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  (confirm)="onConfirmDelete()"
+  (cancel)="showConfirm.set(false)"
+/>

@@ -59,6 +59,8 @@ export interface Lot {
   is_default: boolean;
   status: 'active' | 'blocked';
   current_stock: number;
+  reserved_stock: number;
+  available_stock: number;
   created_at: string;
 }
 

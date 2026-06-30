@@ -36,6 +36,12 @@
             (click)="tabActiva.set('metas')">
       <fa-icon icon="bullseye" class="me-1" />Metas del negocio
     </button>
+    <button class="btn btn-sm"
+            [class.btn-primary]="tabActiva() === 'catalogo'"
+            [class.btn-outline-secondary]="tabActiva() !== 'catalogo'"
+            (click)="tabActiva.set('catalogo')">
+      <fa-icon icon="book-open" class="me-1" />Catálogo
+    </button>
   </div>
 
   <!-- ── Tab: Datos de la empresa ── -->
@@ -122,29 +128,63 @@
       </c-card-body>
     </c-card>
 
-    <!-- Logo -->
+    <!-- Logos -->
     <c-card class="mb-3">
-      <c-card-header><strong>Logo</strong></c-card-header>
-      <c-card-body>
-        <div class="d-flex align-items-center gap-4 flex-wrap">
-          @if (empresa()?.logo_url) {
-            <img [src]="empresa()!.logo_url" alt="Logo" style="height:64px;object-fit:contain;" />
-          } @else {
-            <div class="text-body-secondary small border rounded p-3">Sin logo</div>
-          }
-          <div>
-            <input type="file" class="form-control form-control-sm mb-2"
-                   accept="image/png,image/jpeg,image/svg+xml"
-                   (change)="onLogoChange($event)" />
-            <button class="btn btn-sm btn-secondary"
-                    [disabled]="!logoFile || subiendoLogo()"
-                    (click)="subirLogo()">
-              @if (subiendoLogo()) { <c-spinner size="sm" class="me-1" /> }
-              Subir logo
-            </button>
-            <div class="text-body-secondary mt-1" style="font-size:.78rem;">PNG, JPG o SVG · Máx. 2 MB</div>
+      <c-card-header><strong>Logos</strong></c-card-header>
+      <c-card-body class="d-flex flex-column gap-4">
+
+        <!-- Logo del sistema y catálogo -->
+        <div>
+          <div class="fw-semibold mb-1">Logo del sistema y catálogo</div>
+          <div class="text-body-secondary small mb-2">Aparece en el panel administrativo, la pantalla de login y el catálogo de clientes.</div>
+          <div class="d-flex align-items-center gap-4 flex-wrap">
+            @if (empresa()?.logo_url) {
+              <img [src]="empresa()!.logo_url" alt="Logo" style="height:64px;object-fit:contain;border:1px solid var(--cui-border-color);border-radius:6px;padding:6px;" />
+            } @else {
+              <div class="text-body-secondary small border rounded p-3">Sin logo</div>
+            }
+            <div>
+              <input type="file" class="form-control form-control-sm mb-2"
+                     accept="image/png,image/jpeg,image/svg+xml"
+                     (change)="onLogoChange($event)" />
+              <button class="btn btn-sm btn-secondary"
+                      [disabled]="!logoFile || subiendoLogo()"
+                      (click)="subirLogo()">
+                @if (subiendoLogo()) { <c-spinner size="sm" class="me-1" /> }
+                Subir logo
+              </button>
+              <div class="text-body-secondary mt-1" style="font-size:.78rem;">PNG, JPG o SVG · Máx. 2 MB</div>
+            </div>
           </div>
         </div>
+
+        <hr class="my-0" />
+
+        <!-- Logo para documentos PDF -->
+        <div>
+          <div class="fw-semibold mb-1">Logo para documentos (PDFs)</div>
+          <div class="text-body-secondary small mb-2">Aparece en cotizaciones, facturas, boletas y demás PDFs generados. Si no se sube uno, se usa el logo del sistema.</div>
+          <div class="d-flex align-items-center gap-4 flex-wrap">
+            @if (empresa()?.doc_logo_url) {
+              <img [src]="empresa()!.doc_logo_url" alt="Logo documentos" style="height:64px;object-fit:contain;border:1px solid var(--cui-border-color);border-radius:6px;padding:6px;" />
+            } @else {
+              <div class="text-body-secondary small border rounded p-3">Sin logo de documentos<br><span style="font-size:.75rem;">Se usará el logo del sistema</span></div>
+            }
+            <div>
+              <input type="file" class="form-control form-control-sm mb-2"
+                     accept="image/png,image/jpeg,image/svg+xml"
+                     (change)="onDocLogoChange($event)" />
+              <button class="btn btn-sm btn-secondary"
+                      [disabled]="!docLogoFile || subiendoDocLogo()"
+                      (click)="subirDocLogo()">
+                @if (subiendoDocLogo()) { <c-spinner size="sm" class="me-1" /> }
+                Subir logo de documentos
+              </button>
+              <div class="text-body-secondary mt-1" style="font-size:.78rem;">PNG, JPG o SVG · Máx. 2 MB</div>
+            </div>
+          </div>
+        </div>
+
       </c-card-body>
     </c-card>
   }
@@ -381,7 +421,78 @@
     </c-card>
   }
 
-  <!-- Guardar (siempre visible) -->
+  <!-- ── Tab: Catálogo ── -->
+  @if (tabActiva() === 'catalogo') {
+    <c-card class="mb-3">
+      <c-card-header><strong>Catálogo</strong></c-card-header>
+      <c-card-body>
+
+        <p class="small text-body-secondary mb-3">
+          Cuando un pedido del catálogo público se convierte en cotización, define quién
+          queda como vendedor responsable.
+        </p>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-body-secondary">Vendedor de la cotización generada</label>
+            <select class="form-select" [(ngModel)]="form.catalog_request_seller_mode">
+              <option value="client_assignment">Vendedor asignado al cliente</option>
+              <option value="reviewer">Quien procesa el pedido</option>
+            </select>
+            <div class="form-text">
+              <strong>Vendedor asignado al cliente:</strong> usa el vendedor configurado en la ficha del cliente.<br>
+              <strong>Quien procesa el pedido:</strong> el usuario que valida y convierte el pedido de catálogo.
+            </div>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label small text-body-secondary">WhatsApp de contacto</label>
+            <input type="text" class="form-control" placeholder="51987654321"
+                   [(ngModel)]="form.catalog_whatsapp_number">
+            <div class="form-text">
+              Número con código de país, solo dígitos (ej. 51987654321). Se muestra como botón de
+              WhatsApp en el catálogo público para clientes que aún no se identifican con su RUC.
+              Si se deja vacío, el botón no aparece.
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="catalogShowLotBreakdown"
+                     [(ngModel)]="form.catalog_show_lot_breakdown">
+              <label class="form-check-label small" for="catalogShowLotBreakdown">
+                Mostrar desglose de lotes (FEFO) en el detalle de producto
+              </label>
+            </div>
+            <div class="form-text">
+              Si está activo, el cliente ve en el detalle del producto una tabla con cuántas
+              unidades saldrían de cada lote según FEFO. Como esa asignación se recalcula al
+              convertir el pedido (puede variar si cambia el stock), dejarlo desactivado evita
+              generar falsas expectativas. Los lotes y sus fechas de vencimiento siguen
+              mostrándose mediante badges, sin este desglose.
+            </div>
+          </div>
+
+          <div class="col-sm-4">
+            <label class="form-label small" for="catalogStaleOrderDays">
+              Días esperando aprobación del cliente
+            </label>
+            <input type="number" class="form-control" id="catalogStaleOrderDays"
+                   min="1" max="30"
+                   [(ngModel)]="form.catalog_stale_order_days">
+            <div class="form-text">
+              Para cotizaciones generadas desde un pedido de catálogo: si lleva más de estos días
+              enviada al cliente sin que apruebe o rechace por llamada, se marca como "esperando
+              aprobación" en Cotizaciones y avisa en las notificaciones.
+            </div>
+          </div>
+        </div>
+
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- Guardar -->
   <div class="d-flex gap-2">
     <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
       @if (guardando()) { <c-spinner size="sm" class="me-1" /> }

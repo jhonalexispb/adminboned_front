@@ -26,6 +26,12 @@ export const routes: Routes = [
         data: { title: 'Tendencias' }
       },
       {
+        path: 'catalog-analytics',
+        loadChildren: () => import('./views/catalog-analytics/routes').then(m => m.routes),
+        canActivate: [permissionGuard('catalog_analytics')],
+        data: { title: 'Analítica del catálogo' }
+      },
+      {
         path: 'welcome',
         loadComponent: () => import('./views/welcome/welcome.component').then(m => m.WelcomeComponent),
         data: { title: 'Bienvenido' }
@@ -45,6 +51,11 @@ export const routes: Routes = [
         path: 'laboratories',
         loadChildren: () => import('./views/laboratories/routes').then(m => m.routes),
         data: { title: 'Laboratorios' }
+      },
+      {
+        path: 'catalog-appearance',
+        loadChildren: () => import('./views/catalog-appearance/routes').then(m => m.routes),
+        data: { title: 'Apariencia del catálogo' }
       },
       {
         path: 'products',
@@ -88,6 +99,11 @@ export const routes: Routes = [
         path: 'quotations',
         loadChildren: () => import('./views/quotations/routes').then(m => m.routes),
         data: { title: 'Cotizaciones' }
+      },
+      {
+        path: 'catalog-requests',
+        loadChildren: () => import('./views/catalog-requests/routes').then(m => m.routes),
+        data: { title: 'Pedidos de Catálogo' }
       },
       {
         path: 'orders',
@@ -134,6 +150,12 @@ export const routes: Routes = [
         path: 'roles',
         loadChildren: () => import('./views/roles/routes').then(m => m.routes),
         data: { title: 'Roles y Permisos' }
+      },
+      {
+        path: 'geography',
+        loadChildren: () => import('./views/geography/routes').then(m => m.routes),
+        canActivate: [permissionGuard('geography')],
+        data: { title: 'Geografía' }
       },
       {
         path: 'expenses',

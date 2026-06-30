@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
@@ -18,6 +18,7 @@ export interface QuotationFilters {
   client_id?: number | '';
   date_from?: string;
   date_to?: string;
+  awaiting_approval?: boolean;
   per_page?: number;
   page?: number;
 }
@@ -57,6 +58,7 @@ export class SalesService {
     if (f.client_id !== '' && f.client_id) p = p.set('client_id', String(f.client_id));
     if (f.date_from)                       p = p.set('date_from', f.date_from);
     if (f.date_to)                         p = p.set('date_to',   f.date_to);
+    if (f.awaiting_approval)               p = p.set('awaiting_approval', '1');
     if (f.per_page)                        p = p.set('per_page',  String(f.per_page));
     if (f.page)                            p = p.set('page',      String(f.page));
     return this.http.get<PaginatedResponse<Quotation>>(`${this.base}/quotations`, { params: p });
@@ -66,13 +68,13 @@ export class SalesService {
     return this.http.get<{ quotation: Quotation }>(`${this.base}/quotations/${id}`);
   }
 
-  createQuotation(payload: QuotationPayload): Observable<{ message: string; quotation: Quotation }> {
-    return this.http.post<{ message: string; quotation: Quotation }>(`${this.base}/quotations`, payload);
+  createQuotation(payload: QuotationPayload, context?: HttpContext): Observable<{ message: string; quotation: Quotation }> {
+    return this.http.post<{ message: string; quotation: Quotation }>(`${this.base}/quotations`, payload, context ? { context } : {});
   }
 
   /** Agrega o reemplaza un producto en la cotización (reserva FEFO inmediata). */
-  addQuotationItem(quotationId: number, payload: QuotationAddItemPayload): Observable<{ message: string; quotation: Quotation }> {
-    return this.http.post<any>(`${this.base}/quotations/${quotationId}/items`, payload);
+  addQuotationItem(quotationId: number, payload: QuotationAddItemPayload, context?: HttpContext): Observable<{ message: string; quotation: Quotation }> {
+    return this.http.post<any>(`${this.base}/quotations/${quotationId}/items`, payload, context ? { context } : {});
   }
 
   /** Actualiza el encabezado de una cotización existente (cliente, envío, notas). */
@@ -81,8 +83,8 @@ export class SalesService {
   }
 
   /** Quita todos los lotes de un producto de la cotización y libera sus reservas. */
-  removeQuotationProduct(quotationId: number, productId: number): Observable<{ message: string; quotation: Quotation }> {
-    return this.http.delete<any>(`${this.base}/quotations/${quotationId}/products/${productId}`);
+  removeQuotationProduct(quotationId: number, productId: number, context?: HttpContext): Observable<{ message: string; quotation: Quotation }> {
+    return this.http.delete<any>(`${this.base}/quotations/${quotationId}/products/${productId}`, context ? { context } : {});
   }
 
   approveQuotation(id: number): Observable<{ message: string; quotation: Quotation; order: Order }> {
@@ -136,12 +138,12 @@ export class SalesService {
 
   findOrderByDocument(fullNumber: string): Observable<PaginatedResponse<Order>> {
     return this.http.get<PaginatedResponse<Order>>(`${this.base}/orders`, {
-      params: new HttpParams().set('document_number', fullNumber).set('per_page', '5'),
+      params: new HttpParams().set('document_number', fullNumber).set('for_returns', '1').set('per_page', '5'),
     });
   }
 
   listOrdersByClient(clientId: number, productSearch?: string, lotNumber?: string): Observable<PaginatedResponse<Order>> {
-    let p = new HttpParams().set('client_id', String(clientId)).set('per_page', '15');
+    let p = new HttpParams().set('client_id', String(clientId)).set('for_returns', '1').set('per_page', '15');
     if (productSearch) p = p.set('product_search', productSearch);
     if (lotNumber)     p = p.set('lot_number',     lotNumber);
     return this.http.get<PaginatedResponse<Order>>(`${this.base}/orders`, { params: p });
@@ -162,8 +164,13 @@ export class SalesService {
     return this.http.post<any>(`${this.base}/sale-documents`, payload);
   }
 
-  anularDocument(id: number, reason: string): Observable<{ message: string; sunat_success: boolean; document: SaleDocument }> {
+  anularDocument(id: number, reason: string): Observable<{ message: string; sunat_success: boolean; sunat_pending?: boolean; document: SaleDocument }> {
     return this.http.post<any>(`${this.base}/sale-documents/${id}/anular`, { reason });
+  }
+
+  /** Consulta si SUNAT ya confirmó una baja que había quedado pendiente. */
+  consultarAnulacion(id: number): Observable<{ message: string; sunat_success: boolean; sunat_pending?: boolean; document: SaleDocument }> {
+    return this.http.post<any>(`${this.base}/sale-documents/${id}/consultar-anulacion`, {});
   }
 
   listDocumentSeries(): Observable<{ data: { id: number; document_type: string; series: string; active: boolean }[] }> {

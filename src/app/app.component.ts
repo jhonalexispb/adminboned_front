@@ -9,6 +9,7 @@ import { IconSetService } from '@coreui/icons-angular';
 import { iconSubset } from './icons/icon-subset';
 import { LoadingOverlayComponent } from './shared/components/loading-overlay/loading-overlay.component';
 import { ToasterComponent } from './shared/components/toaster/toaster.component';
+import { EmpresaService } from './core/services/empresa.service';
 
 @Component({
     selector: 'app-root',
@@ -29,9 +30,15 @@ export class AppComponent implements OnInit {
 
   readonly #colorModeService = inject(ColorModeService);
   readonly #iconSetService = inject(IconSetService);
+  readonly #empresaSvc = inject(EmpresaService);
 
   constructor() {
-    this.#titleService.setTitle(this.title);
+    this.#titleService.setTitle('Cargando...');
+    // Ocultar favicon hasta que cargue el logo de la empresa
+    const link: HTMLLinkElement = document.querySelector("link[rel='icon']") ?? document.createElement('link');
+    link.rel  = 'icon';
+    link.href = 'data:,';
+    document.head.appendChild(link);
     // iconSet singleton
     this.#iconSetService.icons = { ...iconSubset };
     this.#colorModeService.localStorageItemName.set('coreui-free-angular-admin-template-theme-default');
@@ -39,6 +46,17 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
+
+    this.#empresaSvc.getPublic().subscribe({
+      next: ({ logo_url, razon_social, nombre_comercial }) => {
+        const nombre = nombre_comercial || razon_social || 'BonedAdmin';
+        this.#titleService.setTitle(nombre);
+        if (logo_url) {
+          const link: HTMLLinkElement = document.querySelector("link[rel='icon']")!;
+          link.href = logo_url;
+        }
+      },
+    });
 
     this.#router.events.pipe(
         takeUntilDestroyed(this.#destroyRef)

@@ -291,7 +291,7 @@ export class AddItemModalComponent implements OnInit {
     if (!this.supplier) return;
     this.loadingNewProducts.set(true);
     this.productService.list({
-      active: true, for_sale: true, per_page: 500,
+      active: true, for_sale: true, per_page: 100000,
       supplier_id: this.supplier.id,
     }).subscribe(res => {
       // Inicializar estado para productos nuevos que aún no existen

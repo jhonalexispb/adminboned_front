@@ -51,6 +51,9 @@ export class OrderDetailComponent implements OnInit {
   deleting           = signal(false);
   showDeleteConfirm  = signal(false);
 
+  // Copiar pedido (a partir de uno anulado)
+  duplicating = signal(false);
+
 
   readonly statusPipeline = [
     'pending', 'documented', 'assembled', 'dispatched', 'delivered', 'paid',
@@ -70,7 +73,7 @@ export class OrderDetailComponent implements OnInit {
   }
 
   get isTerminal(): boolean {
-    return this.order()?.status === 'paid';
+    return ['paid', 'voided', 'cancelled'].includes(this.order()?.status ?? '');
   }
 
   /** Acción rápida de un clic — usa notesText si el usuario escribió algo */
@@ -128,6 +131,7 @@ export class OrderDetailComponent implements OnInit {
     sent:     'info',
     accepted: 'success',
     rejected: 'danger',
+    voided:   'dark',
   };
 
   readonly paymentStatusColors: Record<string, string> = {
@@ -353,6 +357,45 @@ export class OrderDetailComponent implements OnInit {
         this.toast.error(err.error?.message ?? 'Error al eliminar pedido.');
         this.deleting.set(false);
         this.showDeleteConfirm.set(false);
+      },
+    });
+  }
+
+  // ── Copiar pedido ─────────────────────────────────────────────────────────
+
+  duplicateOrder(): void {
+    const o = this.order();
+    if (!o?.client || this.duplicating()) return;
+
+    this.duplicating.set(true);
+    this.sales.createQuotation({ client_id: o.client.id }).subscribe({
+      next: res => {
+        const items = (o.items ?? []).filter(i => i.product_id);
+        if (items.length === 0) {
+          this.duplicating.set(false);
+          this.router.navigate(['/quotations', res.quotation.id, 'edit']);
+          return;
+        }
+
+        forkJoin(items.map(i => this.sales.addQuotationItem(res.quotation.id, {
+          product_id: i.product_id,
+          quantity:   i.quantity,
+        }))).subscribe({
+          next: () => {
+            this.duplicating.set(false);
+            this.toast.success('Pedido copiado. Continúa la cotización.');
+            this.router.navigate(['/quotations', res.quotation.id, 'edit']);
+          },
+          error: () => {
+            this.duplicating.set(false);
+            this.toast.error('La cotización se creó, pero algunos productos no se pudieron agregar.');
+            this.router.navigate(['/quotations', res.quotation.id, 'edit']);
+          },
+        });
+      },
+      error: (err: any) => {
+        this.duplicating.set(false);
+        this.toast.error(err.error?.message ?? 'Error al copiar el pedido.');
       },
     });
   }

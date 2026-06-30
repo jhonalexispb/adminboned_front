@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Vista previa — Atardecer CSS (sin foto)</title>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #f1f3f6;
+    padding: 2rem;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.1rem; margin-bottom: .25rem; }
+  p.hint { color: #666; font-size: .85rem; margin-bottom: 1.5rem; max-width: 700px; }
+  .label { font-size: .85rem; color: #444; margin: 1.75rem 0 .35rem; font-weight: 600; }
+  .row { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; }
+  .col-desktop { flex: 1 1 420px; max-width: 420px; }
+  .tag { font-size: .7rem; color: #999; margin-bottom: .35rem; }
+
+  /* ── Base ─────────────────────────────────────────────────────────── */
+  .dash-greeting {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 200px;
+    padding: 1.5rem 1.75rem;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    color: #fff;
+    box-shadow: 0 .75rem 2rem -1rem rgba(0,0,0,.4);
+    animation: scene-zoom 24s ease-in-out infinite alternate;
+  }
+  .dash-greeting-body {
+    position: relative;
+    z-index: 2;
+    min-width: 0;
+  }
+  .dash-greeting-title {
+    font-weight: 700;
+    font-size: 1.4rem;
+    margin-bottom: .15rem;
+    text-shadow: 0 2px 14px #00000099;
+  }
+  .dash-greeting-message {
+    font-size: .92rem;
+    color: #ffffffeb;
+    text-shadow: 0 1px 8px #00000080;
+  }
+  .dash-greeting-date {
+    font-size: .78rem;
+    color: #ffffffcc;
+    text-transform: capitalize;
+    margin-top: .35rem;
+    text-shadow: 0 1px 8px #00000080;
+  }
+  /* Overlay oscuro a la izquierda para que el texto sea legible siempre */
+  .text-veil {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(100deg, rgba(10,5,2,.65) 0%, rgba(10,5,2,.22) 45%, transparent 75%);
+  }
+  @keyframes scene-zoom {
+    from { transform: scale(1); }
+    to   { transform: scale(1.06); }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { opacity: .55; transform: scale(1); }
+    50%      { opacity: .95; transform: scale(1.15); }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     OPCIÓN I — lavanda polvorienta → coral suave → melocotón
+     ════════════════════════════════════════════════════════════════════ */
+  .sky--warm {
+    background: linear-gradient(165deg,
+      #6b6080 0%,
+      #9a6872 28%,
+      #c4856a 50%,
+      #d9a878 68%,
+      #eecfa0 85%,
+      #f8e8c8 100%
+    );
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     OPCIÓN II — azul pizarra → rosa empolvado → dorado suave
+     ════════════════════════════════════════════════════════════════════ */
+  .sky--fiery {
+    background: linear-gradient(165deg,
+      #4a5270 0%,
+      #7a5870 22%,
+      #a87060 42%,
+      #cc9060 60%,
+      #e0b878 78%,
+      #f2d8a8 100%
+    );
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     SOL CSS — esquina superior derecha
+     ════════════════════════════════════════════════════════════════════ */
+  .css-sun {
+    position: absolute;
+    top: -2.8rem;
+    right: -2.2rem;
+    width: 9rem;
+    height: 9rem;
+    border-radius: 50%;
+    z-index: 0;
+    animation: glow-pulse 5s ease infinite;
+  }
+  .sky--warm .css-sun {
+    background: radial-gradient(circle at 45% 45%, #fff8e0, #ffd878 40%, #f0a850 70%, transparent 100%);
+    box-shadow: 0 0 70px 20px rgba(240,180,80,.35);
+  }
+  .sky--fiery .css-sun {
+    background: radial-gradient(circle at 45% 45%, #fff5d8, #ffd060 38%, #e89840 68%, transparent 100%);
+    box-shadow: 0 0 70px 20px rgba(220,160,60,.35);
+  }
+
+  /* Halo suave irradiando desde la esquina superior derecha */
+  .sun-halo {
+    position: absolute;
+    top: -5rem;
+    right: -5rem;
+    width: 20rem;
+    height: 20rem;
+    border-radius: 50%;
+    mix-blend-mode: screen;
+    z-index: 0;
+    animation: glow-pulse 6s ease infinite;
+    animation-delay: .8s;
+  }
+  .sky--warm  .sun-halo { background: radial-gradient(circle, rgba(240,180,100,.28), transparent 65%); }
+  .sky--fiery .sun-halo { background: radial-gradient(circle, rgba(220,160,80,.28),  transparent 65%); }
+
+  /* ════════════════════════════════════════════════════════════════════
+     NUBES
+     ════════════════════════════════════════════════════════════════════ */
+  .clouds { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .cloud {
+    position: absolute;
+    border-radius: 50px;
+    opacity: .75;
+  }
+  .cloud::before, .cloud::after {
+    content: '';
+    position: absolute;
+    background: inherit;
+    border-radius: 50%;
+  }
+  /* Nubes tintadas según el cielo */
+  .sky--warm  .cloud { background: rgba(255,235,210,.65); }
+  .sky--fiery .cloud { background: rgba(240,220,200,.60); }
+
+  .cloud--a { width: 70px; height: 24px; top: 12%; left: -20%; animation: cloud-drift 38s linear infinite; }
+  .cloud--a::before { width: 34px; height: 34px; top: -18px; left: 9px; }
+  .cloud--a::after  { width: 26px; height: 26px; top: -12px; left: 36px; }
+
+  .cloud--b { width: 52px; height: 18px; top: 50%; left: -15%; animation: cloud-drift 54s linear infinite; animation-delay: -20s; opacity: .55; }
+  .cloud--b::before { width: 24px; height: 24px; top: -12px; left: 7px; }
+  .cloud--b::after  { width: 20px; height: 20px; top: -8px;  left: 26px; }
+
+  .cloud--c { width: 40px; height: 14px; top: 28%; left: -25%; animation: cloud-drift 46s linear infinite; animation-delay: -32s; opacity: .45; }
+  .cloud--c::before { width: 20px; height: 20px; top: -10px; left: 5px; }
+  .cloud--c::after  { width: 15px; height: 15px; top: -7px;  left: 21px; }
+
+  @keyframes cloud-drift {
+    from { transform: translateX(0); }
+    to   { transform: translateX(450px); }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     HOJAS VOLANDO
+     ════════════════════════════════════════════════════════════════════ */
+  .leaves { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .leaf {
+    position: absolute;
+    width: 13px;
+    height: 13px;
+    border-radius: 0 60% 0 60%;
+    animation: leaf-fall linear infinite;
+  }
+  /* Colores de hojas otoñales (más suaves) */
+  .leaf--orange  { background: #c86438; }
+  .leaf--red     { background: #a84030; }
+  .leaf--amber   { background: #b88030; }
+  .leaf--russet  { background: #904828; }
+  .leaf--yellow  { background: #c09828; }
+
+  /* Cada hoja con posición, velocidad y rotación distintas */
+  .leaf--1  { left: 72%; top: -5%;  width: 14px; height: 14px; animation-duration: 9s;  animation-delay: 0s;   }
+  .leaf--2  { left: 58%; top: -5%;  width: 10px; height: 10px; animation-duration: 11s; animation-delay: -2s;  }
+  .leaf--3  { left: 80%; top: -5%;  width: 12px; height: 12px; animation-duration: 8s;  animation-delay: -5s;  }
+  .leaf--4  { left: 65%; top: -5%;  width: 9px;  height: 9px;  animation-duration: 13s; animation-delay: -1s;  }
+  .leaf--5  { left: 88%; top: -5%;  width: 11px; height: 11px; animation-duration: 10s; animation-delay: -7s;  }
+  .leaf--6  { left: 75%; top: -5%;  width: 8px;  height: 8px;  animation-duration: 12s; animation-delay: -3s;  }
+  .leaf--7  { left: 55%; top: -5%;  width: 13px; height: 13px; animation-duration: 7s;  animation-delay: -9s;  }
+  .leaf--8  { left: 92%; top: -5%;  width: 10px; height: 10px; animation-duration: 9s;  animation-delay: -4s;  }
+
+  @keyframes leaf-fall {
+    0%   { transform: translateY(-10px) translateX(0px)   rotate(0deg);   opacity: 0; }
+    8%   { opacity: .9; }
+    35%  { transform: translateY(70px)  translateX(-25px) rotate(140deg); }
+    65%  { transform: translateY(130px) translateX(15px)  rotate(300deg); }
+    90%  { opacity: .7; }
+    100% { transform: translateY(220px) translateX(-10px) rotate(480deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <h1>Vista previa — Atardecer CSS con nubes, sol y hojas</h1>
+  <p class="hint">
+    Tonos más suaves. Sol en la esquina superior derecha. Nubes y hojas otoñales cayendo.
+  </p>
+
+  <div class="label">Tarde — Opción I: lavanda → coral → melocotón</div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting sky--warm">
+        <div class="text-veil"></div>
+        <div class="sun-halo"></div>
+        <div class="css-sun"></div>
+        <div class="clouds">
+          <div class="cloud cloud--a"></div>
+          <div class="cloud cloud--b"></div>
+          <div class="cloud cloud--c"></div>
+        </div>
+        <div class="leaves">
+          <div class="leaf leaf--orange  leaf--1"></div>
+          <div class="leaf leaf--red     leaf--2"></div>
+          <div class="leaf leaf--amber   leaf--3"></div>
+          <div class="leaf leaf--russet  leaf--4"></div>
+          <div class="leaf leaf--yellow  leaf--5"></div>
+          <div class="leaf leaf--orange  leaf--6"></div>
+          <div class="leaf leaf--red     leaf--7"></div>
+          <div class="leaf leaf--amber   leaf--8"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas tardes, Jhon!</div>
+          <div class="dash-greeting-message">Vas a mitad de camino, ¡sigue así!</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Tarde — Opción II: azul pizarra → rosa empolvado → dorado suave</div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting sky--fiery">
+        <div class="text-veil"></div>
+        <div class="sun-halo"></div>
+        <div class="css-sun"></div>
+        <div class="clouds">
+          <div class="cloud cloud--a"></div>
+          <div class="cloud cloud--b"></div>
+          <div class="cloud cloud--c"></div>
+        </div>
+        <div class="leaves">
+          <div class="leaf leaf--orange  leaf--1"></div>
+          <div class="leaf leaf--red     leaf--2"></div>
+          <div class="leaf leaf--amber   leaf--3"></div>
+          <div class="leaf leaf--russet  leaf--4"></div>
+          <div class="leaf leaf--yellow  leaf--5"></div>
+          <div class="leaf leaf--orange  leaf--6"></div>
+          <div class="leaf leaf--red     leaf--7"></div>
+          <div class="leaf leaf--amber   leaf--8"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas tardes, Jhon!</div>
+          <div class="dash-greeting-message">Vas a mitad de camino, ¡sigue así!</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

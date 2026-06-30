@@ -84,7 +84,11 @@ export class OrderDetailModalComponent {
     rejected: 'Rechazado', voided: 'Anulado',
   };
 
-  downloadPdf(doc: OrderSaleDocument): void {
+  openFile(url: string | null): void {
+    if (url) window.open(url, '_blank');
+  }
+
+  downloadSaleNotePdf(doc: OrderSaleDocument): void {
     this.downloadingDocId.set(doc.id);
     this.sales.downloadDocumentFile('sale-documents', doc.id, 'pdf').subscribe({
       next: blob => {
@@ -102,21 +106,20 @@ export class OrderDetailModalComponent {
     });
   }
 
-  downloadCreditNoteFile(cn: OrderCreditNote, type: 'pdf' | 'xml' | 'cdr'): void {
-    const key = `${cn.id}-${type}`;
+  downloadInternalCreditNotePdf(cn: OrderCreditNote): void {
+    const key = `${cn.id}-pdf`;
     this.downloadingNcId.set(key);
-    this.sales.downloadDocumentFile('credit-notes', cn.id, type).subscribe({
+    this.sales.downloadDocumentFile('credit-notes', cn.id, 'pdf').subscribe({
       next: blob => {
-        const ext = type === 'cdr' ? 'zip' : type;
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `${cn.full_number ?? cn.id}.${ext}`;
+        a.download = `${cn.full_number ?? cn.id}.pdf`;
         a.click();
         URL.revokeObjectURL(a.href);
         this.downloadingNcId.set(null);
       },
       error: () => {
-        this.toast.error('Error al descargar el archivo de la nota de crédito.');
+        this.toast.error('Error al descargar el PDF.');
         this.downloadingNcId.set(null);
       },
     });

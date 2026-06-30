@@ -1,0 +1,42 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form" id="loadingMessageForm" (ngSubmit)="onSubmit()">
+
+    @if (error) {
+      <div class="alert alert-danger py-2">{{ error }}</div>
+    }
+
+    <div class="mb-3">
+      <label class="form-label" for="message">Mensaje</label>
+      <textarea
+        class="form-control"
+        id="message"
+        formControlName="message"
+        rows="2"
+        maxlength="160"
+        placeholder="Ej: Preparando los mejores precios para ti..."
+      ></textarea>
+    </div>
+
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="checkbox" id="active" formControlName="active" />
+      <label class="form-check-label" for="active">Activo</label>
+    </div>
+
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="submit" form="loadingMessageForm" class="btn btn-primary" [disabled]="form.invalid || saving()">
+    @if (saving()) {
+      <c-spinner size="sm" class="me-1" />Guardando...
+    } @else {
+      {{ isEdit ? 'Guardar cambios' : 'Crear' }}
+    }
+  </button>
+</div>

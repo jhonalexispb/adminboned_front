@@ -18,6 +18,26 @@ export const navItems: NavItem[] = [
     iconComponent: { name: 'cil-chart-line' },
     permission: 'trends',
   },
+  {
+    name: 'Catálogo (analytics)',
+    url: '/catalog-analytics',
+    iconComponent: { name: 'cil-chart' },
+    permission: 'catalog_analytics',
+  },
+
+  // ── Ventas ───────────────────────────────────────────────────────────────────
+  { title: true, name: 'Ventas' },
+  { name: 'Pedidos de Catálogo', url: '/catalog-requests', iconComponent: { name: 'cil-cart' }, permission: 'catalog_requests' },
+  { name: 'Cotizaciones', url: '/quotations', iconComponent: { name: 'cil-description' }, permission: 'quotations' },
+  { name: 'Pedidos',      url: '/orders',      iconComponent: { name: 'cil-clipboard' },  permission: 'orders' },
+  { name: 'Almacén',      url: '/warehouse',   iconComponent: { name: 'cil-storage' },    permission: 'orders_warehouse' },
+  { name: 'Despacho',     url: '/dispatch',    iconComponent: { name: 'cil-truck' },      permission: 'orders_dispatch' },
+
+  // ── Pagos ────────────────────────────────────────────────────────────────────
+  { title: true, name: 'Pagos' },
+  { name: 'Cobranza',        url: '/payments/my-orders',      iconComponent: { name: 'cil-dollar' },       permission: 'collections' },
+  { name: 'Mis Cobros',      url: '/payments/my-collections', iconComponent: { name: 'cil-wallet' },       permission: 'my_collections' },
+  { name: 'Gestionar Pagos', url: '/payments/manage',         iconComponent: { name: 'cil-check-circle' }, permission: 'payments_manage' },
 
   // ── Maestros ────────────────────────────────────────────────────────────────
   { title: true, name: 'Maestros' },
@@ -25,6 +45,7 @@ export const navItems: NavItem[] = [
   { name: 'Categorías',   url: '/categories',   iconComponent: { name: 'cil-folder' },       permission: 'categories' },
   { name: 'Laboratorios', url: '/laboratories', iconComponent: { name: 'cil-factory' },      permission: 'laboratories' },
   { name: 'Orden de catálogo', url: '/catalog-order', iconComponent: { name: 'cil-list-numbered' }, permission: 'catalog_order' },
+  { name: 'Apariencia catálogo', url: '/catalog-appearance', iconComponent: { name: 'cil-image' }, permission: 'catalog_appearance' },
   { name: 'Proveedores',  url: '/suppliers',    iconComponent: { name: 'cil-truck' },        permission: 'suppliers' },
   { name: 'Clientes',     url: '/clients',      iconComponent: { name: 'cil-people' },       permission: 'clients' },
   { name: 'Transportistas', url: '/carriers',   iconComponent: { name: 'cil-truck' },        permission: 'carriers' },
@@ -44,19 +65,6 @@ export const navItems: NavItem[] = [
   { name: 'Recepciones',       url: '/purchases/receipts',  iconComponent: { name: 'cil-inbox' },  permission: 'purchase_receipts' },
   { name: 'Doc. de ingreso',   url: '/purchases/documents', iconComponent: { name: 'cil-file' },   permission: 'purchase_documents' },
 
-  // ── Ventas ───────────────────────────────────────────────────────────────────
-  { title: true, name: 'Ventas' },
-  { name: 'Cotizaciones', url: '/quotations', iconComponent: { name: 'cil-description' }, permission: 'quotations' },
-  { name: 'Pedidos',      url: '/orders',      iconComponent: { name: 'cil-clipboard' },  permission: 'orders' },
-  { name: 'Almacén',      url: '/warehouse',   iconComponent: { name: 'cil-storage' },    permission: 'orders_warehouse' },
-  { name: 'Despacho',     url: '/dispatch',    iconComponent: { name: 'cil-truck' },      permission: 'orders_dispatch' },
-
-  // ── Pagos ────────────────────────────────────────────────────────────────────
-  { title: true, name: 'Pagos' },
-  { name: 'Cobranza',        url: '/payments/my-orders',      iconComponent: { name: 'cil-dollar' },       permission: 'collections' },
-  { name: 'Mis Cobros',      url: '/payments/my-collections', iconComponent: { name: 'cil-wallet' },       permission: 'my_collections' },
-  { name: 'Gestionar Pagos', url: '/payments/manage',         iconComponent: { name: 'cil-check-circle' }, permission: 'payments_manage' },
-
   // ── Post-venta ───────────────────────────────────────────────────────────────
   { title: true, name: 'Post-venta' },
   { name: 'Mis devoluciones',       url: '/returns/my',     iconComponent: { name: 'cil-loop-circular' }, permission: 'returns' },
@@ -71,5 +79,6 @@ export const navItems: NavItem[] = [
   { title: true, name: 'Configuración' },
   { name: 'Usuarios',        url: '/users',           iconComponent: { name: 'cil-people' },   permission: 'users' },
   { name: 'Roles y Permisos', url: '/roles',          iconComponent: { name: 'cil-lock-locked' }, permission: 'roles' },
+  { name: 'Geografía',       url: '/geography',       iconComponent: { name: 'cil-map' },        permission: 'geography' },
   { name: 'Mi Empresa',      url: '/settings/empresa', iconComponent: { name: 'cil-settings' }, permission: 'settings' },
 ];

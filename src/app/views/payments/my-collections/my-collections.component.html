@@ -164,7 +164,7 @@
           [class.text-primary]="activeTab() === 'deposits'"
           [class.text-body-secondary]="activeTab() !== 'deposits'"
           (click)="selectTab('deposits')">
-    <fa-icon icon="building-columns" />Depósitos
+    <fa-icon icon="building-columns" />Mis Depósitos
     @if (deposits().length) {
       <c-badge color="primary" shape="rounded-pill" style="font-size:.7rem;">{{ deposits().length }}</c-badge>
     }

@@ -243,24 +243,40 @@
                 </div>
               </div>
 
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <div class="small">
-                  @if (lot.expiry_date) {
-                    <div class="d-flex align-items-center gap-2">
-                      <span>{{ lot.expiry_date | date:'dd/MM/yyyy' }}</span>
-                      @switch (expiryStatus(lot)) {
-                        @case ('expired') { <c-badge color="danger">Vencido</c-badge> }
-                        @case ('soon')    { <c-badge color="warning">Próx. a vencer</c-badge> }
-                        @case ('ok')      { <c-badge color="success">Vigente</c-badge> }
-                      }
-                    </div>
-                  } @else {
-                    <span class="text-body-secondary">Sin fecha de vencimiento</span>
-                  }
-                </div>
-                <div class="text-end">
+              <div class="small mb-2">
+                @if (lot.expiry_date) {
+                  <div class="d-flex align-items-center gap-2">
+                    <span>{{ lot.expiry_date | date:'dd/MM/yyyy' }}</span>
+                    @switch (expiryStatus(lot)) {
+                      @case ('expired') { <c-badge color="danger">Vencido</c-badge> }
+                      @case ('soon')    { <c-badge color="warning">Próx. a vencer</c-badge> }
+                      @case ('ok')      { <c-badge color="success">Vigente</c-badge> }
+                    }
+                  </div>
+                } @else {
+                  <span class="text-body-secondary">Sin fecha de vencimiento</span>
+                }
+              </div>
+
+              <div class="d-flex justify-content-around text-center mb-2 small">
+                <div>
                   <div class="text-body-secondary" style="font-size:.7rem">STOCK</div>
                   <strong>{{ lot.current_stock }}</strong>
+                </div>
+                <div>
+                  <div class="text-body-secondary" style="font-size:.7rem">RESERVADO</div>
+                  @if (lot.reserved_stock > 0) {
+                    <c-badge color="warning" textColor="dark">{{ lot.reserved_stock }}</c-badge>
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </div>
+                <div>
+                  <div class="text-body-secondary" style="font-size:.7rem">LIBRE</div>
+                  <strong [class.text-success]="lot.available_stock > 0"
+                          [class.text-danger]="lot.available_stock <= 0">
+                    {{ lot.available_stock }}
+                  </strong>
                 </div>
               </div>
 
@@ -297,9 +313,11 @@
             <thead style="font-size:.78rem">
               <tr>
                 <th class="ps-3" style="width:160px">Lote</th>
-                <th style="width:220px">Vencimiento</th>
-                <th style="width:120px">Estado</th>
+                <th style="width:200px">Vencimiento</th>
+                <th style="width:110px">Estado</th>
                 <th class="text-end" style="width:80px">Stock</th>
+                <th class="text-end" style="width:90px">Reservado</th>
+                <th class="text-end" style="width:90px">Disponible</th>
                 <th style="width:200px"></th>
               </tr>
             </thead>
@@ -343,7 +361,23 @@
                   </td>
 
                   <!-- Stock -->
-                  <td class="text-end fw-semibold pe-3">{{ lot.current_stock }}</td>
+                  <td class="text-end fw-semibold">{{ lot.current_stock }}</td>
+
+                  <!-- Reservado -->
+                  <td class="text-end">
+                    @if (lot.reserved_stock > 0) {
+                      <c-badge color="warning" textColor="dark">{{ lot.reserved_stock }}</c-badge>
+                    } @else {
+                      <span class="text-body-secondary">—</span>
+                    }
+                  </td>
+
+                  <!-- Disponible -->
+                  <td class="text-end fw-semibold pe-3"
+                      [class.text-success]="lot.available_stock > 0"
+                      [class.text-danger]="lot.available_stock <= 0">
+                    {{ lot.available_stock }}
+                  </td>
 
                   <!-- Acciones -->
                   <td>

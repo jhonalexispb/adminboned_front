@@ -85,17 +85,18 @@ export class ClientModalComponent implements OnInit, AfterViewInit, OnDestroy {
     this.form = this.fb.group({
       business_name: [this.client?.business_name ?? '', [Validators.required]],
       name:          [this.client?.name ?? '',          [Validators.maxLength(200)]],
+      contact_name:  [this.client?.contact_name ?? '', [Validators.maxLength(200)]],
       dni:           [this.client?.dni ?? '',           [Validators.pattern(/^\d{8}$/)]],
       ruc:           [this.client?.ruc ?? '',           [Validators.pattern(/^\d{11}$/)]],
       phone:         [this.client?.phone ?? ''],
       email:         [this.client?.email ?? '',         [Validators.email]],
-      address:       [this.client?.address ?? ''],
+      address:       [this.client?.address ?? '', [Validators.required]],
       latitude:      [this.client?.latitude ?? null],
       longitude:     [this.client?.longitude ?? null],
-      department_id: [null],
-      province_id:   [{ value: null, disabled: true }],
-      district_id:   [{ value: null, disabled: true }],
-      active:        [this.client?.active ?? true]
+      department_id: [null, [Validators.required]],
+      province_id:   [{ value: null, disabled: true }, [Validators.required]],
+      district_id:   [{ value: null, disabled: true }, [Validators.required]],
+      active:        [this.client?.active ?? true],
     });
 
     // Cascade departamento → provincias
@@ -149,7 +150,7 @@ export class ClientModalComponent implements OnInit, AfterViewInit, OnDestroy {
     this.dniError = '';
     this.consultService.dni(dni).subscribe({
       next: res => {
-        this.form.patchValue({ name: res.nombre_completo });
+        this.form.patchValue({ contact_name: res.nombre_completo });
         this.consultingDni.set(false);
       },
       error: err => {
@@ -170,7 +171,10 @@ export class ClientModalComponent implements OnInit, AfterViewInit, OnDestroy {
         this.rucResult.set(res);
         // Pre-llenar nombre del negocio si está vacío
         if (!this.form.get('business_name')?.value) {
-          this.form.patchValue({ business_name: res.nombre_comercial || res.razon_social });
+          this.form.patchValue({ business_name: res.razon_social });
+        }
+        if (!this.form.get('name')?.value && res.nombre_comercial) {
+          this.form.patchValue({ name: res.nombre_comercial });
         }
         this.consultingRuc.set(false);
       },
@@ -318,6 +322,7 @@ export class ClientModalComponent implements OnInit, AfterViewInit, OnDestroy {
     const payload = {
       name:          raw.name,
       business_name: raw.business_name || null,
+      contact_name:  raw.contact_name  || null,
       dni:           raw.dni           || null,
       ruc:           raw.ruc           || null,
       phone:         raw.phone         || null,

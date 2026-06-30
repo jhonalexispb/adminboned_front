@@ -1,0 +1,86 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form" id="eventForm" (ngSubmit)="onSubmit()">
+
+    @if (error) {
+      <div class="alert alert-danger py-2">{{ error }}</div>
+    }
+
+    <div class="row g-3">
+
+      <div class="col-12">
+        <label class="form-label" for="image">
+          Imagen de fondo @if (!isEdit) { <span class="text-danger">*</span> }
+        </label>
+        <input
+          type="file"
+          accept="image/*"
+          class="form-control"
+          id="image"
+          (change)="onFileSelected($event)"
+        />
+        @if (previewUrl) {
+          <img [src]="previewUrl" class="img-fluid rounded mt-2" style="max-height:160px;object-fit:cover;" alt="Vista previa" />
+        }
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" for="label">Etiqueta</label>
+        <input
+          cFormControl
+          id="label"
+          formControlName="label"
+          placeholder="Ej: Fiestas Patrias"
+          maxlength="60"
+        />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" for="effect">Efecto visual</label>
+        <select class="form-select" id="effect" formControlName="effect">
+          <option value="none">Sin efecto</option>
+          <option value="confetti">Serpentinas / confeti (Fiestas Patrias)</option>
+          <option value="snow">Copos de nieve (Navidad)</option>
+          <option value="fireworks">Fuegos artificiales (Año Nuevo)</option>
+          <option value="balloons">Globos (Cumpleaños / aniversario)</option>
+        </select>
+      </div>
+
+      <div class="col-md-6 d-flex align-items-end">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="active" formControlName="active" />
+          <label class="form-check-label" for="active">Activo</label>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" for="starts_at">Desde</label>
+        <input cFormControl type="date" id="starts_at" formControlName="starts_at" />
+        <div class="form-text">Opcional. Vacío = sin fecha de inicio.</div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" for="ends_at">Hasta</label>
+        <input cFormControl type="date" id="ends_at" formControlName="ends_at" />
+        <div class="form-text">Opcional. Vacío = sin fecha de fin.</div>
+      </div>
+
+    </div>
+
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="submit" form="eventForm" class="btn btn-primary" [disabled]="form.invalid || saving()">
+    @if (saving()) {
+      <c-spinner size="sm" class="me-1" />Guardando...
+    } @else {
+      {{ isEdit ? 'Guardar cambios' : 'Crear' }}
+    }
+  </button>
+</div>

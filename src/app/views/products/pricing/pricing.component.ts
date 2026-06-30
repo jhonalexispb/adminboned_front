@@ -59,6 +59,26 @@ export class PricingComponent implements OnInit {
     }
   };
 
+  salesChartData = signal<ChartData | null>(null);
+  salesChartOptions: ChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.raw} uds`
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0 }
+      }
+    }
+  };
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -79,6 +99,7 @@ export class PricingComponent implements OnInit {
         this.data.set(res);
         this.buildForm(res);
         this.buildChart(res);
+        this.buildSalesChart(res);
         this.loading.set(false);
       },
       error: () => {
@@ -248,5 +269,33 @@ export class PricingComponent implements OnInit {
         },
       ]
     });
+  }
+
+  private buildSalesChart(d: PricingData): void {
+    const monthly = d.sales_analysis.monthly;
+
+    this.salesChartData.set({
+      labels: monthly.map(m => {
+        const [y, mo] = m.month.split('-');
+        return `${mo}/${y.slice(2)}`;
+      }),
+      datasets: [{
+        label: 'Unidades vendidas',
+        data: monthly.map(m => m.units),
+        backgroundColor: 'rgba(50,168,82,0.5)',
+        borderColor: 'rgba(50,168,82,1)',
+        borderWidth: 1,
+      }],
+    });
+  }
+
+  rotationLabel(months: number | null): string {
+    if (months === null) return 'Sin ventas recientes';
+    if (months < 1) return 'Menos de 1 mes';
+    return `${months} mes${months === 1 ? '' : 'es'} de stock`;
+  }
+
+  hasMonthlySales(monthly: { units: number }[]): boolean {
+    return monthly.some(m => m.units > 0);
   }
 }

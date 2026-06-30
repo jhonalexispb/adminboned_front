@@ -11,7 +11,9 @@ import { MOTIVO_OPTIONS } from '../returns.model';
 export interface ProcessReturnPayload {
   action_type: 'credit_note' | 'void' | 'internal';
   motivo_code?: string;
+  motivo_desc?: string;
   issue_date?:  string;
+  void_reason?: string;
 }
 
 @Component({
@@ -31,9 +33,11 @@ export class ProcessReturnModalComponent {
   confirmed = output<ProcessReturnPayload>();
   cancelled = output<void>();
 
-  actionType = 'credit_note';
-  motivoCode = '07';
-  issueDate  = new Date().toISOString().slice(0, 10);
+  actionType  = 'credit_note';
+  motivoCode  = '07';
+  motivoDesc  = '';
+  issueDate   = new Date().toISOString().slice(0, 10);
+  voidReason  = '';
 
   readonly motivoOptions = MOTIVO_OPTIONS;
   readonly actionOptions = [
@@ -46,16 +50,26 @@ export class ProcessReturnModalComponent {
     effect(() => {
       if (this.visible()) {
         this.motivoCode = '07';
+        this.motivoDesc = '';
         this.issueDate  = new Date().toISOString().slice(0, 10);
+        this.voidReason = '';
       }
     });
+  }
+
+  get canConfirm(): boolean {
+    if (this.actionType === 'credit_note') return !!this.motivoDesc.trim();
+    if (this.actionType === 'void')        return !!this.voidReason.trim();
+    return true;
   }
 
   confirm(): void {
     this.confirmed.emit({
       action_type: this.actionType as any,
-      motivo_code: this.actionType === 'credit_note' ? this.motivoCode : undefined,
-      issue_date:  this.actionType === 'credit_note' ? this.issueDate  : undefined,
+      motivo_code: this.actionType === 'credit_note' ? this.motivoCode        : undefined,
+      motivo_desc: this.actionType === 'credit_note' ? this.motivoDesc.trim() : undefined,
+      issue_date:  this.actionType === 'credit_note' ? this.issueDate         : undefined,
+      void_reason: this.actionType === 'void'        ? this.voidReason.trim() : undefined,
     });
   }
 

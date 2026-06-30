@@ -262,9 +262,9 @@ export class ReturnCreateComponent implements OnInit {
       this.selectedLot?.lot_number ?? undefined,
     ).subscribe({
       next: res => {
-        const withDoc = res.data.filter(o => o.sale_document);
+        const withDoc = res.data.filter(o => o.accepted_sale_document);
         this.clientOrders.set(withDoc);
-        this.searchErr.set(withDoc.length ? '' : 'No se encontraron pedidos documentados con esos criterios.');
+        this.searchErr.set(withDoc.length ? '' : 'No se encontraron pedidos con documento aceptado con esos criterios.');
         this.searching.set(false);
       },
       error: () => { this.searchErr.set('Error al buscar.'); this.searching.set(false); },

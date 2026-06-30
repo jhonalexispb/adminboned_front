@@ -447,7 +447,7 @@ export class SaleDocumentsListComponent implements OnInit {
         this.voiding.set(false);
         this.voidDoc.set(null);
         this.toast.success(res.message);
-        this.documents.update(list => list.map(d => d.id === doc.id ? res.document : d));
+        this.documents.update(list => list.map(d => d.id === doc.id ? { ...res.document, client: doc.client } : d));
       },
       error: (err: any) => {
         this.voiding.set(false);
@@ -463,7 +463,35 @@ export class SaleDocumentsListComponent implements OnInit {
     return issued.getFullYear() !== now.getFullYear() || issued.getMonth() !== now.getMonth();
   }
 
+  openFile(url: string | null): void {
+    if (url) window.open(url, '_blank');
+  }
+
+  openSaleDoc(doc: SaleDocument, type: 'pdf' | 'xml' | 'cdr'): void {
+    if (doc.document_type === 'sale_note') {
+      this.downloadDoc('sale-documents', doc.id, type, doc.full_number ?? doc.id);
+    } else {
+      const url = type === 'pdf' ? doc.pdf_url : type === 'xml' ? doc.xml_url : doc.cdr_url;
+      this.openFile(url);
+    }
+  }
+
+  openCreditNote(nc: CreditNote, type: 'pdf' | 'xml' | 'cdr'): void {
+    if (nc.is_internal) {
+      this.downloadDoc('credit-notes', nc.id, 'pdf', nc.full_number ?? nc.id);
+    } else {
+      const url = type === 'pdf' ? nc.pdf_url : type === 'xml' ? nc.xml_url : nc.cdr_url;
+      this.openFile(url);
+    }
+  }
+
   canVoid(doc: SaleDocument): boolean {
-    return doc.status === 'accepted';
+    if (doc.document_type === 'sale_note') {
+      return doc.status === 'accepted' && !doc.has_internal_credit_notes;
+    }
+    // Factura / boleta: mismo día de emisión y sin NCs electrónicas SUNAT
+    return doc.status === 'accepted' && !!doc.issue_date &&
+           doc.issue_date === new Date().toISOString().slice(0, 10) &&
+           !doc.has_electronic_credit_notes;
   }
 }

@@ -83,7 +83,9 @@ export const RETURN_STATUS_COLORS: Record<string, string> = {
 export const MOTIVO_OPTIONS = [
   { label: 'Anulación de la operación',  value: '01' },
   { label: 'Anulación por error en RUC', value: '02' },
-  { label: 'Devolución total',            value: '06' },
-  { label: 'Devolución por ítem',         value: '07' },
-  { label: 'Disminución en el valor',     value: '09' },
+  { label: 'Descuento global',           value: '04' },
+  { label: 'Descuento por ítem',         value: '05' },
+  { label: 'Devolución total',           value: '06' },
+  { label: 'Devolución por ítem',        value: '07' },
+  { label: 'Disminución en el valor',    value: '09' },
 ];

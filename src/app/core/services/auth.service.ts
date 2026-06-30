@@ -1,6 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { SKIP_LOADING } from './loading.service';
 import { tap } from 'rxjs/operators';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -23,7 +24,7 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${environment.apiUrl}/auth/login`, {
       ...credentials,
       device_name: credentials.device_name ?? 'bonedadmin-web'
-    }).pipe(
+    }, { context: new HttpContext().set(SKIP_LOADING, true) }).pipe(
       tap(res => {
         localStorage.setItem(this.TOKEN_KEY, res.token);
         localStorage.setItem(this.USER_KEY, JSON.stringify(res.user));

@@ -27,6 +27,7 @@ export interface Quotation {
   token_expires_at: string | null;
   notes: string | null;
   document_type: 'invoice' | 'receipt' | 'sale_note' | null;
+  origin: 'admin' | 'catalog';
   approved_at: string | null;
   shipping_type: 'local' | 'province' | null;
   carrier: { id: number; name: string; phone: string | null; ruc: string | null; address: string | null; district: { id: number; name: string; province?: { id: number; name: string; department?: { id: number; name: string } | null } | null } | null } | null;
@@ -38,6 +39,7 @@ export interface Quotation {
   order_sale_document?:  { document_type: 'invoice' | 'receipt' | 'sale_note'; full_number: string | null; status: string } | null;
   order_shipping_guide?: { full_number: string | null; sunat_status: string } | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Carrier {
@@ -170,6 +172,8 @@ export interface OrderSaleDocument {
   xml_url: string | null;
   cdr_url: string | null;
   sunat_message: string | null;
+  /** true si se envió una comunicación de baja y SUNAT aún no confirma la anulación */
+  void_pending: boolean;
   total: string;
   issue_date: string | null;
   credit_notes?: OrderCreditNote[];
@@ -198,7 +202,7 @@ export interface Order {
   } | null;
   seller: { id: number; name: string } | null;
   warehouse_user: { id: number; name: string } | null;
-  status: 'pending' | 'documented' | 'assembled' | 'dispatched' | 'delivered' | 'paid' | 'cancelled';
+  status: 'pending' | 'documented' | 'assembled' | 'dispatched' | 'delivered' | 'paid' | 'cancelled' | 'voided';
   warehouse_notes: string | null;
   document_type: 'invoice' | 'receipt' | 'sale_note' | null;
   subtotal: string;
@@ -214,6 +218,7 @@ export interface Order {
   rejected_count?: number | null;
   rejected_amount?: number | null;
   sale_document?: OrderSaleDocument | null;
+  accepted_sale_document?: OrderSaleDocument | null;
   sale_documents?: OrderSaleDocument[];
   shipping_guide?: OrderShippingGuide | null;
   shipping_guides?: OrderShippingGuide[];
@@ -245,7 +250,7 @@ export interface SaleDocument {
   subtotal: string;
   igv: string;
   total: string;
-  status: 'draft' | 'sent' | 'accepted' | 'rejected';
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'voided';
   /** Estado real del documento en ApiSunat (ACEPTADO/RECHAZADO/PENDIENTE/EXCEPCION/BAJA), calculado en index() */
   apisunat_status: string | null;
   apisunat_faults: string | null;
@@ -259,6 +264,13 @@ export interface SaleDocument {
   cdr_url: string | null;
   /** Mensaje de respuesta SUNAT */
   sunat_message: string | null;
+  /** true si se envió una comunicación de baja y SUNAT aún no confirma la anulación */
+  void_pending: boolean;
+  void_reason: string | null;
+  /** true si esta nota de venta tiene NCs internas asociadas (impide anulación) */
+  has_internal_credit_notes?: boolean;
+  /** true si factura/boleta tiene NCs electrónicas SUNAT asociadas (impide anulación) */
+  has_electronic_credit_notes?: boolean;
   notes: string | null;
   items?: SaleDocumentItem[];
   created_by: string | null;
@@ -358,6 +370,7 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   delivered:  'Entregado',
   paid:       'Cobrado',
   cancelled:  'Cancelado',
+  voided:     'Doc. anulado',
 };
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
@@ -368,6 +381,7 @@ export const ORDER_STATUS_COLORS: Record<string, string> = {
   delivered:  'success',
   paid:       'success',
   cancelled:  'danger',
+  voided:     'dark',
 };
 
 export const SALE_DOC_TYPE_LABELS: Record<string, string> = {

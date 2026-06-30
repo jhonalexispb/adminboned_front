@@ -1,0 +1,300 @@
+<app-page-header title="Pedidos de Catálogo" subtitle="Pedidos enviados por clientes desde el catálogo">
+  <button class="btn btn-outline-secondary btn-sm" [disabled]="loading()" (click)="load()">
+    <fa-icon icon="rotate" class="me-1" />Actualizar
+  </button>
+</app-page-header>
+
+<!-- ── Filtros ─────────────────────────────────────────────────────────────── -->
+<c-card class="mb-3">
+  <c-card-body class="py-2 px-3">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1 text-body-secondary">Cliente</label>
+        <p-select [options]="clients()" optionLabel="displayLabel"
+                  [ngModel]="selectedClient" (ngModelChange)="onClientSelect($event)"
+                  [filter]="true" filterBy="displayLabel"
+                  placeholder="Buscar cliente..." [showClear]="true"
+                  styleClass="w-100" appendTo="body">
+          <ng-template #selectedItem let-c>
+            <span class="fw-medium">{{ c.business_name || c.name }}</span>
+            @if (c.ruc) { <span class="text-body-secondary small ms-2">RUC {{ c.ruc }}</span> }
+          </ng-template>
+          <ng-template #item let-c>
+            <div style="font-size:.85rem; line-height:1.4; padding:2px 0;">
+              <div class="fw-semibold">{{ c.business_name || c.name }}</div>
+              @if (c.business_name && c.name) {
+                <div class="text-body-secondary" style="font-size:.75rem;">{{ c.name }}</div>
+              }
+              @if (c.ruc) {
+                <div class="text-body-secondary" style="font-size:.72rem;">RUC <strong>{{ c.ruc }}</strong></div>
+              }
+            </div>
+          </ng-template>
+        </p-select>
+      </div>
+
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1 text-body-secondary">Estado</label>
+        <p-select [(ngModel)]="filters.status" [options]="statusOptions"
+                  optionLabel="label" optionValue="value"
+                  (ngModelChange)="onSearch()"
+                  styleClass="w-100" appendTo="body" placeholder="Todos" />
+      </div>
+
+      <div class="col-12 col-md-auto ms-md-auto d-flex align-items-center justify-content-end">
+        <span class="text-body-secondary small">
+          {{ total() }} pedido{{ total() !== 1 ? 's' : '' }}
+        </span>
+      </div>
+
+    </div>
+  </c-card-body>
+</c-card>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else {
+
+  <!-- ══ VISTA MOBILE: tarjetas ══════════════════════════════════════════════ -->
+  <div class="d-md-none">
+    @if (!requests().length) {
+      <div class="text-center text-body-secondary py-5">
+        <fa-icon icon="cart-shopping" class="d-block mb-2" style="font-size:2.5rem; opacity:.3;" />
+        No hay pedidos de catálogo para los filtros seleccionados.
+      </div>
+    }
+
+    <div class="d-flex flex-column gap-2">
+      @for (r of requests(); track r.id) {
+        <c-card>
+          <c-card-body class="px-3 py-2">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="font-monospace fw-bold" style="font-size:.88rem;">{{ r.code }}</span>
+                <span class="text-body-secondary" style="font-size:.72rem;">{{ r.created_at | date:'dd/MM/yy' }}</span>
+              </div>
+              <c-badge [color]="statusColors[r.status]" style="font-size:.7rem;">
+                {{ statusLabels[r.status] }}
+              </c-badge>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="fw-semibold" style="font-size:.95rem; line-height:1.2;">{{ clientName(r) }}</div>
+              <div class="fw-bold ms-2 text-nowrap" style="font-size:1rem;">
+                S/ {{ r.total | number:'1.2-2' }}
+              </div>
+            </div>
+
+            <!-- Botones: scroll horizontal -->
+            <div class="d-flex gap-1 overflow-auto pb-1"
+                 style="scrollbar-width:none; -ms-overflow-style:none;">
+
+              <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                      style="min-width:52px; font-size:.68rem;"
+                      [disabled]="actingId() === r.id"
+                      (click)="openDetail(r)">
+                @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                @else { <fa-icon icon="eye" style="font-size:.9rem;" /> }
+                <small>Ver</small>
+              </button>
+
+              @if (r.status !== 'converted' && r.status !== 'cancelled') {
+                <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        [disabled]="actingId() === r.id"
+                        (click)="validateStock(r)">
+                  @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="magnifying-glass" style="font-size:.9rem;" /> }
+                  <small>Validar</small>
+                </button>
+              }
+
+              @if (canConvert(r)) {
+                <button class="btn btn-sm btn-success d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        [disabled]="actingId() === r.id"
+                        (click)="convert(r)">
+                  @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="check" style="font-size:.9rem;" /> }
+                  <small>Convertir</small>
+                </button>
+              }
+
+              @if (canCancel(r)) {
+                <button class="btn btn-sm btn-danger d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        [disabled]="actingId() === r.id"
+                        (click)="cancel(r)">
+                  @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="xmark" style="font-size:.9rem;" /> }
+                  <small>Cancelar</small>
+                </button>
+              }
+
+              @if (r.quotation_id) {
+                <button class="btn btn-sm btn-primary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;"
+                        [disabled]="actingId() === r.id"
+                        (click)="viewQuotation(r)">
+                  @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                  @else { <fa-icon icon="file-invoice" style="font-size:.9rem;" /> }
+                  <small>Cotización</small>
+                </button>
+              }
+
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+  </div>
+
+  <!-- ══ VISTA DESKTOP: tabla ════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle" style="font-size:.875rem">
+          <thead style="font-size:.75rem; text-transform:uppercase; letter-spacing:.04em;">
+            <tr>
+              <th class="ps-3" style="width:140px">Código</th>
+              <th>Cliente</th>
+              <th class="text-end" style="width:100px">Total</th>
+              <th style="width:170px">Estado</th>
+              <th style="width:260px">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of requests(); track r.id) {
+              <tr>
+                <td class="ps-3">
+                  <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ r.code }}</div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ r.created_at | date:'dd/MM/yy' }}</div>
+                </td>
+                <td>
+                  <div class="fw-medium lh-sm">{{ clientName(r) }}</div>
+                  @if (r.client?.phone) {
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ r.client!.phone }}</div>
+                  }
+                </td>
+                <td class="text-end fw-semibold">S/ {{ r.total | number:'1.2-2' }}</td>
+                <td>
+                  <c-badge [color]="statusColors[r.status]" style="font-size:.72rem;">
+                    {{ statusLabels[r.status] }}
+                  </c-badge>
+                </td>
+                <td>
+                  <div class="d-flex gap-1 align-items-center overflow-auto pb-1"
+                       style="scrollbar-width:none; -ms-overflow-style:none;">
+
+                    <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                            style="min-width:38px; font-size:.7rem;"
+                            [disabled]="actingId() === r.id"
+                            (click)="openDetail(r)">
+                      @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                      @else { <fa-icon icon="eye" /> }
+                      <small>Ver</small>
+                    </button>
+
+                    @if (r.status !== 'converted' && r.status !== 'cancelled') {
+                      <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              [disabled]="actingId() === r.id"
+                              (click)="validateStock(r)">
+                        @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="magnifying-glass" /> }
+                        <small>Validar</small>
+                      </button>
+                    }
+
+                    @if (canConvert(r)) {
+                      <button class="btn btn-sm btn-success d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              [disabled]="actingId() === r.id"
+                              (click)="convert(r)">
+                        @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="check" /> }
+                        <small>Convertir</small>
+                      </button>
+                    }
+
+                    @if (canCancel(r)) {
+                      <button class="btn btn-sm btn-danger d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              [disabled]="actingId() === r.id"
+                              (click)="cancel(r)">
+                        @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="xmark" /> }
+                        <small>Cancelar</small>
+                      </button>
+                    }
+
+                    @if (r.quotation_id) {
+                      <button class="btn btn-sm btn-primary d-flex flex-column align-items-center"
+                              style="min-width:38px; font-size:.7rem;"
+                              [disabled]="actingId() === r.id"
+                              (click)="viewQuotation(r)">
+                        @if (actingId() === r.id) { <c-spinner size="sm" /> }
+                        @else { <fa-icon icon="file-invoice" /> }
+                        <small>Cotización</small>
+                      </button>
+                    }
+
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="text-center text-body-secondary py-5">
+                  <fa-icon icon="cart-shopping" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+                  No hay pedidos de catálogo para los filtros seleccionados.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <app-pagination
+        [currentPage]="filters.page!"
+        [lastPage]="lastPage()"
+        [total]="total()"
+        wrapperClass="px-3 py-2 border-top"
+        (pageChange)="goToPage($event)"
+      />
+    </c-card-body>
+  </c-card>
+
+  <!-- Paginación mobile -->
+  @if (lastPage() > 1) {
+    <div class="d-md-none d-flex justify-content-between align-items-center mt-3">
+      <button class="btn btn-outline-secondary btn-sm"
+              [disabled]="filters.page === 1"
+              (click)="goToPage(filters.page - 1)">
+        <fa-icon icon="chevron-left" class="me-1" />Anterior
+      </button>
+      <small class="text-body-secondary">{{ filters.page }} / {{ lastPage() }}</small>
+      <button class="btn btn-outline-secondary btn-sm"
+              [disabled]="filters.page === lastPage()"
+              (click)="goToPage(filters.page + 1)">
+        Siguiente<fa-icon icon="chevron-right" class="ms-1" />
+      </button>
+    </div>
+  }
+
+} <!-- /loading -->
+
+<app-catalog-request-detail-modal
+  [request]="detailRequest()"
+  (closed)="detailRequest.set(null)"
+  (updated)="onDetailUpdated($event)" />
+
+<app-quotation-detail-modal
+  [quotation]="detailQuotation()"
+  [viewOnly]="true"
+  (closed)="detailQuotation.set(null)" />
+
+<app-order-detail-modal
+  [orderId]="previewOrderId()"
+  [viewOnly]="true"
+  (closed)="previewOrderId.set(null)" />

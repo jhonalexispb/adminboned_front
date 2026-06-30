@@ -70,7 +70,7 @@ export class StockListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.productService.list({ active: true, per_page: 500 }).subscribe(r => this.products.set(r.data));
+    this.productService.list({ active: true, per_page: 100000 }).subscribe(r => this.products.set(r.data));
     this.laboratoryService.list({ active: true, per_page: 200 }).subscribe(r => this.laboratories.set(r.data));
     this.load();
   }

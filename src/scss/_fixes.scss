@@ -1,4 +1,9 @@
 // Place for temp fixes
 
+// SweetAlert2: elevar por encima de todos los modales/sheets del catálogo
+.swal2-container {
+  z-index: 99999 !important;
+}
+
 
 

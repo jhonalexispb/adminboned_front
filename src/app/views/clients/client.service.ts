@@ -8,6 +8,7 @@ import { PaginatedResponse } from '../../core/models/api.model';
 export interface ClientFilters {
   search?: string;
   active?: boolean | '';
+  catalog_enabled?: boolean | '';
   per_page?: number;
   page?: number;
 }
@@ -22,6 +23,7 @@ export class ClientService {
     let params = new HttpParams();
     if (filters.search)                                        params = params.set('search', filters.search);
     if (filters.active !== '' && filters.active !== undefined) params = params.set('active', String(filters.active));
+    if (filters.catalog_enabled !== '' && filters.catalog_enabled !== undefined) params = params.set('catalog_enabled', String(filters.catalog_enabled));
     if (filters.per_page)                                      params = params.set('per_page', String(filters.per_page));
     if (filters.page)                                          params = params.set('page', String(filters.page));
     return this.http.get<PaginatedResponse<Client>>(this.url, { params });
@@ -41,6 +43,10 @@ export class ClientService {
 
   delete(id: number): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(`${this.url}/${id}`);
+  }
+
+  updateCatalogAccess(id: number, payload: { catalog_enabled: boolean; catalog_access_expires_at?: string | null }): Observable<{ message: string; client: Client }> {
+    return this.http.patch<{ message: string; client: Client }>(`${this.url}/${id}/catalog-access`, payload);
   }
 
   soldProducts(clientId: number): Observable<{ products: SoldProduct[] }> {

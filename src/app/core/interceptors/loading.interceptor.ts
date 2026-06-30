@@ -1,14 +1,14 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { finalize } from 'rxjs';
-import { LoadingService } from '../services/loading.service';
+import { LoadingService, SKIP_LOADING } from '../services/loading.service';
 
 // Solo mostramos overlay en mutaciones, no en GETs (la tabla tiene su propio spinner)
 const MUTATION_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
   const loading = inject(LoadingService);
-  const isMutation = MUTATION_METHODS.includes(req.method);
+  const isMutation = MUTATION_METHODS.includes(req.method) && !req.context.get(SKIP_LOADING);
 
   if (isMutation) loading.show();
 

@@ -69,13 +69,18 @@ export class QuotationsListComponent implements OnInit {
 
   filters: {
     status: string; client_id: number | '';
-    date_from: string; date_to: string; per_page: number; page: number;
+    date_from: string; date_to: string;
+    awaiting_approval: boolean;
+    per_page: number; page: number;
   } = {
     status: '', client_id: '',
     date_from: QuotationsListComponent.firstDayOfMonth(),
     date_to:   QuotationsListComponent.today(),
+    awaiting_approval: false,
     per_page: 20, page: 1,
   };
+
+  staleThresholdDays = signal(3);
 
   selectedClient: ClientOption | null = null;
 
@@ -134,6 +139,7 @@ export class QuotationsListComponent implements OnInit {
         this.quotations.set(res.data);
         this.total.set(res.meta.total);
         this.lastPage.set(res.meta.last_page);
+        if (res.meta.stale_threshold_days) this.staleThresholdDays.set(res.meta.stale_threshold_days);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -157,6 +163,17 @@ export class QuotationsListComponent implements OnInit {
   clientName(q: Quotation): string {
     const c = q.client;
     return c ? (c.business_name || c.name) : '—';
+  }
+
+  /** Días transcurridos desde que la cotización fue enviada al cliente (updated_at en status='sent'). */
+  daysWaiting(q: Quotation): number {
+    const ms = Date.now() - new Date(q.updated_at).getTime();
+    return Math.floor(ms / (1000 * 60 * 60 * 24));
+  }
+
+  /** Cotización de catálogo enviada al cliente que lleva varios días esperando aprobación/rechazo por llamada. */
+  isAwaitingApproval(q: Quotation): boolean {
+    return q.origin === 'catalog' && q.status === 'sent' && this.daysWaiting(q) >= this.staleThresholdDays();
   }
 
   // ── Modal detalle ──────────────────────────────────────────────────────────
@@ -262,16 +279,31 @@ export class QuotationsListComponent implements OnInit {
 
   closeDocs(): void { this.docsOrder.set(null); this.loadingDocs.set(false); }
 
-  openDocFile(type: 'pdf' | 'xml' | 'cdr'): void {
-    const doc = this.docsOrder()?.sale_document;
-    if (!doc) return;
-    this.triggerDownload('sale-documents', doc.id, type, doc.full_number ?? String(doc.id));
+  openFile(url: string | null): void {
+    if (url) window.open(url, '_blank');
   }
 
-  openGuideFile(type: 'pdf' | 'xml' | 'cdr'): void {
-    const g = this.docsOrder()?.shipping_guide;
-    if (!g) return;
-    this.triggerDownload('shipping-guides', g.id, type, g.full_number ?? String(g.id));
+  openDocFile(doc: { id: number; document_type: string; full_number: string | null; pdf_url: string | null; xml_url: string | null; cdr_url: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
+    if (doc.document_type === 'sale_note') {
+      this.triggerDownload('sale-documents', doc.id, type, doc.full_number ?? String(doc.id));
+    } else {
+      const url = type === 'pdf' ? doc.pdf_url : type === 'xml' ? doc.xml_url : doc.cdr_url;
+      this.openFile(url);
+    }
+  }
+
+  openGuideFile(g: { pdf_url: string | null; xml_url: string | null; cdr_url: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
+    const url = type === 'pdf' ? g.pdf_url : type === 'xml' ? g.xml_url : g.cdr_url;
+    this.openFile(url);
+  }
+
+  openCreditNoteFile(cn: { id: number; full_number: string | null; is_internal: boolean; pdf_url: string | null; xml_url: string | null; cdr_url: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
+    if (cn.is_internal) {
+      this.triggerDownload('credit-notes', cn.id, 'pdf', cn.full_number ?? String(cn.id));
+    } else {
+      const url = type === 'pdf' ? cn.pdf_url : type === 'xml' ? cn.xml_url : cn.cdr_url;
+      this.openFile(url);
+    }
   }
 
   private triggerDownload(

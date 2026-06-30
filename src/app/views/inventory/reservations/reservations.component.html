@@ -11,27 +11,27 @@
       <div class="col-12 col-md-5">
         <label class="form-label small mb-1 text-body-secondary">Producto</label>
         <p-select
-          [options]="products()"
+          [options]="productOptions()"
           optionLabel="name"
           [ngModel]="selectedProduct()"
           (ngModelChange)="onProductSelect($event)"
           [filter]="true"
-          filterBy="name,sku,laboratory.name"
+          filterBy="name,sku,lab"
           placeholder="Todos los productos"
           [showClear]="true"
           [style]="{ width: '100%' }"
           appendTo="body">
           <ng-template #selectedItem let-p>
             <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
-            @if (p.laboratory) {
-              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            @if (p.lab) {
+              <span class="text-info me-1">{{ p.lab }}</span>
             }
             {{ p.name }}
           </ng-template>
           <ng-template #item let-p>
             <span class="font-monospace small text-body-secondary me-1">{{ p.sku }}</span>
-            @if (p.laboratory) {
-              <span class="text-info me-1">{{ p.laboratory.name }}</span>
+            @if (p.lab) {
+              <span class="text-info me-1">{{ p.lab }}</span>
             }
             {{ p.name }}
           </ng-template>
@@ -40,7 +40,7 @@
       <div class="col-12 col-md-auto d-flex align-items-end">
         <div class="form-check mb-0">
           <input class="form-check-input" type="checkbox" id="oversold_only"
-                 [(ngModel)]="oversoldOnly" (change)="load()" />
+                 [ngModel]="oversoldOnly()" (ngModelChange)="oversoldOnly.set($event)" />
           <label class="form-check-label fw-medium text-danger" for="oversold_only">
             <fa-icon icon="triangle-exclamation" class="me-1" />Solo con sobreventa
           </label>
@@ -56,7 +56,7 @@
   <c-card>
     <c-card-body class="text-center text-body-secondary py-5">
       <fa-icon icon="check-circle" class="mb-2 d-block text-success" style="font-size:2rem" />
-      @if (oversoldOnly) {
+      @if (oversoldOnly()) {
         No hay productos con sobreventa. Todo en orden.
       } @else {
         No hay reservas activas en este momento.

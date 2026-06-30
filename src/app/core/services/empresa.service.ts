@@ -16,9 +16,14 @@ export interface Empresa {
   telefono?: string;
   email?: string;
   logo_url?: string;
+  doc_logo_url?: string;
   apisunat_persona_id?: string;
   apisunat_token_set?: boolean;
   meta_diaria?: number;
+  catalog_request_seller_mode?: 'client_assignment' | 'reviewer';
+  catalog_whatsapp_number?: string;
+  catalog_show_lot_breakdown?: boolean;
+  catalog_stale_order_days?: number;
 }
 
 export interface DocumentSeries {
@@ -43,6 +48,11 @@ export class EmpresaService {
     return this.http.get<Empresa | null>(this.base);
   }
 
+  /** Datos de marca para pantallas públicas (login, catálogo) — no requiere autenticación. */
+  getPublic(): Observable<{ razon_social: string | null; nombre_comercial: string | null; logo_url: string | null; catalog_whatsapp_number: string | null }> {
+    return this.http.get<{ razon_social: string | null; nombre_comercial: string | null; logo_url: string | null; catalog_whatsapp_number: string | null }>(`${this.base}/public`);
+  }
+
   save(data: Partial<Empresa> & { apisunat_persona_token?: string }): Observable<Empresa> {
     return this.http.put<Empresa>(this.base, data);
   }
@@ -51,6 +61,12 @@ export class EmpresaService {
     const form = new FormData();
     form.append('logo', file);
     return this.http.post<{ logo_url: string }>(`${this.base}/logo`, form);
+  }
+
+  uploadDocLogo(file: File): Observable<{ doc_logo_url: string }> {
+    const form = new FormData();
+    form.append('logo', file);
+    return this.http.post<{ doc_logo_url: string }>(`${this.base}/doc-logo`, form);
   }
 
   listDocumentSeries(params?: { document_type?: string; active?: boolean }): Observable<{ data: DocumentSeries[] }> {

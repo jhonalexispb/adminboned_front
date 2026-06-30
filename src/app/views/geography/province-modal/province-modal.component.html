@@ -1,0 +1,55 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<form [formGroup]="form" (ngSubmit)="onSubmit()">
+  <div class="modal-body">
+
+    @if (error) {
+      <div class="alert alert-danger py-2 small mb-3">{{ error }}</div>
+    }
+
+    <div class="mb-3">
+      <label class="form-label">Departamento <span class="text-danger">*</span></label>
+      @if (loadingDeps()) {
+        <div class="d-flex align-items-center gap-2 py-1">
+          <c-spinner size="sm" />
+          <span class="text-body-secondary small">Cargando...</span>
+        </div>
+      } @else {
+        <select cFormControl formControlName="department_id">
+          <option [ngValue]="null">Seleccionar departamento</option>
+          @for (dep of departments(); track dep.id) {
+            <option [value]="dep.id">{{ dep.name }}</option>
+          }
+        </select>
+        @if (form.get('department_id')?.invalid && form.get('department_id')?.touched) {
+          <div class="text-danger small mt-1">El departamento es requerido.</div>
+        }
+      }
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Nombre <span class="text-danger">*</span></label>
+      <input cFormControl formControlName="name" placeholder="Ej. Abancay" />
+      @if (form.get('name')?.invalid && form.get('name')?.touched) {
+        <div class="text-danger small mt-1">El nombre es requerido.</div>
+      }
+    </div>
+
+    <div class="mb-1">
+      <label class="form-label">Código <span class="text-body-secondary small">(opcional)</span></label>
+      <input cFormControl formControlName="code" placeholder="Ej. 0301" maxlength="10" />
+    </div>
+
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+    <button type="submit" class="btn btn-primary" [disabled]="saving()">
+      @if (saving()) { <c-spinner size="sm" class="me-1" /> }
+      {{ isEdit ? 'Guardar cambios' : 'Crear provincia' }}
+    </button>
+  </div>
+</form>

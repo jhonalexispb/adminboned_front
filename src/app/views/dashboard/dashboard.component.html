@@ -4,6 +4,79 @@
   </div>
 } @else if (data(); as d) {
 
+  <!-- ── Saludo personalizado ──────────────────────────────────────────── -->
+  <div class="dash-greeting" [ngClass]="skyClass()">
+
+    @switch (greeting().period) {
+      @case ('morning') {
+        <div class="illus-clouds">
+          <div class="cg cg--1">
+            <div class="blob"></div><div class="blob"></div>
+            <div class="blob"></div><div class="blob"></div>
+          </div>
+          <div class="cg cg--2">
+            <div class="blob"></div><div class="blob"></div><div class="blob"></div>
+          </div>
+        </div>
+        <div class="illus-sun"></div>
+        <div class="birds">
+          <div class="bird bird--1"></div>
+          <div class="bird bird--2"></div>
+        </div>
+      }
+      @case ('afternoon') {
+        <div class="illus-clouds">
+          <div class="cg cg-warm cg--1">
+            <div class="blob"></div><div class="blob"></div>
+            <div class="blob"></div><div class="blob"></div>
+          </div>
+          <div class="cg cg-warm cg--2">
+            <div class="blob"></div><div class="blob"></div><div class="blob"></div>
+          </div>
+        </div>
+        <div class="sunset-halo"></div>
+        <div class="sunset-sun"></div>
+        <div class="birds">
+          <div class="bird bird--1"></div>
+          <div class="bird bird--2"></div>
+        </div>
+      }
+      @default {
+        <div class="stars"></div>
+        <div class="star-bright star-bright--1"></div>
+        <div class="star-bright star-bright--2"></div>
+        <div class="star-bright star-bright--3"></div>
+        <div class="shooting-star"></div>
+        <div class="moon-halo"></div>
+        <div class="full-moon">
+          <div class="crater crater--1"></div>
+          <div class="crater crater--2"></div>
+          <div class="crater crater--3"></div>
+          <div class="crater crater--4"></div>
+        </div>
+      }
+    }
+
+    <div class="landscape">
+      <div class="hill h-f1"></div>
+      <div class="hill h-f2"></div>
+      <div class="hill h-f3"></div>
+      <div class="hill h-m1"></div>
+      <div class="hill h-m2"></div>
+      <div class="tree t1"></div><div class="tree t2"></div>
+      <div class="tree t3"></div><div class="tree t4"></div>
+      <div class="tree t5"></div><div class="tree t6"></div>
+      <div class="hill h-n1"></div>
+      <div class="ground-strip"></div>
+    </div>
+
+    <div class="dash-greeting-body">
+      <div class="dash-greeting-title">{{ greeting().salutation }}@if (firstName) {, {{ firstName }}}!</div>
+      <div class="dash-greeting-message">{{ greeting().message }}</div>
+      <div class="dash-greeting-date">{{ today | date:"EEEE d 'de' MMMM" }}</div>
+    </div>
+  </div>
+
   <!-- ── Estado del negocio ────────────────────────────────────────────── -->
   <c-card class="border-0 shadow-sm mb-4" [class]="'bg-' + estadoColor" style="--cui-bg-opacity:.08">
     <c-card-body class="d-flex align-items-center gap-3">
@@ -276,60 +349,86 @@
 
   <!-- ── Fila 3: Gráfico ventas diarias ────────────────────────────────── -->
   <c-card class="border-0 shadow-sm mb-4">
-    <c-card-header class="border-bottom d-flex justify-content-between align-items-center">
-      <span class="fw-semibold">Ventas diarias del mes</span>
-      <a routerLink="/orders" class="small text-primary text-decoration-none">Ver pedidos →</a>
+    <c-card-header class="border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="fw-semibold" style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px"
+            (click)="showInfo('Cómo funciona este gráfico', 'Cada barra es un día del mes. La parte azul (hacia arriba) es tu venta bruta de ese día, sin descontar devoluciones; si ese día hubo devoluciones, se dibujan como una barra roja hacia abajo. Al pasar el mouse sobre una barra verás el detalle: venta bruta, devoluciones y venta neta. La venta neta es la cifra real (bruta menos devoluciones) — cuando no hubo devoluciones ese día, bruta y neta son iguales y solo se muestra la neta. La línea morada punteada es tu meta diaria: si la venta neta la supera, vas bien ese día.')">
+        Ventas diarias del mes
+      </span>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <select class="form-select form-select-sm" style="width:auto"
+                [ngModel]="chartMonth()" (ngModelChange)="chartMonth.set($event); onChartFilterChange()">
+          @for (m of months; track m.value) {
+            <option [ngValue]="m.value">{{ m.label }}</option>
+          }
+        </select>
+        <select class="form-select form-select-sm" style="width:auto"
+                [ngModel]="chartYear()" (ngModelChange)="chartYear.set($event); onChartFilterChange()">
+          @for (y of years; track y) {
+            <option [ngValue]="y">{{ y }}</option>
+          }
+        </select>
+        <button cButton color="secondary" variant="outline" size="sm" class="d-flex align-items-center gap-2"
+                [disabled]="downloadingSalesReport()" (click)="downloadSalesReport()">
+          @if (downloadingSalesReport()) {
+            <c-spinner size="sm" />
+          } @else {
+            <svg cIcon name="cilCloudDownload" size="sm"></svg>
+          }
+          Generar reporte
+        </button>
+        <a routerLink="/orders" class="small text-primary text-decoration-none">Ver pedidos →</a>
+      </div>
     </c-card-header>
     <c-card-body>
-      @if (chartData()) {
-        <c-chart type="bar" [data]="chartData()!" [options]="chartOptions" [height]="240" />
+      @if (chartLoading()) {
+        <div class="d-flex justify-content-center align-items-center" style="height:240px">
+          <c-spinner color="primary" />
+        </div>
+      } @else if (chartData()) {
+        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;"
+             (click)="onChartClick($event)"
+             (mousemove)="onChartHover($event)"
+             (mouseleave)="onChartLeave()">
+          <div [style.min-width]="chartMinWidth()">
+            <c-chart type="bar" [data]="chartData()!" [options]="chartOptions" [height]="240" />
+          </div>
+        </div>
+
+        <!-- Panel de día seleccionado -->
+        @if (selectedDay(); as day) {
+          <div class="mt-3 px-1">
+            <div style="background:rgba(var(--cui-dark-rgb),.06); border-radius:12px; padding:12px 16px; font-size:13.5px; line-height:1.8; position:relative">
+              <button type="button" (click)="selectedDay.set(null)"
+                      style="position:absolute;top:8px;right:10px;background:none;border:none;font-size:16px;line-height:1;color:var(--cui-secondary-color);cursor:pointer;padding:2px 6px">×</button>
+              <div style="font-weight:700; font-size:14px; margin-bottom:6px">Día {{ day.label }}</div>
+              @if (day.devol > 0) {
+                <div>Venta bruta: <strong>S/ {{ day.ventas | number:'1.2-2' }}</strong></div>
+                <div style="color:#dc3545">Devoluciones: <strong>S/ {{ day.devol | number:'1.2-2' }}</strong></div>
+                <div>Venta neta: <strong>S/ {{ day.neto | number:'1.2-2' }}</strong></div>
+              } @else {
+                <div>Venta neta: <strong>S/ {{ day.neto | number:'1.2-2' }}</strong></div>
+              }
+              @if (day.meta > 0) {
+                <div style="color:#6f42c1; margin-top:2px">Meta: <strong>S/ {{ day.meta | number:'1.2-2' }}</strong></div>
+              }
+            </div>
+          </div>
+        } @else {
+          <p class="d-none d-lg-block text-center mt-2 mb-0" style="font-size:12px; color:var(--cui-secondary-color)">
+            Haz clic en una barra para ver el detalle
+          </p>
+          <p class="d-lg-none text-center mt-2 mb-0" style="font-size:12px; color:var(--cui-secondary-color)">
+            Toca una barra para ver el detalle
+          </p>
+        }
       }
     </c-card-body>
   </c-card>
 
-  <!-- ── Fila 4: Top clientes + Pendientes ─────────────────────────────── -->
+  <!-- ── Fila 4: Pendientes ─────────────────────────────────────────────── -->
   <c-row [gutter]="3" class="mb-4">
 
-    <c-col [lg]="7">
-      <c-card class="border-0 shadow-sm h-100">
-        <c-card-header class="border-bottom d-flex justify-content-between align-items-center">
-          <span class="fw-semibold">Top clientes del mes</span>
-          <a routerLink="/clients" class="small text-primary text-decoration-none">Ver todos →</a>
-        </c-card-header>
-        <c-card-body class="p-0">
-          <table class="table table-hover table-sm align-middle mb-0">
-            <thead>
-              <tr>
-                <th class="ps-4 text-body-secondary fw-semibold small">#</th>
-                <th class="text-body-secondary fw-semibold small">Cliente</th>
-                <th class="text-center text-body-secondary fw-semibold small">Pedidos</th>
-                <th class="text-end pe-4 text-body-secondary fw-semibold small">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (c of d.top_clientes; track c.client_id; let i = $index) {
-                <tr style="cursor:pointer" routerLink="/clients">
-                  <td class="ps-4">
-                    <span class="badge rounded-pill text-bg-secondary">{{ i + 1 }}</span>
-                  </td>
-                  <td class="fw-semibold">{{ c.client_name }}</td>
-                  <td class="text-center">
-                    <c-badge color="info" shape="rounded-pill">{{ c.pedidos }}</c-badge>
-                  </td>
-                  <td class="text-end pe-4 fw-semibold text-primary">S/ {{ c.total_comprado | number:'1.2-2' }}</td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="4" class="text-center text-body-secondary py-4">Sin pedidos este mes.</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </c-card-body>
-      </c-card>
-    </c-col>
-
-    <c-col [lg]="5">
+    <c-col [lg]="12">
       <c-card class="border-0 shadow-sm h-100">
         <c-card-header class="border-bottom"><span class="fw-semibold">Pendientes de atención</span></c-card-header>
         <c-card-body class="d-flex flex-column gap-3">
@@ -430,6 +529,113 @@
       </c-card-body>
     </c-card>
   }
+
+  <!-- ── Fila 6: Rotación de mercadería ─────────────────────────────────── -->
+  <c-card class="border-0 shadow-sm mt-4">
+    <c-card-header class="border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="fw-semibold" style="cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px"
+            (click)="showInfo('Rotación de mercadería', 'Compara las unidades vendidas en el rango de fechas elegido contra el stock disponible actual. Más rotación son tus productos más vendidos en ese periodo; Sin rotación son productos con stock disponible que no tuvieron ventas en ese periodo, candidatos a promoción o liquidación. Cambia las fechas para generar distintas temporadas de análisis.')">
+        Rotación de mercadería
+      </span>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <input type="date" class="form-control form-control-sm" style="width:auto"
+               [(ngModel)]="rotationFrom" [disabled]="rotationLoading()" />
+        <span class="text-body-secondary small">a</span>
+        <input type="date" class="form-control form-control-sm" style="width:auto"
+               [(ngModel)]="rotationTo" [disabled]="rotationLoading()" />
+        <button type="button" class="btn btn-sm btn-primary" [disabled]="rotationLoading()" (click)="loadRotation()">
+          @if (rotationLoading()) { <c-spinner size="sm" class="me-1" /> }
+          Aplicar
+        </button>
+      </div>
+    </c-card-header>
+    <c-card-body>
+      @if (rotationLoading()) {
+        <div class="d-flex justify-content-center align-items-center" style="min-height: 150px">
+          <c-spinner color="primary" />
+        </div>
+      } @else if (rotation(); as rot) {
+        @if (rot.top_rotacion.length === 0 && rot.sin_rotacion.length === 0) {
+          <div class="text-center text-body-secondary py-4">Sin datos para el rango seleccionado.</div>
+        } @else {
+          <c-row [gutter]="3">
+            <c-col [lg]="6">
+              <div class="fw-semibold small mb-2">Más rotación</div>
+              <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th class="text-body-secondary fw-semibold small">Producto</th>
+                      <th class="text-center text-body-secondary fw-semibold small">Vendidas</th>
+                      <th class="text-center text-body-secondary fw-semibold small">Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of rot.top_rotacion; track p.product_id) {
+                      <tr>
+                        <td>
+                          <div class="fw-semibold">{{ p.name }}</div>
+                          <div class="text-body-secondary" style="font-size:.72rem">
+                            {{ p.sku }} @if (p.laboratory) { · {{ p.laboratory }} }
+                          </div>
+                        </td>
+                        <td class="text-center">
+                          <c-badge color="success" shape="rounded-pill">{{ p.unidades }}</c-badge>
+                        </td>
+                        <td class="text-center text-body-secondary">{{ p.stock_actual }}</td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="3" class="text-center text-body-secondary py-3">Sin ventas en el rango.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </c-col>
+
+            <c-col [lg]="6">
+              <div class="fw-semibold small mb-2">Sin rotación</div>
+              <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th class="text-body-secondary fw-semibold small">Producto</th>
+                      <th class="text-center text-body-secondary fw-semibold small">Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of rot.sin_rotacion; track p.product_id) {
+                      <tr>
+                        <td>
+                          <div class="fw-semibold">{{ p.name }}</div>
+                          <div class="text-body-secondary" style="font-size:.72rem">
+                            {{ p.sku }} @if (p.laboratory) { · {{ p.laboratory }} }
+                          </div>
+                        </td>
+                        <td class="text-center">
+                          <c-badge color="warning" shape="rounded-pill">{{ p.stock_actual }}</c-badge>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="2" class="text-center text-body-secondary py-3">Todo tu stock activo está rotando.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              @if (rot.sin_rotacion.length > 0) {
+                <div class="text-body-secondary small mt-1">
+                  Sin ventas en el rango pero con stock disponible — candidatos a promoción o liquidación.
+                </div>
+              }
+            </c-col>
+          </c-row>
+        }
+      }
+    </c-card-body>
+  </c-card>
 
 }
 

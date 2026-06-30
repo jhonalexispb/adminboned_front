@@ -75,7 +75,7 @@ export class LotsListComponent implements OnInit {
   }
 
   loadProducts(): void {
-    this.productService.list({ per_page: 500, active: true }).subscribe({
+    this.productService.list({ per_page: 100000, active: true }).subscribe({
       next: res => this.products.set(res.data),
     });
   }

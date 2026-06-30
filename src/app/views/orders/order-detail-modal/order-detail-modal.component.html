@@ -135,12 +135,13 @@
               </c-card-body>
             </c-card>
 
-            <!-- Documento emitido -->
-            @let docs = o.sale_documents ?? (o.sale_document ? [o.sale_document] : []);
-            @if (docs.length) {
+            <!-- Documentos emitidos -->
+            @let docs   = o.sale_documents   ?? (o.sale_document   ? [o.sale_document]   : []);
+            @let guides = o.shipping_guides  ?? (o.shipping_guide  ? [o.shipping_guide]  : []);
+            @if (docs.length || guides.length) {
               <c-card>
                 <c-card-header class="py-2 px-3">
-                  <strong style="font-size:.83rem;">Documento emitido</strong>
+                  <strong style="font-size:.83rem;">Documentos emitidos</strong>
                 </c-card-header>
                 <c-card-body class="p-0">
                   @for (doc of docs; track doc.id) {
@@ -159,18 +160,44 @@
                             · S/ {{ doc.total | number:'1.2-2' }}
                           </div>
                         </div>
+                        <!-- Botones de descarga según tipo de documento -->
                         <div class="d-flex gap-1 flex-shrink-0">
-                          <button class="btn btn-sm btn-outline-success"
-                                  style="font-size:.75rem;"
-                                  title="Descargar PDF"
-                                  [disabled]="downloadingDocId() === doc.id"
-                                  (click)="downloadPdf(doc)">
-                            @if (downloadingDocId() === doc.id) {
-                              <c-spinner size="sm" />
-                            } @else {
-                              <fa-icon icon="file-pdf" class="me-1" />PDF
+                          @if (doc.document_type === 'sale_note') {
+                            <!-- Nota de venta interna: PDF propio -->
+                            <button class="btn btn-sm btn-outline-success"
+                                    style="font-size:.75rem;" title="Descargar PDF"
+                                    [disabled]="downloadingDocId() === doc.id"
+                                    (click)="downloadSaleNotePdf(doc)">
+                              @if (downloadingDocId() === doc.id) {
+                                <c-spinner size="sm" />
+                              } @else {
+                                <fa-icon icon="file-pdf" class="me-1" />PDF
+                              }
+                            </button>
+                          } @else {
+                            <!-- Factura / Boleta: links de ApiSunat -->
+                            @if (doc.pdf_url) {
+                              <button class="btn btn-sm btn-outline-success"
+                                      style="font-size:.75rem;" title="Ver PDF"
+                                      (click)="openFile(doc.pdf_url)">
+                                <fa-icon icon="file-pdf" class="me-1" />PDF
+                              </button>
                             }
-                          </button>
+                            @if (doc.xml_url) {
+                              <button class="btn btn-sm btn-outline-info"
+                                      style="font-size:.75rem;" title="Descargar XML"
+                                      (click)="openFile(doc.xml_url)">
+                                <fa-icon icon="file-code" class="me-1" />XML
+                              </button>
+                            }
+                            @if (doc.cdr_url) {
+                              <button class="btn btn-sm btn-outline-warning"
+                                      style="font-size:.75rem;" title="Descargar CDR"
+                                      (click)="openFile(doc.cdr_url)">
+                                <fa-icon icon="file-zipper" class="me-1" />CDR
+                              </button>
+                            }
+                          }
                         </div>
                       </div>
 
@@ -183,48 +210,92 @@
                             <span class="text-body-secondary"> · S/ {{ cn.total | number:'1.2-2' }}</span>
                           </div>
                           <div class="d-flex gap-1 flex-shrink-0">
-                            <button class="btn btn-sm btn-outline-success"
-                                    style="font-size:.75rem;"
-                                    title="Descargar PDF"
-                                    [disabled]="downloadingNcId() === (cn.id + '-pdf')"
-                                    (click)="downloadCreditNoteFile(cn, 'pdf')">
-                              @if (downloadingNcId() === (cn.id + '-pdf')) {
-                                <c-spinner size="sm" />
-                              } @else {
-                                <fa-icon icon="file-pdf" class="me-1" />PDF
+                            @if (cn.is_internal) {
+                              <!-- NC interna: PDF propio -->
+                              <button class="btn btn-sm btn-outline-success"
+                                      style="font-size:.75rem;" title="Descargar PDF"
+                                      [disabled]="downloadingNcId() === (cn.id + '-pdf')"
+                                      (click)="downloadInternalCreditNotePdf(cn)">
+                                @if (downloadingNcId() === (cn.id + '-pdf')) {
+                                  <c-spinner size="sm" />
+                                } @else {
+                                  <fa-icon icon="file-pdf" class="me-1" />PDF
+                                }
+                              </button>
+                            } @else {
+                              <!-- NC SUNAT: links de ApiSunat -->
+                              @if (cn.pdf_url) {
+                                <button class="btn btn-sm btn-outline-success"
+                                        style="font-size:.75rem;" title="Ver PDF"
+                                        (click)="openFile(cn.pdf_url)">
+                                  <fa-icon icon="file-pdf" class="me-1" />PDF
+                                </button>
                               }
-                            </button>
-                            @if (cn.xml_url) {
-                              <button class="btn btn-sm btn-outline-info"
-                                      style="font-size:.75rem;"
-                                      title="Descargar XML"
-                                      [disabled]="downloadingNcId() === (cn.id + '-xml')"
-                                      (click)="downloadCreditNoteFile(cn, 'xml')">
-                                @if (downloadingNcId() === (cn.id + '-xml')) {
-                                  <c-spinner size="sm" />
-                                } @else {
+                              @if (cn.xml_url) {
+                                <button class="btn btn-sm btn-outline-info"
+                                        style="font-size:.75rem;" title="Descargar XML"
+                                        (click)="openFile(cn.xml_url)">
                                   <fa-icon icon="file-code" class="me-1" />XML
-                                }
-                              </button>
-                            }
-                            @if (cn.cdr_url) {
-                              <button class="btn btn-sm btn-outline-warning"
-                                      style="font-size:.75rem;"
-                                      title="Descargar CDR"
-                                      [disabled]="downloadingNcId() === (cn.id + '-cdr')"
-                                      (click)="downloadCreditNoteFile(cn, 'cdr')">
-                                @if (downloadingNcId() === (cn.id + '-cdr')) {
-                                  <c-spinner size="sm" />
-                                } @else {
+                                </button>
+                              }
+                              @if (cn.cdr_url) {
+                                <button class="btn btn-sm btn-outline-warning"
+                                        style="font-size:.75rem;" title="Descargar CDR"
+                                        (click)="openFile(cn.cdr_url)">
                                   <fa-icon icon="file-zipper" class="me-1" />CDR
-                                }
-                              </button>
+                                </button>
+                              }
                             }
                           </div>
                         </div>
                       }
                     </div>
                   }
+
+                  @for (guide of guides; track guide.id) {
+                    <div class="px-3 py-2 border-top" style="font-size:.85rem;">
+                      <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+                        <div>
+                          <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <fa-icon icon="truck" class="text-body-secondary" style="font-size:.8rem;" />
+                            <span class="font-monospace fw-semibold">{{ guide.full_number ?? '—' }}</span>
+                            <c-badge [color]="docStatusColor[guide.sunat_status]" style="font-size:.65rem;">
+                              {{ docStatusLabel[guide.sunat_status] }}
+                            </c-badge>
+                          </div>
+                          <div class="text-body-secondary" style="font-size:.75rem;">
+                            Guía de Remisión
+                            @if (guide.transfer_date) { · {{ guide.transfer_date | date:'dd/MM/yyyy' }} }
+                            @if (guide.carrier_name) { · {{ guide.carrier_name }} }
+                          </div>
+                        </div>
+                        <div class="d-flex gap-1 flex-shrink-0">
+                          @if (guide.pdf_url) {
+                            <button class="btn btn-sm btn-outline-success"
+                                    style="font-size:.75rem;" title="Ver PDF"
+                                    (click)="openFile(guide.pdf_url)">
+                              <fa-icon icon="file-pdf" class="me-1" />PDF
+                            </button>
+                          }
+                          @if (guide.xml_url) {
+                            <button class="btn btn-sm btn-outline-info"
+                                    style="font-size:.75rem;" title="Descargar XML"
+                                    (click)="openFile(guide.xml_url)">
+                              <fa-icon icon="file-code" class="me-1" />XML
+                            </button>
+                          }
+                          @if (guide.cdr_url) {
+                            <button class="btn btn-sm btn-outline-warning"
+                                    style="font-size:.75rem;" title="Descargar CDR"
+                                    (click)="openFile(guide.cdr_url)">
+                              <fa-icon icon="file-zipper" class="me-1" />CDR
+                            </button>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  }
+
                 </c-card-body>
               </c-card>
             }

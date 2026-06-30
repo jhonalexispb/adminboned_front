@@ -1,0 +1,423 @@
+<%
+
+    const fix = (number, fraction, force0) => parseFloat(number) ? (new Intl.NumberFormat('en-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: typeof fraction === 'number' ? fraction : 2 }).format(number)).replace(/(\s|[PEN])/g, '') : (force0 ? '0.00' : '')
+
+    const emisor_logo = getCloudImgUrl(persona?.logo || 'logoMin')
+    const serie_numero = json?.['cbc:ID']?._text || ''
+    const fecha_emision = json?.['cbc:IssueDate']?._text || ''
+    const hora_emision = json?.['cbc:IssueTime']?._text || ''
+    const tipo_moneda = json?.['cbc:DocumentCurrencyCode']?._text || ''
+    const moneda_simbolo = catalogoFn('_A02', tipo_moneda) || ''
+    const nombre_moneda = catalogoFn('02', tipo_moneda) || tipo_moneda
+    const fecha_vencimiento = json?.['cbc:DueDate']?._text || ''
+
+    const emisor_ruc = json?.['cac:AccountingSupplierParty']?.['cac:Party']?.['cac:PartyIdentification']?.['cbc:ID']?._text || ''
+    const emisor_nombre_comercial = json?.['cac:AccountingSupplierParty']?.['cac:Party']?.['cac:PartyName']?.['cbc:Name']?._text || persona?.tradename || ''
+    const emisor_nombre_apellido_razon_social = json?.['cac:AccountingSupplierParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cbc:RegistrationName']?._text || persona?.name || ''
+    const emisor_tipo_id = json?.['cac:AccountingSupplierParty']?.['cac:Party']?.['cac:PartyIdentification']?.['cbc:ID']?._attributes?.schemeID || ''
+    const emisor_direccion = json?.['cac:AccountingSupplierParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cac:RegistrationAddress']?.['cac:AddressLine']?.['cbc:Line']?._text || persona?.address || ''
+    const emisor_provincia = json?.['cac:AccountingSupplierParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cac:RegistrationAddress']?.['cbc:CityName']?._text || ''
+    const emisor_departamento = json?.['cac:AccountingSupplierParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cac:RegistrationAddress']?.['cbc:CountrySubentity']?._text || ''
+    const emisor_distrito = json?.['cac:AccountingSupplierParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cac:RegistrationAddress']?.['cbc:District']?._text || ''
+    const emisor_descripcion = persona?.description || ''
+    const emisor_mensaje_pie = persona?.footerMessage || ''
+
+    const adquirente_tipo_id = catalogoFn('06', json?.["cac:AccountingCustomerParty"]?.["cac:Party"]?.["cac:PartyIdentification"]?.["cbc:ID"]?._attributes?.schemeID) || ''
+    const adquirente_nombre = json?.['cac:AccountingCustomerParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cbc:RegistrationName']?._text || ''
+    const adquirente_id = json?.['cac:AccountingCustomerParty']?.['cac:Party']?.['cac:PartyIdentification']?.['cbc:ID']?._text || ''
+    const adquirente_direccion = json?.['cac:AccountingCustomerParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cac:RegistrationAddress']?.['cac:AddressLine']?.['cbc:Line']?._text || ''
+    const adquirente_tipo_nombre = (json?.["cac:AccountingCustomerParty"]?.["cac:Party"]?.["cac:PartyIdentification"]?.["cbc:ID"]?._attributes?.schemeID === '6' && adquirente_id?.slice(0, 2) === '20') ? 'RAZON SOCIAL' : 'NOMBRE'
+
+    const relacionados_guias = json?.['cac:DespatchDocumentReference']?.map(e => ({
+        tipo: catalogoFn('01', e['cbc:DocumentTypeCode']?._text) || catalogoFn('12', e['cbc:DocumentTypeCode']?._text) || '',
+        numero: e['cbc:ID']?._text || ''
+    }))
+
+    const relacionados = json?.['cac:AdditionalDocumentReference']?.map(e => ({
+        tipo: e['cbc:DocumentStatusCode']?._text ? catalogoFn('12', e['cbc:DocumentTypeCode']?._text) : catalogoFn('01', e['cbc:DocumentTypeCode']?._text) || '',
+        numero: e['cbc:ID']?._text || ''
+    }))
+
+    const items = json?.['cac:InvoiceLine']?.map((e, i) => {
+        const item = {}
+
+        if (e['cac:Item']?.['cac:AdditionalItemProperty']?.length > 0) {
+            item.propiedades = e['cac:Item']?.['cac:AdditionalItemProperty']?.map(p => {
+                const propiedad = {
+                    nombre: p['cbc:Name']?._text || '',
+                    codigo: p['cbc:NameCode']?._text || '',
+                    valor: p['cbc:Value']?._text || ''
+                }
+                if (['3059', '3005'].includes(p['cbc:NameCode']?._text)) propiedad.valor = p['cac:UsabilityPeriod']?.['cbc:StartDate']?._text || ''
+                if (['3060'].includes(p['cbc:NameCode']?._text)) propiedad.valor = p['cac:UsabilityPeriod']?.['cbc:StartTime']?._text || ''
+                if (['4005'].includes(p['cbc:NameCode']?._text)) propiedad.valor = p['cac:UsabilityPeriod']?.['cbc:DurationMeasure']?._text || ''
+                if (['4002', '4003', '4004', '4006'].includes(p['cbc:NameCode']?._text)) propiedad.valor = p['cac:UsabilityPeriod']?.['cbc:StartDate']?._text || ''
+                return propiedad
+            })
+        }
+
+        item.numero_orden = e['cbc:ID']?._text || ''
+        item.cantidad_unidades = e['cbc:InvoicedQuantity']?._text || ''
+        item.unidad = catalogoFn(e['cbc:InvoicedQuantity']?._text > 1 ? '03' : '03B', e['cbc:InvoicedQuantity']?._attributes.unitCode) || ''
+        item.unidad_codigo = e['cbc:InvoicedQuantity']?._attributes?.unitCode || item.unidad
+        item.codigo = e['cac:Item']?.['cac:SellersItemIdentification']?.['cbc:ID']?._text || ''
+        item.descripcion = e['cac:Item']?.['cbc:Description']?._text || ''
+        item.valor_unitario = e['cac:Price']?.['cbc:PriceAmount']?._text
+        item.precio_venta_unitario = e['cac:PricingReference']?.['cac:AlternativeConditionPrice']?.['cbc:PriceAmount']?._text || '0.00'
+        item.valor_venta = e['cbc:LineExtensionAmount']?._text
+        item.igv = e['cac:TaxTotal']?.['cac:TaxSubtotal']?.find(e => e['cac:TaxCategory']?.['cac:TaxScheme']?.['cbc:ID']?._text === '1000')?.['cbc:TaxAmount']?._text
+
+        e['cac:AllowanceCharge']?.map(e => {
+            if (e['cbc:AllowanceChargeReasonCode']?._text === '00') item.descuento_afecta_base = e['cbc:Amount']?._text
+            if (e['cbc:AllowanceChargeReasonCode']?._text === '01') item.descuento_no_afecta_base = e['cbc:Amount']?._text
+        })
+
+        item.total_precio = item.precio_venta_unitario * item.cantidad_unidades
+        item.total_valor = item.valor_unitario * item.cantidad_unidades
+        return item
+    })
+
+    const totales_gravada    = fix(json?.['cac:TaxTotal']?.['cac:TaxSubtotal']?.find(e => e['cac:TaxCategory']?.['cac:TaxScheme']?.['cbc:ID']?._text === '1000')?.['cbc:TaxableAmount']?._text)
+    const totales_exonerada  = fix(json?.['cac:TaxTotal']?.['cac:TaxSubtotal']?.find(e => e['cac:TaxCategory']?.['cac:TaxScheme']?.['cbc:ID']?._text === '9997')?.['cbc:TaxableAmount']?._text)
+    const totales_inafecta   = fix(json?.['cac:TaxTotal']?.['cac:TaxSubtotal']?.find(e => e['cac:TaxCategory']?.['cac:TaxScheme']?.['cbc:ID']?._text === '9998')?.['cbc:TaxableAmount']?._text)
+    const totales_gratuita   = fix(json?.['cac:TaxTotal']?.['cac:TaxSubtotal']?.find(e => e['cac:TaxCategory']?.['cac:TaxScheme']?.['cbc:ID']?._text === '9996')?.['cbc:TaxableAmount']?._text)
+    const totales_igv        = fix(json?.['cac:TaxTotal']?.['cac:TaxSubtotal']?.find(e => e['cac:TaxCategory']?.['cac:TaxScheme']?.['cbc:ID']?._text === '1000')?.['cbc:TaxAmount']?._text)
+    const totales_isc        = fix(json?.['cac:TaxTotal']?.['cac:TaxSubtotal']?.find(e => e['cac:TaxCategory']?.['cac:TaxScheme']?.['cbc:ID']?._text === '2000')?.['cbc:TaxAmount']?._text)
+    const totales_icbper     = fix(json?.['cac:TaxTotal']?.['cac:TaxSubtotal']?.find(e => e['cac:TaxCategory']?.['cac:TaxScheme']?.['cbc:ID']?._text === '7152')?.['cbc:TaxAmount']?._text)
+    const totales_otros_dsctos  = fix(json?.['cac:LegalMonetaryTotal']?.['cbc:AllowanceTotalAmount']?._text)
+    const totales_otros_cargos  = fix(json?.['cac:LegalMonetaryTotal']?.['cbc:ChargeTotalAmount']?._text)
+    const totales_importe_total = fix(json?.['cac:LegalMonetaryTotal']?.['cbc:PayableAmount']?._text)
+    const totales_redondeo      = fix(json?.['cac:LegalMonetaryTotal']?.['cbc:PayableRoundingAmount']?._text)
+    const totales_anticipos     = fix(json?.['cac:LegalMonetaryTotal']?.['cbc:PrepaidAmount']?._text)
+
+    const condiciones_pago = (json?.['cac:PaymentTerms']?.map(e => {
+        if (e['cbc:ID']?._text === 'FormaPago') return { tipo: e['cbc:PaymentMeansID']?._text.toLocaleUpperCase(), fecha: e['cbc:PaymentDueDate']?._text, monto: fix(e['cbc:Amount']?._text) }
+        return null
+    }) || []).filter(e => e !== null)
+
+    const _cbcNotes = Array.isArray(json?.['cbc:Note']) ? json['cbc:Note'] : (json?.['cbc:Note'] ? [json['cbc:Note']] : [])
+    const totales_importe_total_letras = (_cbcNotes.find(e => e._attributes?.languageLocaleID === '1000') || {})._text || ''
+    const notas = _cbcNotes.map(e => { if (e._attributes?.languageLocaleID !== '1000' && String(e._text || '').indexOf('NC:') !== 0) return e._text })
+    const adquirente_nombre_comercial = ((_cbcNotes.find(e => String(e._text || '').indexOf('NC:') === 0) || {})._text || '').slice(3).trim()
+
+    const searchUrl = fileName?.replace(/-/g, '|') + '|' + (emisor_tipo_id || '') + '|' + (adquirente_id || '')
+
+    const parsearDesc = (desc) => {
+        const raw = (desc || '').trim()
+        const idx = raw.search(/\blote\b/i)
+        if (idx < 0) return { nombre: raw, lote: '', vence: '' }
+        const nombre = raw.slice(0, idx).replace(/[-\s]+$/, '').trim()
+        const resto  = raw.slice(idx)
+        const lote   = (resto.match(/lote[:\s]+(\S+)/i) || [])[1] || ''
+        const vence  = (resto.match(/venc\S*[:\s]+(\S+)/i) || [])[1] || ''
+        return { nombre: nombre, lote: lote, vence: vence }
+    }
+%>
+
+<style>
+    @page { margin: 8mm; }
+    * { box-sizing: border-box; }
+
+    body { font-family: 'Yantramanav', sans-serif; font-size: 9.8pt; line-height: 1.3; color: #1a1a1a; }
+
+    .row { display: flex; flex-direction: row; flex-wrap: wrap; }
+    .row.column { flex-direction: column; }
+    .col   { flex: 1; flex-basis: 0; max-width: 100%; }
+    .col-2 { flex-basis: 16.667%; max-width: 16.667%; }
+    .col-3 { flex-basis: 25%;     max-width: 25%; }
+    .col-4 { flex-basis: 33.333%; max-width: 33.333%; }
+    .col-5 { flex-basis: 41.667%; max-width: 41.667%; }
+    .col-6 { flex-basis: 50%;     max-width: 50%; }
+    .col-7 { flex-basis: 58.333%; max-width: 58.333%; }
+    .col-8 { flex-basis: 66.667%; max-width: 66.667%; }
+    .col-9 { flex-basis: 75%;     max-width: 75%; }
+    .col-10{ flex-basis: 83.333%; max-width: 83.333%; }
+    .col-12{ flex-basis: 100%;    max-width: 100%; }
+    .between { justify-content: space-between; }
+    .end     { justify-content: flex-end; }
+    .middle  { align-items: center; }
+    .center  { text-align: center; justify-content: center; }
+    .right   { text-align: right; }
+    .bold    { font-weight: 700; }
+    .no-break{ page-break-inside: avoid; }
+
+    .container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
+
+    /* ── Header ── */
+    .header { margin-bottom: 12px; }
+    .header .logo { flex-shrink: 0; width: 200px; }
+    .header .logo img { width: 200px; height: auto; display: block; }
+
+    .header .company-info { padding: 0 14px; }
+    .header .company-info .name    { font-size: 15pt; font-weight: 700; }
+    .header .company-info .address { font-size: 9pt; color: #333333; margin-top: 3px; line-height: 1.5; }
+
+    .header .ruc-box {
+        flex-shrink: 0;
+        width: 200px;
+        border: 2.5px solid #0D4F81;
+        border-radius: 4px;
+        padding: 10px 12px;
+        text-align: center;
+        color: #0D4F81;
+    }
+    .header .ruc-box .doc-type { font-size: 10pt; font-weight: 700; margin-bottom: 4px; }
+    .header .ruc-box .ruc-num  { font-size: 9.5pt; font-weight: 700; }
+    .header .ruc-box .serie    { font-size: 11pt; font-weight: 700; margin-top: 4px; border-top: 1.5px solid #0D4F81; padding-top: 6px; }
+
+    .divider { border: none; border-top: 2px solid #0D4F81; margin: 10px 0; }
+
+    /* ── Info cliente/emisión ── */
+    .info-row { display: flex; flex-direction: row; margin-bottom: 2px; font-size: 9.5pt; }
+    .info-row .lbl { width: 130px; font-weight: 700; text-transform: uppercase; color: #333333; flex-shrink: 0; }
+    .info-row .val { flex: 1; text-transform: uppercase; }
+
+    /* ── Tabla items ── */
+    table.items-table { table-layout: auto; width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    table.items-table thead th {
+        background: #0D4F81;
+        color: #ffffff;
+        padding: 6px 6px;
+        font-size: 9pt;
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+    table.items-table tbody tr:nth-child(even) { background: #f8fafc; }
+    table.items-table tbody td { padding: 6px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; font-size: 9.5pt; }
+
+    .product-name { font-weight: 700; text-transform: uppercase; word-break: break-word; }
+    .product-lab  { font-weight: 400; font-size: 8.5pt; color: #333333; text-transform: uppercase; }
+    .col-lote, .col-venc { white-space: nowrap; text-align: center; font-size: 8.5pt; }
+
+    /* ── Totales ── */
+    .totals-table { width: 260px; margin-left: auto; border-collapse: collapse; margin-bottom: 14px; }
+    .totals-table td { padding: 4px 6px; font-size: 9.5pt; }
+    .totals-table .lbl-col { color: #333333; }
+    .totals-table .total-row td {
+        font-size: 12pt;
+        font-weight: 700;
+        border-top: 2px solid #0D4F81;
+        padding-top: 6px;
+        color: #0D4F81;
+    }
+
+    .letras-box { border: 1px solid #e5e7eb; border-radius: 3px; padding: 5px 8px; font-size: 9pt; margin-bottom: 10px; }
+
+    /* ── Footer ── */
+    .footer { margin-top: 14px; border-top: 1px solid #e5e7eb; padding-top: 8px; font-size: 8.5pt; color: #333333; }
+    .footer .qr img { width: 90px; }
+    .thanks { margin-top: 14px; text-align: center; font-size: 9pt; color: #333333; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+</style>
+
+<div class="container">
+
+    <!-- ══ HEADER ══════════════════════════════════════════════════════ -->
+    <div class="header row between middle">
+
+        <div class="logo">
+            <img src="<%= emisor_logo %>" />
+        </div>
+
+        <div class="company-info col">
+            <div class="name"><%= emisor_nombre_comercial || emisor_nombre_apellido_razon_social %></div>
+            <% if (emisor_nombre_comercial && emisor_nombre_apellido_razon_social) { %>
+            <div style="font-size:9.5pt; font-weight:700; color:#333333;"><%= emisor_nombre_apellido_razon_social %></div>
+            <% } %>
+            <div class="address">
+                <% if (emisor_direccion) { %><%= emisor_direccion %><% } %>
+                <% if (emisor_distrito) { %>, <%= emisor_distrito %><% } %>
+                <% if (emisor_provincia) { %>, <%= emisor_provincia %><% } %>
+                <% if (emisor_departamento) { %>, <%= emisor_departamento %><% } %>
+            </div>
+            <% if (emisor_descripcion) { %>
+            <div class="address" style="margin-top:4px;"><%= emisor_descripcion %></div>
+            <% } %>
+        </div>
+
+        <div class="ruc-box">
+            <div class="ruc-num">R.U.C. N° <%= emisor_ruc %></div>
+            <div class="doc-type">BOLETA DE VENTA ELECTRÓNICA</div>
+            <div class="serie"><%= serie_numero %></div>
+        </div>
+
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ══ DATOS CLIENTE + EMISIÓN ═══════════════════════════════════ -->
+    <div class="row" style="margin-bottom:10px;">
+
+        <div class="col-7">
+            <% if (adquirente_nombre && adquirente_nombre !== '---') { %>
+            <div class="info-row">
+                <div class="lbl"><%= adquirente_tipo_nombre %>:</div>
+                <div class="val"><%= adquirente_nombre %></div>
+            </div>
+            <% } %>
+            <% if (adquirente_nombre_comercial) { %>
+            <div class="info-row">
+                <div class="lbl">Nombre Comercial:</div>
+                <div class="val"><%= adquirente_nombre_comercial %></div>
+            </div>
+            <% } %>
+            <% if (adquirente_id && adquirente_id !== '00000000') { %>
+            <div class="info-row">
+                <div class="lbl"><%= adquirente_tipo_id %>:</div>
+                <div class="val"><%= adquirente_id %></div>
+            </div>
+            <% } %>
+            <% if (adquirente_direccion) { %>
+            <div class="info-row">
+                <div class="lbl">Direccion:</div>
+                <div class="val"><%= adquirente_direccion %></div>
+            </div>
+            <% } %>
+        </div>
+
+        <div class="col-5" style="padding-left:12px;">
+            <div class="info-row">
+                <div class="lbl">Emision:</div>
+                <div class="val"><%= fecha_emision %> <%= hora_emision %></div>
+            </div>
+            <% if (fecha_vencimiento) { %>
+            <div class="info-row">
+                <div class="lbl">Vencimiento:</div>
+                <div class="val"><%= fecha_vencimiento %></div>
+            </div>
+            <% } %>
+            <div class="info-row">
+                <div class="lbl">Moneda:</div>
+                <div class="val"><%= nombre_moneda %></div>
+            </div>
+            <div class="info-row">
+                <div class="lbl">Forma de pago:</div>
+                <div class="val"><%= condiciones_pago?.find(e => e?.tipo === 'CREDITO' || e?.tipo === 'CONTADO')?.tipo || 'CONTADO' %></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ══ TABLA DE PRODUCTOS ═════════════════════════════════════════ -->
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="text-align:center; width:45px;">CANT.</th>
+                <th style="text-align:left;">DESCRIPCION</th>
+                <th style="text-align:center; white-space:nowrap;">LOTE</th>
+                <th style="text-align:center; white-space:nowrap;">VENCIM.</th>
+                <th style="text-align:right; width:72px;">
+                    <% if (pdfConfig.mostrar_valor) { %>VALOR UNIT.<% } else { %>P. UNIT.<% } %>
+                </th>
+                <th style="text-align:right; width:72px;">
+                    <% if (pdfConfig.mostrar_valor) { %>VALOR TOTAL<% } else { %>TOTAL<% } %>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <% items.map(e => { %>
+            <%
+                const parsed = parsearDesc(e.descripcion)
+            %>
+            <tr>
+                <td style="text-align:center; white-space:nowrap;">
+                    <%= fix(e.cantidad_unidades, 0) %> <span style="font-size:8.5pt; color:#333333;"><%= e.unidad_codigo %></span>
+                </td>
+                <td>
+                    <% if (e.codigo) { %>
+                    <span class="product-lab"><%= e.codigo %> · </span>
+                    <% } %>
+                    <span class="product-name"><%= parsed.nombre %></span>
+                </td>
+                <td class="col-lote"><%= parsed.lote || '-' %></td>
+                <td class="col-venc"><%= parsed.vence || '-' %></td>
+                <td style="text-align:right;">
+                    <% if (pdfConfig.mostrar_valor) { %><%= fix(e.valor_unitario, 3) %><% } else { %><%= fix(e.precio_venta_unitario, 3) %><% } %>
+                </td>
+                <td style="text-align:right;">
+                    <% if (pdfConfig.mostrar_valor) { %><%= fix(e.total_valor, 3) %><% } else { %><%= fix(e.total_precio, 3) %><% } %>
+                </td>
+            </tr>
+            <% }) %>
+        </tbody>
+    </table>
+
+    <!-- ══ TOTALES ═══════════════════════════════════════════════════ -->
+    <table class="totals-table">
+        <% if (totales_gravada) { %>
+        <tr><td class="lbl-col">OP. GRAVADA</td><td style="text-align:right;"><%= totales_gravada %></td></tr>
+        <% } %>
+        <% if (totales_exonerada) { %>
+        <tr><td class="lbl-col">OP. EXONERADA</td><td style="text-align:right;"><%= totales_exonerada %></td></tr>
+        <% } %>
+        <% if (totales_inafecta) { %>
+        <tr><td class="lbl-col">OP. INAFECTA</td><td style="text-align:right;"><%= totales_inafecta %></td></tr>
+        <% } %>
+        <% if (totales_gratuita) { %>
+        <tr><td class="lbl-col">OP. GRATUITA</td><td style="text-align:right;"><%= totales_gratuita %></td></tr>
+        <% } %>
+        <% if (totales_anticipos) { %>
+        <tr><td class="lbl-col">ANTICIPOS</td><td style="text-align:right;"><%= totales_anticipos %></td></tr>
+        <% } %>
+        <% if (totales_isc) { %>
+        <tr><td class="lbl-col">ISC</td><td style="text-align:right;"><%= totales_isc %></td></tr>
+        <% } %>
+        <% if (totales_igv) { %>
+        <tr><td class="lbl-col">IGV (18%)</td><td style="text-align:right;"><%= totales_igv %></td></tr>
+        <% } %>
+        <% if (totales_icbper) { %>
+        <tr><td class="lbl-col">ICBPER</td><td style="text-align:right;"><%= totales_icbper %></td></tr>
+        <% } %>
+        <% if (totales_otros_cargos) { %>
+        <tr><td class="lbl-col">OTROS CARGOS</td><td style="text-align:right;"><%= totales_otros_cargos %></td></tr>
+        <% } %>
+        <% if (totales_otros_dsctos) { %>
+        <tr><td class="lbl-col">OTROS DSCTOS.</td><td style="text-align:right;"><%= totales_otros_dsctos %></td></tr>
+        <% } %>
+        <% if (totales_redondeo) { %>
+        <tr><td class="lbl-col">REDONDEO</td><td style="text-align:right;"><%= totales_redondeo %></td></tr>
+        <% } %>
+        <tr class="total-row">
+            <td>IMPORTE TOTAL (<%= moneda_simbolo %>)</td>
+            <td style="text-align:right;"><%= totales_importe_total %></td>
+        </tr>
+    </table>
+
+    <% if (totales_importe_total_letras) { %>
+    <div class="letras-box">SON: <%= totales_importe_total_letras %></div>
+    <% } %>
+
+    <% if (notas?.length > 0) { %>
+    <div style="font-size:8.5pt; color:#333333; margin-bottom:8px;">
+        <% notas.map(e => { if (e) { %><div><%- e %></div><% } }) %>
+    </div>
+    <% } %>
+
+    <!-- ══ FOOTER ═════════════════════════════════════════════════════ -->
+    <div class="footer row no-break">
+        <% if (urlQR) { %>
+        <div style="margin-right:8px;">
+            <img src="<%= urlQR %>" style="width:90px;" />
+        </div>
+        <% } %>
+        <div class="col">
+            <div class="bold" style="font-size:8pt;"><%= data?.qr?.digest %></div>
+            <div style="margin-top:3px;">
+                Representacion Impresa de la BOLETA DE VENTA ELECTRONICA.
+                <% if (production) { %>
+                Consultar validez en
+                <a href="https://<%= domain %>/buscar?<%= searchUrl %>" target="_blank"><%= domain %>/buscar</a>
+                <% } else { %>
+                Generada en <a href="https://<%= domain %>/" target="_blank"><%= domain %></a>
+                <% } %>
+            </div>
+            <% if (emisor_mensaje_pie) { %>
+            <div style="margin-top:4px;"><%= emisor_mensaje_pie %></div>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="thanks">
+        Gracias por su preferencia. Estamos a su disposicion para cualquier consulta.
+    </div>
+
+</div>

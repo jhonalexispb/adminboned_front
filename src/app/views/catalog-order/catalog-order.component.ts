@@ -1,15 +1,21 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
-import { CardBodyComponent, CardComponent, SpinnerComponent } from '@coreui/angular';
+import {
+  CardBodyComponent, CardComponent, SpinnerComponent,
+  ModalBodyComponent, ModalComponent, ModalFooterComponent,
+  ModalHeaderComponent, ModalTitleDirective,
+} from '@coreui/angular';
 import { Select } from 'primeng/select';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { LaboratoryService } from '../laboratories/laboratory.service';
 import { CategoryService } from '../categories/category.service';
 import { CatalogOrderService } from './catalog-order.service';
+import { ProductService } from '../products/product.service';
 import { Laboratory } from '../laboratories/laboratory.model';
 import { Category } from '../categories/category.model';
 import { CategoryOrderItem, GroupProduct } from './catalog-order.model';
+import { ProductImage } from '../products/product.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -18,7 +24,11 @@ type Tab = 'laboratories' | 'categories' | 'category-override' | 'products';
 @Component({
   selector: 'app-catalog-order',
   standalone: true,
-  imports: [FormsModule, FaIconComponent, CardComponent, CardBodyComponent, SpinnerComponent, DragDropModule, PageHeaderComponent, Select],
+  imports: [
+    FormsModule, FaIconComponent, CardComponent, CardBodyComponent, SpinnerComponent,
+    DragDropModule, PageHeaderComponent, Select,
+    ModalComponent, ModalHeaderComponent, ModalTitleDirective, ModalBodyComponent, ModalFooterComponent,
+  ],
   templateUrl: './catalog-order.component.html'
 })
 export class CatalogOrderComponent implements OnInit {
@@ -50,10 +60,19 @@ export class CatalogOrderComponent implements OnInit {
   loadingProducts       = signal(false);
   savingProducts        = signal(false);
 
+  // ── Modal de imágenes ──────────────────────────────────────────────────
+  imageModalOpen    = signal(false);
+  imageModalProduct = signal<GroupProduct | null>(null);
+  modalImages       = signal<ProductImage[]>([]);
+  modalLoading      = signal(false);
+  modalUploading    = signal(false);
+  modalImageError   = signal('');
+
   constructor(
     private laboratoryService: LaboratoryService,
     private categoryService: CategoryService,
     private catalogOrderService: CatalogOrderService,
+    private productService: ProductService,
     private toast: ToastService
   ) {}
 
@@ -241,6 +260,87 @@ export class CatalogOrderComponent implements OnInit {
       next: res => { this.toast.success(res.message); this.savingProducts.set(false); },
       error: err => { this.toast.error(err.error?.message ?? 'Error al guardar el orden.'); this.savingProducts.set(false); }
     });
+  }
+
+  // ── Modal de imágenes ──────────────────────────────────────────────────
+  openImageModal(product: GroupProduct): void {
+    this.imageModalProduct.set(product);
+    this.imageModalOpen.set(true);
+    this.modalImages.set([]);
+    this.modalImageError.set('');
+    this.modalLoading.set(true);
+    this.productService.get(product.id).subscribe({
+      next: res => { this.modalImages.set(res.product.images ?? []); this.modalLoading.set(false); },
+      error: () => this.modalLoading.set(false),
+    });
+  }
+
+  closeImageModal(): void {
+    this.imageModalOpen.set(false);
+    this.imageModalProduct.set(null);
+  }
+
+  onModalFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (!files.length || !this.imageModalProduct()) return;
+    this.modalUploading.set(true);
+    this.modalImageError.set('');
+    this.productService.uploadImages(this.imageModalProduct()!.id, files).subscribe({
+      next: res => {
+        this.modalImages.update(imgs => [...imgs, ...res.images]);
+        this.syncPrimaryUrl();
+        this.modalUploading.set(false);
+      },
+      error: err => {
+        this.modalImageError.set(err.error?.message ?? 'Error al subir imágenes.');
+        this.modalUploading.set(false);
+      },
+    });
+  }
+
+  setModalPrimary(img: ProductImage): void {
+    if (img.is_primary || !this.imageModalProduct()) return;
+    this.productService.setPrimaryImage(this.imageModalProduct()!.id, img.id).subscribe({
+      next: () => {
+        this.modalImages.update(imgs => imgs.map(i => ({ ...i, is_primary: i.id === img.id })));
+        this.syncPrimaryUrl();
+      },
+      error: err => this.toast.error(err.error?.message ?? 'Error al definir imagen principal.'),
+    });
+  }
+
+  deleteModalImage(img: ProductImage): void {
+    if (!this.imageModalProduct()) return;
+    this.productService.deleteImage(this.imageModalProduct()!.id, img.id).subscribe({
+      next: () => {
+        const remaining = this.modalImages().filter(i => i.id !== img.id);
+        if (img.is_primary && remaining.length) remaining[0] = { ...remaining[0], is_primary: true };
+        this.modalImages.set(remaining);
+        this.syncPrimaryUrl();
+      },
+      error: err => this.toast.error(err.error?.message ?? 'Error al eliminar imagen.'),
+    });
+  }
+
+  dropModalImage(event: CdkDragDrop<ProductImage[]>): void {
+    if (event.previousIndex === event.currentIndex) return;
+    const arr = [...this.modalImages()];
+    moveItemInArray(arr, event.previousIndex, event.currentIndex);
+    this.modalImages.set(arr);
+    this.productService.reorderImages(this.imageModalProduct()!.id, arr.map(i => i.id)).subscribe({
+      error: err => this.toast.error(err.error?.message ?? 'Error al actualizar el orden.'),
+    });
+  }
+
+  private syncPrimaryUrl(): void {
+    const product = this.imageModalProduct();
+    if (!product) return;
+    const primary = this.modalImages().find(i => i.is_primary);
+    this.groupProducts.update(ps =>
+      ps.map(p => p.id === product.id ? { ...p, primary_image_url: primary?.url ?? null } : p)
+    );
   }
 
   private sortByOrder<T extends { sort_order: number; name: string }>(items: T[]): T[] {

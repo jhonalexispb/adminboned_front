@@ -85,7 +85,9 @@ export class ReturnDetailComponent implements OnInit {
     this.svc.accept(r.id, {
       action_type: payload.action_type,
       motivo_code: payload.motivo_code,
+      motivo_desc: payload.motivo_desc,
       issue_date:  payload.issue_date,
+      void_reason: payload.void_reason,
     }).subscribe({
       next: res => {
         this.toast.success(res.message);

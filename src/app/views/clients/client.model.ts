@@ -2,6 +2,7 @@ export interface Client {
   id: number;
   name: string;
   business_name: string;
+  contact_name: string | null;
   dni: string | null;
   ruc: string | null;
   address: string | null;
@@ -15,6 +16,8 @@ export interface Client {
   phone: string | null;
   email: string | null;
   active: boolean;
+  catalog_enabled: boolean;
+  catalog_access_expires_at: string | null;
   seller_assignment: {
     seller_id: number;
     seller_name: string | null;
@@ -37,6 +40,7 @@ export function toClientOption(c: Client): ClientOption {
 export interface ClientPayload {
   name: string;
   business_name?: string | null;
+  contact_name?: string | null;
   dni?: string | null;
   ruc?: string | null;
   address?: string | null;
@@ -46,4 +50,5 @@ export interface ClientPayload {
   phone?: string | null;
   email?: string | null;
   active?: boolean;
+  catalog_enabled?: boolean;
 }

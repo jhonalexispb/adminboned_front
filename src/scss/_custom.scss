@@ -14,6 +14,11 @@
   z-index: 1060 !important;
 }
 
+// SweetAlert2: siempre por encima de sheets y modales del catálogo (z-index máx: 1063)
+.swal2-container {
+  z-index: 99999 !important;
+}
+
 // PrimeNG Select: panel acotado al viewport y opciones con salto de línea (máx 2 líneas)
 .p-select-overlay {
   max-width: 95vw !important;

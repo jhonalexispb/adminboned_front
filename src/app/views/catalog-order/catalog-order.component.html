@@ -80,19 +80,30 @@
                 <c-spinner size="sm" />
               }
               <div class="d-flex align-items-center gap-1" (click)="$event.stopPropagation()">
-                <input type="color" class="form-control form-control-color p-0"
-                       style="width:2.2rem; height:2.2rem;"
-                       title="Color de la cinta de categoría"
-                       [value]="cat.color || '#6c757d'"
-                       [disabled]="savingColorId() === cat.id"
-                       (change)="onCategoryColorChange(cat, $any($event.target).value)">
                 @if (cat.color) {
+                  <input type="color" class="form-control form-control-color p-0"
+                         style="width:2.2rem; height:2.2rem;"
+                         title="Color de la cinta de categoría"
+                         [value]="cat.color"
+                         [disabled]="savingColorId() === cat.id"
+                         (change)="onCategoryColorChange(cat, $any($event.target).value)">
                   <button type="button" class="btn btn-sm btn-outline-secondary"
                           [disabled]="savingColorId() === cat.id"
                           title="Quitar color"
                           (click)="clearCategoryColor(cat)">
                     <fa-icon icon="xmark" />
                   </button>
+                } @else {
+                  <label class="d-flex align-items-center justify-content-center rounded-2 text-body-secondary position-relative"
+                         style="width:2.2rem; height:2.2rem; border:1px dashed var(--cui-border-color); cursor:pointer;"
+                         title="Sin color asignado · clic para asignar uno">
+                    <fa-icon icon="plus" style="font-size:.75rem;" />
+                    <input type="color" class="position-absolute opacity-0"
+                           style="width:100%; height:100%; cursor:pointer;"
+                           value="#6c757d"
+                           [disabled]="savingColorId() === cat.id"
+                           (change)="onCategoryColorChange(cat, $any($event.target).value)">
+                  </label>
                 }
               </div>
             </div>
@@ -186,6 +197,103 @@
   </c-card>
 }
 
+<!-- ══ MODAL: IMÁGENES DE PRODUCTO ══════════════════════════════════════════ -->
+<c-modal [visible]="imageModalOpen()" (visibleChange)="imageModalOpen.set($event)"
+         size="lg" alignment="center" scrollable>
+  <c-modal-header>
+    <h5 cModalTitle class="d-flex align-items-center gap-2 text-truncate">
+      <fa-icon icon="image" />
+      <span class="text-truncate">{{ imageModalProduct()?.name }}</span>
+    </h5>
+  </c-modal-header>
+
+  <c-modal-body>
+    <!-- Info sobre procesamiento -->
+    <div class="alert alert-info d-flex gap-2 align-items-start py-2 mb-3" style="font-size:.82rem;">
+      <fa-icon icon="circle-info" class="mt-1 flex-shrink-0" />
+      <span>
+        Las imágenes se convierten automáticamente a <strong>WebP</strong> con calidad 82 (optimizado para web).
+        Máximo <strong>10 imágenes</strong> por producto · máximo <strong>3 MB</strong> por archivo.
+        Arrastra las miniaturas para cambiar el orden de aparición en el catálogo.
+      </span>
+    </div>
+
+    @if (modalLoading()) {
+      <div class="text-center py-5"><c-spinner color="primary" /></div>
+    } @else {
+      @if (modalImageError()) {
+        <div class="alert alert-danger py-2 small">{{ modalImageError() }}</div>
+      }
+
+      @if (modalImages().length === 0) {
+        <p class="text-body-secondary text-center py-4 mb-0">
+          <fa-icon icon="image" style="font-size:2rem; opacity:.2;" class="d-block mb-2" />
+          Sin imágenes aún. Usa el botón para subir la primera.
+        </p>
+      } @else {
+        <div cdkDropList cdkDropListOrientation="mixed" class="row g-3"
+             (cdkDropListDropped)="dropModalImage($event)">
+          @for (img of modalImages(); track img.id) {
+            <div cdkDrag class="col-6 col-sm-4 col-md-3">
+              <div class="position-relative rounded-2"
+                   [class.border]="img.is_primary" [class.border-2]="img.is_primary"
+                   [class.border-primary]="img.is_primary"
+                   style="padding:2px; cursor:grab;">
+                <img [src]="img.url" class="img-fluid rounded-2"
+                     style="width:100%; height:130px; object-fit:contain; background:var(--cui-tertiary-bg);" />
+                @if (img.is_primary) {
+                  <span class="badge bg-primary position-absolute top-0 start-0 m-1"
+                        style="font-size:.65rem;">Principal</span>
+                }
+                <span class="badge bg-body-secondary text-body-secondary position-absolute top-0 end-0 m-1"
+                      style="font-size:.65rem;">
+                  <fa-icon icon="grip-vertical" />
+                </span>
+                <div class="d-flex gap-1 mt-1">
+                  @if (!img.is_primary) {
+                    <button type="button" class="btn btn-xs btn-outline-primary flex-fill"
+                            style="font-size:.7rem; padding:2px 4px;"
+                            (click)="setModalPrimary(img)">
+                      Principal
+                    </button>
+                  }
+                  <button type="button" class="btn btn-xs btn-outline-danger"
+                          style="font-size:.7rem; padding:2px 6px;"
+                          (click)="deleteModalImage(img)">
+                    <fa-icon icon="trash" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+  </c-modal-body>
+
+  <c-modal-footer class="d-flex justify-content-between align-items-center">
+    <label class="btn btn-primary mb-0"
+           [class.disabled]="modalUploading() || modalLoading() || modalImages().length >= 10">
+      @if (modalUploading()) {
+        <c-spinner size="sm" class="me-1" />Subiendo...
+      } @else {
+        <fa-icon icon="upload" class="me-1" />Subir imágenes
+      }
+      <input type="file" accept="image/*" multiple class="d-none"
+             (change)="onModalFilesSelected($event)"
+             [disabled]="modalUploading() || modalLoading() || modalImages().length >= 10" />
+    </label>
+    @if (modalImages().length >= 10) {
+      <span class="text-body-secondary small">Límite de 10 imágenes alcanzado</span>
+    } @else {
+      <span class="text-body-secondary small">{{ modalImages().length }}/10 imágenes</span>
+    }
+    <button type="button" class="btn btn-outline-secondary" (click)="closeImageModal()">
+      Cerrar
+    </button>
+  </c-modal-footer>
+</c-modal>
+
 <!-- ══ ORDEN DE PRODUCTOS ══════════════════════════════════════════════════ -->
 @if (activeTab() === 'products') {
   <c-card>
@@ -235,7 +343,7 @@
                 <div class="rounded-2 overflow-hidden flex-shrink-0 bg-body-secondary d-flex align-items-center justify-content-center"
                      style="width:40px;height:40px;">
                   @if (product.primary_image_url) {
-                    <img [src]="product.primary_image_url" alt="" style="width:100%;height:100%;object-fit:cover;">
+                    <img [src]="product.primary_image_url" alt="" style="width:100%;height:100%;object-fit:contain;">
                   } @else {
                     <fa-icon icon="box-open" class="text-body-secondary" />
                   }
@@ -246,6 +354,12 @@
                     <div class="text-body-secondary small">{{ product.sku }}</div>
                   }
                 </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary flex-shrink-0"
+                        title="Gestionar imágenes"
+                        (click)="openImageModal(product)">
+                  <fa-icon icon="image" class="me-1" />
+                  <span class="d-none d-sm-inline">Imágenes</span>
+                </button>
               </div>
             } @empty {
               <div class="text-center text-body-secondary py-4">

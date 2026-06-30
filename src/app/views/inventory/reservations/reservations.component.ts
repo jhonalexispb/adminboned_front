@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import {
@@ -7,12 +7,17 @@ import {
 import { Select } from 'primeng/select';
 import { InventoryService } from '../inventory.service';
 import { ReservationGroup, ActiveReservation } from '../inventory.model';
-import { ProductService } from '../../products/product.service';
-import { Product } from '../../products/product.model';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { Quotation } from '../../quotations/sales.model';
 import { OrderDetailModalComponent } from '../../orders/order-detail-modal/order-detail-modal.component';
 import { QuotationDetailModalComponent } from '../../quotations/quotation-detail-modal/quotation-detail-modal.component';
+
+interface ProductOption {
+  id:  number;
+  name: string;
+  sku: string | null;
+  lab: string | null;
+}
 
 @Component({
   selector: 'app-reservations',
@@ -26,40 +31,45 @@ import { QuotationDetailModalComponent } from '../../quotations/quotation-detail
   templateUrl: './reservations.component.html',
 })
 export class ReservationsComponent implements OnInit {
-  groups   = signal<ReservationGroup[]>([]);
-  loading  = signal(true);
-  oversoldOnly = false;
+  private allGroups = signal<ReservationGroup[]>([]);
+  loading           = signal(true);
+  oversoldOnly      = signal(false);
+  selectedProduct   = signal<ProductOption | null>(null);
 
-  products        = signal<Product[]>([]);
-  selectedProduct = signal<Product | null>(null);
+  previewOrderId   = signal<number | null>(null);
+  previewQuotation = signal<Quotation | null>(null);
 
-  previewOrderId    = signal<number | null>(null);
-  previewQuotation  = signal<Quotation | null>(null);
+  productOptions = computed<ProductOption[]>(() =>
+    this.allGroups().map(g => ({
+      id:   g.product_id,
+      name: g.product_name,
+      sku:  g.product_sku,
+      lab:  g.product_laboratory,
+    }))
+  );
 
-  constructor(
-    private inventoryService: InventoryService,
-    private productService: ProductService,
-  ) {}
+  groups = computed(() => {
+    let list = this.allGroups();
+    if (this.oversoldOnly()) list = list.filter(g => g.oversold);
+    const pid = this.selectedProduct()?.id ?? null;
+    if (pid !== null) list = list.filter(g => g.product_id === pid);
+    return list;
+  });
 
-  ngOnInit(): void {
-    this.productService.list({ active: true, per_page: 500 }).subscribe(r => this.products.set(r.data));
-    this.load();
-  }
+  constructor(private inventoryService: InventoryService) {}
+
+  ngOnInit(): void { this.load(); }
 
   load(): void {
     this.loading.set(true);
-    this.inventoryService.listReservations({
-      oversold:   this.oversoldOnly || undefined,
-      product_id: this.selectedProduct()?.id,
-    }).subscribe({
-      next: res => { this.groups.set(res.data); this.loading.set(false); },
+    this.inventoryService.listReservations({}).subscribe({
+      next: res => { this.allGroups.set(res.data); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
 
-  onProductSelect(product: Product | null): void {
-    this.selectedProduct.set(product);
-    this.load();
+  onProductSelect(opt: ProductOption | null): void {
+    this.selectedProduct.set(opt);
   }
 
   viewReservation(r: ActiveReservation): void {

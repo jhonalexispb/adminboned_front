@@ -1,0 +1,206 @@
+<app-page-header title="Analítica del catálogo" subtitle="Actividad de clientes en el catálogo de pedidos">
+  <select class="form-select form-select-sm" style="width:auto"
+          [(ngModel)]="days" (change)="onDaysChange()">
+    @for (opt of periodOptions; track opt.value) {
+      <option [value]="opt.value">{{ opt.label }}</option>
+    }
+  </select>
+</app-page-header>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (!data()) {
+  <div class="text-center text-body-secondary py-5">No se pudo cargar la analítica.</div>
+} @else {
+
+  <!-- ── Stat cards ──────────────────────────────────────────────────────── -->
+  <c-row [gutter]="3" class="mb-4">
+
+    <c-col xs="6" lg="3">
+      <c-card class="h-100">
+        <c-card-body class="d-flex flex-column justify-content-between">
+          <div class="text-body-secondary small mb-1">Sesiones totales</div>
+          <div class="fs-3 fw-bold">{{ data()!.total_sessions | number }}</div>
+          <div class="text-body-secondary small">en los últimos {{ data()!.period }} días</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+    <c-col xs="6" lg="3">
+      <c-card class="h-100">
+        <c-card-body class="d-flex flex-column justify-content-between">
+          <div class="text-body-secondary small mb-1">Clientes únicos</div>
+          <div class="fs-3 fw-bold">{{ data()!.unique_clients | number }}</div>
+          <div class="text-body-secondary small">identificados en el período</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+    <c-col xs="6" lg="3">
+      <c-card class="h-100">
+        <c-card-body class="d-flex flex-column justify-content-between">
+          <div class="text-body-secondary small mb-1">Uso desde celular</div>
+          <div class="fs-3 fw-bold">{{ pctMobile() }}%</div>
+          <div class="text-body-secondary small">{{ data()!.by_device['mobile'] ?? 0 }} sesiones móvil</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+    <c-col xs="6" lg="3">
+      <c-card class="h-100">
+        <c-card-body class="d-flex flex-column justify-content-between">
+          <div class="text-body-secondary small mb-1">Hora pico</div>
+          <div class="fs-3 fw-bold">{{ peakHour() }}</div>
+          <div class="text-body-secondary small">hora con más accesos</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+  </c-row>
+
+  <!-- ── Visitas: identificados vs anónimos ───────────────────────────────── -->
+  <c-row [gutter]="3" class="mb-4">
+
+    <c-col xs="6" lg="4">
+      <c-card class="h-100">
+        <c-card-body class="d-flex flex-column justify-content-between">
+          <div class="text-body-secondary small mb-1">Visitas identificadas</div>
+          <div class="fs-3 fw-bold text-success">{{ data()!.identified_visits | number }}</div>
+          <div class="text-body-secondary small">clientes que se identificaron</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+    <c-col xs="6" lg="4">
+      <c-card class="h-100">
+        <c-card-body class="d-flex flex-column justify-content-between">
+          <div class="text-body-secondary small mb-1">Visitas anónimas</div>
+          <div class="fs-3 fw-bold text-secondary">{{ data()!.anonymous_visits | number }}</div>
+          <div class="text-body-secondary small">navegaron sin identificarse</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+    <c-col xs="12" lg="4">
+      <c-card class="h-100">
+        <c-card-body class="d-flex flex-column justify-content-between">
+          <div class="text-body-secondary small mb-1">Tasa de identificación</div>
+          <div class="fs-3 fw-bold text-primary">{{ data()!.conversion_pct }}%</div>
+          <div class="text-body-secondary small">del total de visitas se identificó</div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+  </c-row>
+
+  <!-- ── Sesiones por día ────────────────────────────────────────────────── -->
+  <c-card class="mb-4">
+    <c-card-header><strong>Sesiones por día</strong></c-card-header>
+    <c-card-body>
+      <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+        <div [style.min-width]="dailyMinWidth()" style="height:220px;">
+          @if (dailyChartData()) {
+            <c-chart type="line" [data]="dailyChartData()!" [options]="dailyChartOptions" />
+          }
+        </div>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <!-- ── Dispositivos + Hora pico ───────────────────────────────────────── -->
+  <c-row [gutter]="3" class="mb-4">
+
+    <c-col xs="12" lg="5">
+      <c-card class="h-100">
+        <c-card-header>
+          <strong>Dispositivos</strong>
+        </c-card-header>
+        <c-card-body>
+          <!-- Doughnut chart -->
+          <div style="height:200px; position:relative;" class="mb-3">
+            @if (deviceChartData()) {
+              <c-chart type="doughnut" [data]="deviceChartData()!" [options]="deviceChartOptions" />
+            }
+          </div>
+          <!-- OS breakdown -->
+          <div class="border-top pt-3">
+            <div class="text-body-secondary small mb-2">Por sistema operativo</div>
+            @for (entry of $any(data()!.by_os) | keyvalue; track entry.key) {
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small">{{ entry.key }}</span>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ entry.value }}</span>
+              </div>
+            }
+          </div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+    <c-col xs="12" lg="7">
+      <c-card class="h-100">
+        <c-card-header><strong>Hora del día</strong></c-card-header>
+        <c-card-body>
+          <div style="height:260px;">
+            @if (hourChartData()) {
+              <c-chart type="bar" [data]="hourChartData()!" [options]="hourChartOptions" />
+            }
+          </div>
+        </c-card-body>
+      </c-card>
+    </c-col>
+
+  </c-row>
+
+  <!-- ── Top clientes ───────────────────────────────────────────────────── -->
+  <c-card>
+    <c-card-header><strong>Clientes más activos</strong></c-card-header>
+    <c-card-body class="p-0">
+
+      @if (!data()!.top_clients.length) {
+        <div class="text-center text-body-secondary py-4 small">Sin datos en este período.</div>
+      } @else {
+
+        <!-- Mobile: cards -->
+        <div class="d-md-none d-flex flex-column gap-2 p-3">
+          @for (client of data()!.top_clients; track client.client_name; let i = $index) {
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="d-flex align-items-center gap-2">
+                <span class="text-body-secondary small" style="min-width:1.5rem;">{{ i + 1 }}.</span>
+                <span class="fw-medium small">{{ client.client_name }}</span>
+              </div>
+              <span class="badge bg-primary-subtle text-primary-emphasis">
+                {{ client.sessions }} sesión{{ client.sessions !== 1 ? 'es' : '' }}
+              </span>
+            </div>
+          }
+        </div>
+
+        <!-- Desktop: tabla -->
+        <table class="table table-hover mb-0 d-none d-md-table">
+          <thead>
+            <tr>
+              <th style="width:3rem;">#</th>
+              <th>Cliente</th>
+              <th class="text-end">Sesiones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (client of data()!.top_clients; track client.client_name; let i = $index) {
+              <tr>
+                <td class="text-body-secondary">{{ i + 1 }}</td>
+                <td class="fw-medium">{{ client.client_name }}</td>
+                <td class="text-end">
+                  <span class="badge bg-primary-subtle text-primary-emphasis">
+                    {{ client.sessions }}
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+      }
+    </c-card-body>
+  </c-card>
+
+}

@@ -12,33 +12,42 @@
 
     <div class="row g-3">
 
-      <!-- Nombre comercial -->
+      <!-- Razón social -->
       <div class="col-md-6">
         <label class="form-label" for="business_name">
-          Nombre comercial <span class="text-danger">*</span>
+          Razón social <span class="text-danger">*</span>
         </label>
         <input cFormControl id="business_name" formControlName="business_name"
                [class.is-invalid]="form.get('business_name')?.invalid && form.get('business_name')?.touched"
-               placeholder="Ej: Bodega El Sol" />
+               placeholder="Ej: GARCIA PEREZ ROSA MARIA" />
         @if (form.get('business_name')?.hasError('required') && form.get('business_name')?.touched) {
-          <div class="invalid-feedback">El nombre comercial es obligatorio.</div>
+          <div class="invalid-feedback">La razón social es obligatoria.</div>
         }
       </div>
 
-      <!-- Nombre del contacto -->
+      <!-- Nombre comercial -->
       <div class="col-md-6">
         <label class="form-label" for="name">
-          Nombre del contacto
+          Nombre comercial
           <span class="text-body-secondary fw-normal small">(opcional)</span>
         </label>
         <input
           cFormControl id="name" formControlName="name"
-          placeholder="Ej: Juan Pérez"
+          placeholder="Ej: Botica San José"
           [class.is-invalid]="form.get('name')?.invalid && form.get('name')?.touched"
         />
-        @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
-          <div class="invalid-feedback">El nombre es obligatorio.</div>
-        }
+      </div>
+
+      <!-- Nombre de contacto -->
+      <div class="col-md-6">
+        <label class="form-label" for="contact_name">
+          Nombre de contacto
+          <span class="text-body-secondary fw-normal small">(para boletas)</span>
+        </label>
+        <input
+          cFormControl id="contact_name" formControlName="contact_name"
+          placeholder="Ej: Juan Pérez García"
+        />
       </div>
 
       <!-- DNI -->
@@ -240,9 +249,9 @@
       </div>
 
       <!-- Activo -->
-      <div class="col-12">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="active" formControlName="active" />
+      <div class="col-12 col-md-6">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch" id="active" formControlName="active" />
           <label class="form-check-label" for="active">Activo</label>
         </div>
       </div>

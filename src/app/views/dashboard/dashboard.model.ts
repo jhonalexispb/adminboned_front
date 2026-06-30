@@ -35,16 +35,11 @@ export interface DashboardData {
     mensaje: string;
   };
   chart: {
-    labels: number[];
-    ventas: number[];
-    meta:   number[];
+    labels:       number[];
+    ventas:       number[];
+    devoluciones: number[];
+    meta:         number[];
   };
-  top_clientes: {
-    client_id:      number;
-    client_name:    string;
-    total_comprado: number;
-    pedidos:        number;
-  }[];
   geo: {
     provincia:    string;
     departamento: string;
@@ -57,4 +52,32 @@ export interface DashboardData {
     cotizaciones_enviadas: number;
     pedidos_sin_documento: number;
   };
+}
+
+export interface ChartMonthData {
+  periodo:     string;
+  meta_diaria: number;
+  chart: {
+    labels:       number[];
+    ventas:       number[];
+    devoluciones: number[];
+    meta:         number[];
+  };
+}
+
+export interface RotationItem {
+  product_id:    number;
+  name:          string;
+  sku:           string | null;
+  laboratory:    string | null;
+  unidades:      number;
+  ingresos:      number;
+  stock_actual:  number;
+}
+
+export interface RotationData {
+  from: string;
+  to:   string;
+  top_rotacion: RotationItem[];
+  sin_rotacion: RotationItem[];
 }

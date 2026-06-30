@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
@@ -47,9 +47,9 @@ export class OrdersListComponent implements OnInit {
   total    = signal(0);
   lastPage = signal(1);
 
-  actingId  = signal<number | null>(null);
   detailId  = signal<number | null>(null);
   docOrder  = signal<Order | null>(null);
+  actingId  = computed<number | null>(() => this.docOrder()?.id ?? null);
 
   // ── Docs modal ────────────────────────────────────────────────────────────
   docsOrder      = signal<Order | null>(null);
@@ -57,24 +57,10 @@ export class OrdersListComponent implements OnInit {
   downloadingKey = signal<string | null>(null);
 
   // ── Void modal ────────────────────────────────────────────────────────────
-  voidOrder      = signal<Order | null>(null);
-  voidReason     = '';
-  voidSubmitting = signal(false);
-
-  // ── NC modal ──────────────────────────────────────────────────────────────
-  ncOrder        = signal<Order | null>(null);
-  ncSubmitting   = signal(false);
-  ncForm         = { motivo_code: '06', reason: '', subtotal: 0, issue_date: new Date().toISOString().slice(0, 10) };
-
-  readonly motivoOptions = [
-    { code: '01', label: 'Anulación de la operación' },
-    { code: '02', label: 'Anulación por error en el RUC' },
-    { code: '03', label: 'Corrección en la descripción' },
-    { code: '06', label: 'Devolución total' },
-    { code: '07', label: 'Devolución por ítem' },
-    { code: '09', label: 'Disminución en el valor' },
-    { code: '10', label: 'Otros conceptos' },
-  ];
+  voidOrder       = signal<Order | null>(null);
+  voidReason      = '';
+  voidSubmitting  = signal(false);
+  consultingVoidId = signal<number | null>(null);
 
   // ── Payments modal ────────────────────────────────────────────────────────
   paymentsOrder   = signal<Order | null>(null);
@@ -109,6 +95,7 @@ export class OrdersListComponent implements OnInit {
     { label: 'En ruta',     value: 'dispatched' },
     { label: 'Entregado',   value: 'delivered' },
     { label: 'Cobrado',     value: 'paid' },
+    { label: 'Doc. anulado', value: 'voided' },
   ];
 
   readonly statusLabels: Partial<Record<string, string>> = ORDER_STATUS_LABELS;
@@ -207,16 +194,31 @@ export class OrdersListComponent implements OnInit {
 
   closeDocs(): void { this.docsOrder.set(null); this.loadingDocs.set(false); }
 
-  openDocFile(doc: { id: number; full_number: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
-    this.triggerDownload('sale-documents', doc.id, type, doc.full_number ?? String(doc.id));
+  openFile(url: string | null): void {
+    if (url) window.open(url, '_blank');
   }
 
-  openGuideFile(g: { id: number; full_number: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
-    this.triggerDownload('shipping-guides', g.id, type, g.full_number ?? String(g.id));
+  openDocFile(doc: { id: number; document_type: string; full_number: string | null; pdf_url: string | null; xml_url: string | null; cdr_url: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
+    if (doc.document_type === 'sale_note') {
+      this.triggerDownload('sale-documents', doc.id, type, doc.full_number ?? String(doc.id));
+    } else {
+      const url = type === 'pdf' ? doc.pdf_url : type === 'xml' ? doc.xml_url : doc.cdr_url;
+      this.openFile(url);
+    }
   }
 
-  openCreditNoteFile(cn: { id: number; full_number: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
-    this.triggerDownload('credit-notes', cn.id, type, cn.full_number ?? String(cn.id));
+  openGuideFile(g: { pdf_url: string | null; xml_url: string | null; cdr_url: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
+    const url = type === 'pdf' ? g.pdf_url : type === 'xml' ? g.xml_url : g.cdr_url;
+    this.openFile(url);
+  }
+
+  openCreditNoteFile(cn: { id: number; full_number: string | null; is_internal: boolean; pdf_url: string | null; xml_url: string | null; cdr_url: string | null }, type: 'pdf' | 'xml' | 'cdr'): void {
+    if (cn.is_internal) {
+      this.triggerDownload('credit-notes', cn.id, 'pdf', cn.full_number ?? String(cn.id));
+    } else {
+      const url = type === 'pdf' ? cn.pdf_url : type === 'xml' ? cn.xml_url : cn.cdr_url;
+      this.openFile(url);
+    }
   }
 
   private triggerDownload(
@@ -258,13 +260,15 @@ export class OrdersListComponent implements OnInit {
 
   // ── Ventana de anulación ─────────────────────────────────────────────────
 
-  canVoid(doc: { issue_date: string | null }): boolean {
+  canVoid(doc: { document_type: string; issue_date: string | null; credit_notes?: { is_internal: boolean }[] }): boolean {
+    const cns = doc.credit_notes ?? [];
+    if (doc.document_type === 'sale_note') {
+      return !cns.some(cn => cn.is_internal);
+    }
+    // Factura / boleta: mismo día de emisión y sin NCs electrónicas SUNAT
     if (!doc.issue_date) return false;
-    const issued  = new Date(doc.issue_date);
-    const today   = new Date();
-    const diffMs  = today.getTime() - issued.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    return diffDays <= 35; // ~mismo mes + primeros días del siguiente
+    return doc.issue_date === new Date().toISOString().slice(0, 10) &&
+           !cns.some(cn => !cn.is_internal);
   }
 
   // ── Void modal ────────────────────────────────────────────────────────────
@@ -288,8 +292,9 @@ export class OrdersListComponent implements OnInit {
         this.voidSubmitting.set(false);
         this.voidOrder.set(null);
         this.load();
-        if (res.sunat_success) this.toast.success(res.message);
-        else                   this.toast.error(res.message);
+        if (res.sunat_pending)           this.toast.info(res.message);
+        else if (res.sunat_success === false) this.toast.error(res.message);
+        else                             this.toast.success(res.message);
       },
       error: (err: any) => {
         this.voidSubmitting.set(false);
@@ -298,37 +303,21 @@ export class OrdersListComponent implements OnInit {
     });
   }
 
-  // ── NC modal ──────────────────────────────────────────────────────────────
-
-  openNCModal(o: Order): void {
-    this.ncForm = {
-      motivo_code: '06',
-      reason: '',
-      subtotal: o.sale_document ? +(o.sale_document.total) / 1.18 : 0,
-      issue_date: new Date().toISOString().slice(0, 10),
-    };
-    this.ncOrder.set(o);
-    this.docsOrder.set(null);
-  }
-
-  submitNC(): void {
-    const o = this.ncOrder();
-    if (!o?.sale_document || this.ncSubmitting()) return;
-    this.ncSubmitting.set(true);
-    this.sales.issueCreditNote(o.sale_document.id, {
-      motivo_code: this.ncForm.motivo_code,
-      reason:      this.ncForm.reason || (this.motivoOptions.find(m => m.code === this.ncForm.motivo_code)?.label ?? ''),
-      subtotal:    +this.ncForm.subtotal,
-      issue_date:  this.ncForm.issue_date,
-    }).subscribe({
+  /** Vuelve a consultar a SUNAT si una baja que quedó pendiente ya fue confirmada. */
+  consultarAnulacion(docId: number): void {
+    if (this.consultingVoidId()) return;
+    this.consultingVoidId.set(docId);
+    this.sales.consultarAnulacion(docId).subscribe({
       next: res => {
-        this.ncSubmitting.set(false);
-        this.ncOrder.set(null);
-        this.toast.success(res.message);
+        this.consultingVoidId.set(null);
+        this.load();
+        if (res.sunat_pending)           this.toast.info(res.message);
+        else if (res.sunat_success === false) this.toast.error(res.message);
+        else                             this.toast.success(res.message);
       },
       error: (err: any) => {
-        this.ncSubmitting.set(false);
-        this.toast.error(err?.error?.message ?? 'Error al emitir la nota de crédito.');
+        this.consultingVoidId.set(null);
+        this.toast.error(err?.error?.message ?? 'Error al consultar la anulación.');
       },
     });
   }

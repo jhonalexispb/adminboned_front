@@ -15,9 +15,12 @@
     </c-modal-header>
 
     <c-modal-body>
-      @if (loading()) {
-        <div class="text-center py-3"><c-spinner size="sm" /></div>
-      }
+      @if (loadingDetail()) {
+        <div class="text-center py-5">
+          <c-spinner color="primary" />
+          <div class="text-body-secondary small mt-2">Cargando información...</div>
+        </div>
+      } @else {
       <div class="row g-3">
 
         <!-- Columna izquierda: datos -->
@@ -148,18 +151,6 @@
 
           @if (r.status === 'pending') {
             @if (!showReject()) {
-              @if (r.sale_document?.status === 'accepted' && r.sale_document?.document_type !== 'sale_note') {
-                <div class="bg-body-tertiary rounded p-2 d-flex align-items-start gap-2" style="font-size:.82rem;">
-                  <fa-icon icon="circle-info" class="text-primary flex-shrink-0 mt-1" />
-                  <span>
-                    @if (canVoid()) {
-                      <strong>Hoy se puede anular o emitir NC.</strong>
-                    } @else {
-                      Solo se puede emitir <strong>Nota de Crédito</strong> — emitido el {{ r.sale_document!.issue_date | date:'dd/MM/yyyy' }}.
-                    }
-                  </span>
-                </div>
-              }
               <div>
                 <div class="form-label fw-medium mb-2">¿Qué se hará con el documento?</div>
                 <div class="d-flex gap-2 flex-wrap">
@@ -170,15 +161,6 @@
                             (click)="actionType = 'credit_note'">
                       <fa-icon icon="file-invoice" class="d-block mb-1" style="font-size:1.2rem;" />
                       <div class="fw-semibold" style="font-size:.85rem;">Nota de Crédito</div>
-                    </button>
-                    <button class="btn flex-grow-1 py-2"
-                            [class.btn-warning]="actionType === 'void'"
-                            [class.btn-outline-warning]="actionType !== 'void'"
-                            [disabled]="!canVoid()"
-                            (click)="actionType = 'void'">
-                      <fa-icon icon="ban" class="d-block mb-1" style="font-size:1.2rem;" />
-                      <div class="fw-semibold" style="font-size:.85rem;">Anular</div>
-                      <div style="font-size:.72rem;">{{ canVoid() ? 'Disponible hoy' : 'Solo mismo día' }}</div>
                     </button>
                   }
                   @if (isInternalOnly()) {
@@ -200,6 +182,14 @@
                     <label class="form-label small fw-medium">Fecha de emisión NC</label>
                     <input type="date" class="form-control" [(ngModel)]="issueDate" />
                   </div>
+                  <div class="col-12">
+                    <label class="form-label small fw-medium">
+                      Descripción del motivo <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" class="form-control" [(ngModel)]="motivoDesc"
+                           placeholder="Ej: Cliente rechazó el producto por vencimiento próximo"
+                           maxlength="500" />
+                  </div>
                 </div>
               }
             } @else {
@@ -217,37 +207,39 @@
 
         </div>
       </div>
+      } <!-- /else loadingDetail -->
     </c-modal-body>
 
     <c-modal-footer>
       @if (r.status === 'pending') {
         <!-- Revertir a borrador -->
-        <button cButton color="warning" variant="outline" size="sm" [disabled]="processing()"
+        <button cButton color="warning" variant="outline" size="sm" [disabled]="busy()"
                 title="Devolver al usuario para que pueda editarla"
                 (click)="revert()">
           <fa-icon icon="rotate-left" class="me-1" />Revertir
         </button>
 
         @if (!showReject()) {
-          <button cButton color="danger" variant="outline" [disabled]="processing()"
+          <button cButton color="danger" variant="outline" [disabled]="busy()"
                   (click)="showReject.set(true)">
             <fa-icon icon="xmark" class="me-1" />Rechazar
           </button>
-          <button cButton color="primary" [disabled]="processing() || (actionType === 'void' && !canVoid())"
+          <button cButton color="primary"
+                  [disabled]="busy() || (actionType === 'credit_note' && !motivoDesc.trim())"
                   (click)="process()">
             @if (processing()) { <c-spinner size="sm" class="me-1" /> }
             <fa-icon icon="check" class="me-1" />
-            {{ actionType === 'credit_note' ? 'Emitir NC' : actionType === 'void' ? 'Anular' : 'Procesar' }}
+            {{ actionType === 'credit_note' ? 'Emitir NC' : 'Procesar' }}
           </button>
         } @else {
-          <button cButton color="secondary" [disabled]="processing()" (click)="showReject.set(false)">Volver</button>
-          <button cButton color="danger" [disabled]="processing()" (click)="reject()">
+          <button cButton color="secondary" [disabled]="busy()" (click)="showReject.set(false)">Volver</button>
+          <button cButton color="danger" [disabled]="busy()" (click)="reject()">
             @if (processing()) { <c-spinner size="sm" class="me-1" /> }
             <fa-icon icon="xmark" class="me-1" />Rechazar definitivamente
           </button>
         }
       }
-      <button cButton color="secondary" variant="outline" [disabled]="processing()" (click)="close()">Cerrar</button>
+      <button cButton color="secondary" variant="outline" [disabled]="busy()" (click)="close()">Cerrar</button>
     </c-modal-footer>
   }
 </c-modal>

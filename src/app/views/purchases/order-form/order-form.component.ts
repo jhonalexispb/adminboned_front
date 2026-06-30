@@ -104,7 +104,7 @@ export class OrderFormComponent implements OnInit {
     this.loadingProducts.set(true);
     forkJoin({
       suppliers: this.supplierService.list({ active: true, per_page: 200 }),
-      products:  this.productService.list({ active: true, for_sale: true, per_page: 500 }),
+      products:  this.productService.list({ active: true, for_sale: true, per_page: 100000 }),
     }).subscribe(({ suppliers, products }) => {
       this.suppliers.set(suppliers.data);
       this.products.set(products.data);
@@ -118,7 +118,7 @@ export class OrderFormComponent implements OnInit {
     this.form.get('supplier_id')!.valueChanges.pipe(
       tap(() => this.loadingProducts.set(true)),
       switchMap(supplierId => this.productService.list({
-        active: true, for_sale: true, per_page: 500,
+        active: true, for_sale: true, per_page: 100000,
         ...(supplierId ? { supplier_id: supplierId } : {}),
       })),
       takeUntilDestroyed(this.destroyRef),

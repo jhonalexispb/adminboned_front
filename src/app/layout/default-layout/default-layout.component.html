@@ -8,8 +8,21 @@
 >
   <c-sidebar-header class="border-bottom">
     <c-sidebar-brand [routerLink]="[]">
-      <svg [class]="{icon: false}" cIcon class="sidebar-brand-full" height="32" name="logo" title="CoreUI Logo"></svg>
-      <svg cIcon class="sidebar-brand-narrow" height="32" name="signet" title="CoreUI Logo"></svg>
+      @if (logoUrl()) {
+        <div class="sidebar-brand-full d-flex align-items-center gap-2">
+          <img [src]="logoUrl()!" alt="Logo" class="rounded-2 border flex-shrink-0" height="32" style="width:auto; max-width:60px; object-fit:contain;" />
+          @if (brandName()) {
+            <span class="text-truncate fw-semibold">{{ brandName() }}</span>
+          }
+        </div>
+        <img [src]="logoUrl()!" alt="Logo" class="sidebar-brand-narrow rounded-2 border" height="32" width="32" style="object-fit:cover;" />
+      } @else if (brandName()) {
+        <span class="sidebar-brand-full text-truncate fw-semibold">{{ brandName() }}</span>
+        <span class="sidebar-brand-narrow fw-semibold">{{ brandName()![0].toUpperCase() }}</span>
+      } @else {
+        <svg [class]="{icon: false}" cIcon class="sidebar-brand-full" height="32" name="logo" title="CoreUI Logo"></svg>
+        <svg cIcon class="sidebar-brand-narrow" height="32" name="signet" title="CoreUI Logo"></svg>
+      }
     </c-sidebar-brand>
   </c-sidebar-header>
 
@@ -48,3 +61,6 @@
   [deposit]="null"
   (registered)="onDepositRegistered($event)"
   (cancelled)="collectionService.showNewDeposit.set(false)" />
+
+<!-- Notificaciones (acceso rápido desde la campana en el header) -->
+<app-notifications-modal />

@@ -1,0 +1,62 @@
+<c-modal [visible]="alertsService.notificationsOpen()" (visibleChange)="alertsService.notificationsOpen.set($event)"
+         fullscreen="sm" [scrollable]="true" alignment="center">
+  <c-modal-header>
+    <h6 cModalTitle class="d-flex align-items-center gap-2 mb-0">
+      <svg cIcon name="cilBell" size="lg"></svg>
+      Notificaciones
+      @if (alerts().total > 0) {
+        <c-badge color="danger" shape="rounded-pill">
+          {{ alerts().total }} pendiente{{ alerts().total !== 1 ? 's' : '' }}
+        </c-badge>
+      }
+    </h6>
+  </c-modal-header>
+  <c-modal-body class="p-0">
+    @for (item of notificationItems(); track item.route) {
+      <a [routerLink]="item.route" (click)="alertsService.notificationsOpen.set(false)"
+         class="d-flex align-items-center gap-3 py-3 px-3 text-decoration-none text-body border-bottom">
+        <span class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+              [class]="'bg-' + item.color + '-subtle text-' + item.color + '-emphasis'"
+              style="width:42px;height:42px">
+          <svg cIcon [name]="item.icon" size="lg"></svg>
+        </span>
+        <span class="flex-grow-1">
+          <span class="d-block">{{ item.label }}</span>
+          <span class="text-body-secondary small">
+            @if (item.count > 0) {
+              {{ item.count }} {{ item.unit ?? 'pendiente' }}{{ item.count === 1 ? '' : 's' }}
+            } @else {
+              {{ item.emptyLabel ?? 'Sin pendientes' }}
+            }
+          </span>
+        </span>
+        @if (item.count > 0) {
+          <c-badge [color]="item.color" shape="rounded-pill" class="flex-shrink-0">
+            {{ item.count > 99 ? '99+' : item.count }}
+          </c-badge>
+        } @else {
+          <svg cIcon name="cilCheckCircle" class="text-success flex-shrink-0" size="lg"></svg>
+        }
+      </a>
+    } @empty {
+      <div class="text-center text-body-secondary py-5 px-3">
+        <svg cIcon name="cilCheckCircle" size="xl" class="text-success mb-2"></svg>
+        <div>No hay notificaciones disponibles</div>
+      </div>
+    }
+  </c-modal-body>
+  <c-modal-footer class="d-flex justify-content-between">
+    <button cButton color="secondary" variant="outline" size="sm"
+            class="d-flex align-items-center gap-2"
+            [disabled]="alertsService.loading()"
+            (click)="alertsService.load()">
+      @if (alertsService.loading()) {
+        <c-spinner size="sm" />
+      } @else {
+        <svg cIcon name="cilLoopCircular" size="sm"></svg>
+      }
+      Actualizar
+    </button>
+    <button cButton color="secondary" size="sm" (click)="alertsService.notificationsOpen.set(false)">Cerrar</button>
+  </c-modal-footer>
+</c-modal>

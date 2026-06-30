@@ -29,8 +29,9 @@ export class EmpresaComponent implements OnInit {
   cargando      = signal(true);
   guardando     = signal(false);
   guardandoSeries = signal(false);
-  subiendoLogo  = signal(false);
-  tabActiva     = signal<'empresa' | 'sunat' | 'facturacion' | 'metas'>('empresa');
+  subiendoLogo    = signal(false);
+  subiendoDocLogo = signal(false);
+  tabActiva     = signal<'empresa' | 'sunat' | 'facturacion' | 'metas' | 'catalogo'>('empresa');
   mostrarToken  = signal(false);
 
   documentSeries   = signal<DocumentSeries[]>([]);
@@ -42,15 +43,16 @@ export class EmpresaComponent implements OnInit {
   nuevaSerie       = { document_type: '', series: '', current_correlative: 0 };
 
   readonly docTypeOptions = [
-    { value: 'invoice',             label: 'Factura' },
-    { value: 'receipt',             label: 'Boleta' },
-    { value: 'credit_note_invoice', label: 'NC de Factura' },
-    { value: 'credit_note_receipt', label: 'NC de Boleta' },
-    { value: 'sale_note',           label: 'Nota de venta' },
-    { value: 'shipping_guide',      label: 'Guía de Remisión' },
+    { value: 'invoice',                label: 'Factura' },
+    { value: 'receipt',                label: 'Boleta' },
+    { value: 'credit_note_invoice',    label: 'NC de Factura' },
+    { value: 'credit_note_receipt',    label: 'NC de Boleta' },
+    { value: 'sale_note',              label: 'Nota de venta' },
+    { value: 'credit_note_sale_note',  label: 'NC de Nota de Venta' },
+    { value: 'shipping_guide',         label: 'Guía de Remisión' },
   ];
 
-  private readonly seriesOrder = ['invoice', 'receipt', 'credit_note_invoice', 'credit_note_receipt', 'sale_note', 'shipping_guide'];
+  private readonly seriesOrder = ['invoice', 'receipt', 'credit_note_invoice', 'credit_note_receipt', 'sale_note', 'credit_note_sale_note', 'shipping_guide'];
 
   private sortSeries(list: DocumentSeries[]): DocumentSeries[] {
     return [...list].sort((a, b) => {
@@ -67,9 +69,14 @@ export class EmpresaComponent implements OnInit {
     telefono: '', email: '',
     apisunat_persona_id: '', apisunat_persona_token: '',
     meta_diaria: 1500,
+    catalog_request_seller_mode: 'client_assignment',
+    catalog_whatsapp_number: '',
+    catalog_show_lot_breakdown: false,
+    catalog_stale_order_days: 3,
   };
 
-  logoFile: File | null = null;
+  logoFile:    File | null = null;
+  docLogoFile: File | null = null;
 
   // Ubigeo
   departments   = signal<Department[]>([]);
@@ -85,8 +92,6 @@ export class EmpresaComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.geoSvc.departments().subscribe(d => this.departments.set(d));
-
     this.svc.listDocumentSeries().subscribe({
       next: res => {
         const sorted = this.sortSeries(res.data);
@@ -98,8 +103,12 @@ export class EmpresaComponent implements OnInit {
       },
     });
 
-    this.svc.get().subscribe({
-      next: e => {
+    forkJoin({
+      departments: this.geoSvc.departments(),
+      empresa: this.svc.get(),
+    }).subscribe({
+      next: ({ departments, empresa: e }) => {
+        this.departments.set(departments);
         this.cargando.set(false);
         if (!e) return;
         this.empresa.set(e);
@@ -110,7 +119,7 @@ export class EmpresaComponent implements OnInit {
         };
         // Pre-cargar provincia y distrito si ya hay datos guardados
         if (e.departamento) {
-          const dept = this.departments().find(d =>
+          const dept = departments.find(d =>
             d.name.toLowerCase() === e.departamento!.toLowerCase()
           );
           if (dept) {
@@ -201,6 +210,27 @@ export class EmpresaComponent implements OnInit {
       error: () => {
         this.toast.error('Error al subir el logo.');
         this.subiendoLogo.set(false);
+      },
+    });
+  }
+
+  onDocLogoChange(e: Event): void {
+    this.docLogoFile = (e.target as HTMLInputElement).files?.[0] ?? null;
+  }
+
+  subirDocLogo(): void {
+    if (!this.docLogoFile) return;
+    this.subiendoDocLogo.set(true);
+    this.svc.uploadDocLogo(this.docLogoFile).subscribe({
+      next: res => {
+        this.empresa.update(e => e ? { ...e, doc_logo_url: res.doc_logo_url } : e);
+        this.docLogoFile = null;
+        this.subiendoDocLogo.set(false);
+        this.toast.success('Logo de documentos actualizado.');
+      },
+      error: () => {
+        this.toast.error('Error al subir el logo de documentos.');
+        this.subiendoDocLogo.set(false);
       },
     });
   }
@@ -308,11 +338,12 @@ export class EmpresaComponent implements OnInit {
     const map: Record<string, string> = {
       invoice:             'primary',
       receipt:             'success',
-      credit_note:         'warning',
-      credit_note_invoice: 'warning',
-      credit_note_receipt: 'warning',
-      sale_note:           'secondary',
-      shipping_guide:      'info',
+      credit_note:           'warning',
+      credit_note_invoice:   'warning',
+      credit_note_receipt:   'warning',
+      credit_note_sale_note: 'warning',
+      sale_note:             'secondary',
+      shipping_guide:        'info',
     };
     return map[type] ?? 'secondary';
   }
@@ -320,4 +351,5 @@ export class EmpresaComponent implements OnInit {
   nextCorrelative(id: number): string {
     return String((this.seriesEdits[id] ?? 0) + 1).padStart(8, '0');
   }
+
 }

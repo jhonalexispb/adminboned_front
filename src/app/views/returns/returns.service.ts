@@ -60,6 +60,7 @@ export class ReturnsService {
   accept(id: number, payload: {
     action_type: 'credit_note' | 'void' | 'internal';
     motivo_code?: string;
+    motivo_desc?: string;
     issue_date?: string;
     void_reason?: string;
   }): Observable<{ message: string; return: ReturnRecord }> {

@@ -51,13 +51,27 @@
           <label class="form-label fw-medium">Fecha de emisión NC</label>
           <input type="date" class="form-control" [(ngModel)]="issueDate" />
         </div>
+        <div class="col-12">
+          <label class="form-label fw-medium">Descripción del motivo <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" [(ngModel)]="motivoDesc"
+                 placeholder="Ej: Cliente rechazó el producto por vencimiento próximo" maxlength="500" />
+        </div>
+      </div>
+    }
+
+    @if (actionType === 'void') {
+      <div class="mt-2">
+        <label class="form-label fw-medium">Motivo de anulación <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" [(ngModel)]="voidReason"
+               placeholder="Ej: Error en el monto facturado" maxlength="100" />
+        <div class="form-text">Mínimo 3 caracteres. Se enviará a SUNAT junto con la comunicación de baja.</div>
       </div>
     }
 
   </c-modal-body>
   <c-modal-footer>
     <button cButton color="secondary" [disabled]="processing()" (click)="cancel()">Cancelar</button>
-    <button cButton color="primary" [disabled]="processing() || (actionType === 'void' && !canVoid())"
+    <button cButton color="primary" [disabled]="processing() || (actionType === 'void' && !canVoid()) || !canConfirm"
             (click)="confirm()">
       @if (processing()) { <c-spinner size="sm" class="me-1" /> }
       <fa-icon icon="check" class="me-1" />Confirmar y procesar

@@ -98,7 +98,18 @@
           }
 
           <!-- Estado terminal -->
-
+          @if (o.status === 'voided') {
+            <div class="alert alert-dark py-2 small d-flex gap-2 align-items-center mb-3">
+              <fa-icon icon="ban" />
+              <span>Pedido anulado. El stock fue restituido.</span>
+            </div>
+            <button class="btn btn-primary w-100 fw-semibold"
+                    [disabled]="duplicating()"
+                    (click)="duplicateOrder()">
+              @if (duplicating()) { <c-spinner size="sm" class="me-1" /> } @else { <fa-icon icon="copy" class="me-1" /> }
+              Copiar pedido
+            </button>
+          }
 
           <!-- Notas de almacén previas -->
           @if (o.warehouse_notes) {

@@ -1,4 +1,6 @@
-import { ApplicationConfig, APP_INITIALIZER } from '@angular/core';
+import { ApplicationConfig, APP_INITIALIZER, LOCALE_ID } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import localeEsPe from '@angular/common/locales/es-PE';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { providePrimeNG } from 'primeng/config';
 import Aura from '@primeuix/themes/aura';
@@ -21,6 +23,8 @@ import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { loadingInterceptor } from './core/interceptors/loading.interceptor';
 
+registerLocaleData(localeEsPe);
+
 // Registra todos los íconos FA globalmente
 export function setupIcons(library: FaIconLibrary) {
   return () => { library.addIconPacks(fas, far); library.addIcons(faWhatsapp); };
@@ -28,6 +32,7 @@ export function setupIcons(library: FaIconLibrary) {
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    { provide: LOCALE_ID, useValue: 'es-PE' },
     provideRouter(routes,
       withRouterConfig({
         onSameUrlNavigation: 'reload'

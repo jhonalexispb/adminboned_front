@@ -1,0 +1,340 @@
+<app-page-header title="Geografía" subtitle="Gestión de departamentos, provincias y distritos">
+  @if (tab() === 'departments') {
+    <button class="btn btn-primary" (click)="openCreateDep()">
+      <fa-icon icon="plus" class="me-1" />
+      <span class="d-none d-sm-inline">Nuevo departamento</span>
+      <span class="d-sm-none">Nuevo</span>
+    </button>
+  }
+  @if (tab() === 'provinces') {
+    <button class="btn btn-primary" (click)="openCreateProv()">
+      <fa-icon icon="plus" class="me-1" />
+      <span class="d-none d-sm-inline">Nueva provincia</span>
+      <span class="d-sm-none">Nueva</span>
+    </button>
+  }
+  @if (tab() === 'districts') {
+    <button class="btn btn-primary" (click)="openCreateDist()">
+      <fa-icon icon="plus" class="me-1" />
+      <span class="d-none d-sm-inline">Nuevo distrito</span>
+      <span class="d-sm-none">Nuevo</span>
+    </button>
+  }
+</app-page-header>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <button type="button" class="nav-link" [class.active]="tab() === 'departments'" (click)="setTab('departments')">
+      Departamentos
+    </button>
+  </li>
+  <li class="nav-item">
+    <button type="button" class="nav-link" [class.active]="tab() === 'provinces'" (click)="setTab('provinces')">
+      Provincias
+    </button>
+  </li>
+  <li class="nav-item">
+    <button type="button" class="nav-link" [class.active]="tab() === 'districts'" (click)="setTab('districts')">
+      Distritos
+    </button>
+  </li>
+</ul>
+
+<!-- ══ DEPARTAMENTOS ═════════════════════════════════════════════════════════ -->
+@if (tab() === 'departments') {
+
+  <c-card class="mb-3">
+    <c-card-body class="py-2 px-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-5">
+          <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+          <div class="input-group input-group-sm">
+            <input class="form-control" placeholder="Nombre del departamento..."
+                   [(ngModel)]="depsFilters.search" (keyup.enter)="onDepsSearch()" />
+            @if (depsFilters.search) {
+              <button class="btn btn-outline-secondary" type="button"
+                      (click)="depsFilters.search = ''; onDepsSearch()">
+                <fa-icon icon="xmark" />
+              </button>
+            }
+            <button class="btn btn-primary" type="button" (click)="onDepsSearch()">
+              <fa-icon icon="search" />
+            </button>
+          </div>
+        </div>
+        <div class="col-auto ms-auto">
+          <span class="text-body-secondary small">{{ depsTotal() }} departamento{{ depsTotal() !== 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  @if (depsLoading()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (!departments().length) {
+    <div class="text-center text-body-secondary py-5">No se encontraron departamentos.</div>
+  } @else {
+
+    <!-- Mobile -->
+    <div class="d-md-none d-flex flex-column gap-2 mb-3">
+      @for (dep of departments(); track dep.id) {
+        <c-card>
+          <c-card-body class="px-3 py-2 d-flex align-items-center justify-content-between">
+            <div>
+              <div class="fw-semibold">{{ dep.name }}</div>
+              @if (dep.code) { <div class="text-body-secondary small">Cód. {{ dep.code }}</div> }
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" title="Editar" (click)="openEditDep(dep)">
+              <fa-icon icon="pen" />
+            </button>
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+
+    <!-- Desktop -->
+    <c-card class="d-none d-md-block mb-3">
+      <c-card-body class="p-0">
+        <table cTable hover class="mb-0">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Código</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (dep of departments(); track dep.id) {
+              <tr>
+                <td class="fw-medium">{{ dep.name }}</td>
+                <td class="text-body-secondary small">{{ dep.code || '—' }}</td>
+                <td class="text-end">
+                  <button class="btn btn-sm btn-outline-secondary" (click)="openEditDep(dep)">
+                    <fa-icon icon="pen" class="me-1" />Editar
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </c-card-body>
+    </c-card>
+
+    <app-pagination [currentPage]="depsFilters.page" [lastPage]="depsLastPage()" (pageChange)="depsGoToPage($event)" />
+  }
+}
+
+<!-- ══ PROVINCIAS ════════════════════════════════════════════════════════════ -->
+@if (tab() === 'provinces') {
+
+  <c-card class="mb-3">
+    <c-card-body class="py-2 px-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+          <div class="input-group input-group-sm">
+            <input class="form-control" placeholder="Nombre de provincia..."
+                   [(ngModel)]="provsFilters.search" (keyup.enter)="onProvsSearch()" />
+            @if (provsFilters.search) {
+              <button class="btn btn-outline-secondary" type="button"
+                      (click)="provsFilters.search = ''; onProvsSearch()">
+                <fa-icon icon="xmark" />
+              </button>
+            }
+            <button class="btn btn-primary" type="button" (click)="onProvsSearch()">
+              <fa-icon icon="search" />
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label small mb-1 text-body-secondary">Departamento</label>
+          <select class="form-select form-select-sm" [(ngModel)]="provsFilters.department_id" (change)="onProvsDeptChange()">
+            <option value="">Todos</option>
+            @for (dep of allDepartments(); track dep.id) {
+              <option [value]="dep.id">{{ dep.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-auto ms-auto">
+          <span class="text-body-secondary small">{{ provsTotal() }} provincia{{ provsTotal() !== 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  @if (provsLoading()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (!provinces().length) {
+    <div class="text-center text-body-secondary py-5">No se encontraron provincias.</div>
+  } @else {
+
+    <!-- Mobile -->
+    <div class="d-md-none d-flex flex-column gap-2 mb-3">
+      @for (prov of provinces(); track prov.id) {
+        <c-card>
+          <c-card-body class="px-3 py-2 d-flex align-items-center justify-content-between">
+            <div>
+              <div class="fw-semibold">{{ prov.name }}</div>
+              <div class="text-body-secondary small">{{ prov.department_name }}</div>
+              @if (prov.code) { <div class="text-body-secondary small">Cód. {{ prov.code }}</div> }
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" (click)="openEditProv(prov)">
+              <fa-icon icon="pen" />
+            </button>
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+
+    <!-- Desktop -->
+    <c-card class="d-none d-md-block mb-3">
+      <c-card-body class="p-0">
+        <table cTable hover class="mb-0">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Departamento</th>
+              <th>Código</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (prov of provinces(); track prov.id) {
+              <tr>
+                <td class="fw-medium">{{ prov.name }}</td>
+                <td class="text-body-secondary">{{ prov.department_name }}</td>
+                <td class="text-body-secondary small">{{ prov.code || '—' }}</td>
+                <td class="text-end">
+                  <button class="btn btn-sm btn-outline-secondary" (click)="openEditProv(prov)">
+                    <fa-icon icon="pen" class="me-1" />Editar
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </c-card-body>
+    </c-card>
+
+    <app-pagination [currentPage]="provsFilters.page" [lastPage]="provsLastPage()" (pageChange)="provsGoToPage($event)" />
+  }
+}
+
+<!-- ══ DISTRITOS ═════════════════════════════════════════════════════════════ -->
+@if (tab() === 'districts') {
+
+  <c-card class="mb-3">
+    <c-card-body class="py-2 px-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+          <label class="form-label small mb-1 text-body-secondary">Buscar</label>
+          <div class="input-group input-group-sm">
+            <input class="form-control" placeholder="Nombre del distrito..."
+                   [(ngModel)]="distsFilters.search" (keyup.enter)="onDistsSearch()" />
+            @if (distsFilters.search) {
+              <button class="btn btn-outline-secondary" type="button"
+                      (click)="distsFilters.search = ''; onDistsSearch()">
+                <fa-icon icon="xmark" />
+              </button>
+            }
+            <button class="btn btn-primary" type="button" (click)="onDistsSearch()">
+              <fa-icon icon="search" />
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label small mb-1 text-body-secondary">Departamento</label>
+          <select class="form-select form-select-sm" [(ngModel)]="distsFilters.department_id" (change)="onDistsDeptChange()">
+            <option value="">Todos</option>
+            @for (dep of allDepartments(); track dep.id) {
+              <option [value]="dep.id">{{ dep.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label small mb-1 text-body-secondary">Provincia</label>
+          <select class="form-select form-select-sm" [(ngModel)]="distsFilters.province_id" (change)="onDistsProvChange()"
+                  [disabled]="!distsFilters.department_id">
+            <option value="">
+              {{ distsFilters.department_id ? 'Todas las provincias' : 'Elige un departamento primero' }}
+            </option>
+            @for (prov of filteredProvinces(); track prov.id) {
+              <option [value]="prov.id">{{ prov.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-auto ms-auto">
+          <span class="text-body-secondary small">{{ distsTotal() }} distrito{{ distsTotal() !== 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+    </c-card-body>
+  </c-card>
+
+  @if (distsLoading()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (!districts().length) {
+    <div class="text-center text-body-secondary py-5">No se encontraron distritos.</div>
+  } @else {
+
+    <!-- Mobile -->
+    <div class="d-md-none d-flex flex-column gap-2 mb-3">
+      @for (dist of districts(); track dist.id) {
+        <c-card>
+          <c-card-body class="px-3 py-2 d-flex align-items-start justify-content-between">
+            <div>
+              <div class="fw-semibold">{{ dist.name }}</div>
+              <div class="text-body-secondary small">{{ dist.province_name }}, {{ dist.department_name }}</div>
+              @if (dist.code) {
+                <span class="badge bg-secondary-subtle text-secondary-emphasis mt-1">{{ dist.code }}</span>
+              }
+            </div>
+            <button class="btn btn-sm btn-outline-secondary ms-2" (click)="openEditDist(dist)">
+              <fa-icon icon="pen" />
+            </button>
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+
+    <!-- Desktop -->
+    <c-card class="d-none d-md-block mb-3">
+      <c-card-body class="p-0">
+        <table cTable hover class="mb-0">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Provincia</th>
+              <th>Departamento</th>
+              <th>Ubigeo</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (dist of districts(); track dist.id) {
+              <tr>
+                <td class="fw-medium">{{ dist.name }}</td>
+                <td class="text-body-secondary">{{ dist.province_name }}</td>
+                <td class="text-body-secondary">{{ dist.department_name }}</td>
+                <td>
+                  @if (dist.code) {
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ dist.code }}</span>
+                  } @else {
+                    <span class="text-body-secondary">—</span>
+                  }
+                </td>
+                <td class="text-end">
+                  <button class="btn btn-sm btn-outline-secondary" (click)="openEditDist(dist)">
+                    <fa-icon icon="pen" class="me-1" />Editar
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </c-card-body>
+    </c-card>
+
+    <app-pagination [currentPage]="distsFilters.page" [lastPage]="distsLastPage()" (pageChange)="distsGoToPage($event)" />
+  }
+}

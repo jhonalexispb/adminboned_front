@@ -20,10 +20,12 @@ export interface PermissionGroup {
 const PERMISSION_LABELS: Record<string, string> = {
   dashboard:          'Dashboard',
   trends:             'Tendencias',
+  catalog_analytics:  'Analítica del catálogo',
   products:           'Productos',
   categories:         'Categorías',
   laboratories:       'Laboratorios',
   catalog_order:      'Orden de catálogo',
+  catalog_appearance: 'Apariencia catálogo',
   suppliers:          'Proveedores',
   clients:            'Clientes',
   carriers:           'Transportistas',
@@ -36,6 +38,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   purchase_orders:    'Órdenes de compra',
   purchase_receipts:  'Recepciones',
   purchase_documents: 'Documentos de ingreso',
+  catalog_requests:   'Pedidos de catálogo',
   quotations:         'Cotizaciones',
   orders:             'Pedidos',
   orders_warehouse:   'Almacén',
@@ -49,19 +52,20 @@ const PERMISSION_LABELS: Record<string, string> = {
   expenses:           'Gastos',
   users:              'Usuarios',
   roles:              'Roles y permisos',
+  geography:          'Geografía',
   settings:           'Mi empresa',
 };
 
 const SECTION_GROUPS: { label: string; permissions: string[] }[] = [
-  { label: 'Reportes',      permissions: ['dashboard', 'trends'] },
-  { label: 'Maestros',      permissions: ['products', 'categories', 'laboratories', 'catalog_order', 'suppliers', 'clients', 'carriers', 'banks'] },
+  { label: 'Reportes',      permissions: ['dashboard', 'trends', 'catalog_analytics'] },
+  { label: 'Maestros',      permissions: ['products', 'categories', 'laboratories', 'catalog_order', 'catalog_appearance', 'suppliers', 'clients', 'carriers', 'banks'] },
   { label: 'Inventario',    permissions: ['stock', 'lots', 'reservations', 'kardex'] },
   { label: 'Compras',       permissions: ['purchase_analytics', 'purchase_orders', 'purchase_receipts', 'purchase_documents'] },
-  { label: 'Ventas',        permissions: ['quotations', 'orders', 'orders_warehouse', 'orders_dispatch'] },
+  { label: 'Ventas',        permissions: ['catalog_requests', 'quotations', 'orders', 'orders_warehouse', 'orders_dispatch'] },
   { label: 'Pagos',         permissions: ['collections', 'my_collections', 'payments_manage'] },
   { label: 'Post-venta',    permissions: ['returns', 'returns_manage', 'documents'] },
   { label: 'Finanzas',      permissions: ['expenses'] },
-  { label: 'Configuración', permissions: ['users', 'roles', 'settings'] },
+  { label: 'Configuración', permissions: ['users', 'roles', 'geography', 'settings'] },
 ];
 
 @Component({

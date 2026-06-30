@@ -1,0 +1,103 @@
+<div class="modal-header">
+  <h5 class="modal-title">{{ title }}</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+  <form [formGroup]="form" id="bannerForm" (ngSubmit)="onSubmit()">
+
+    @if (error) {
+      <div class="alert alert-danger py-2">{{ error }}</div>
+    }
+
+    <div class="row g-3">
+
+      <div class="col-12">
+        <label class="form-label" for="image">
+          Imagen del banner @if (!isEdit) { <span class="text-danger">*</span> }
+        </label>
+        <input
+          type="file"
+          accept="image/*"
+          class="form-control"
+          id="image"
+          (change)="onFileSelected($event)"
+        />
+        @if (previewUrl) {
+          <img [src]="previewUrl" class="img-fluid rounded mt-2" style="max-height:160px;object-fit:cover;" alt="Vista previa" />
+        }
+        <div class="form-text">Se recomienda una imagen ancha, tipo banner (ej. 1600x400px).</div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label" for="title">Título</label>
+        <input
+          cFormControl
+          id="title"
+          formControlName="title"
+          placeholder="Ej: Promo de invierno"
+          maxlength="100"
+        />
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Producto vinculado <span class="text-body-secondary fw-normal">(opcional)</span></label>
+        <p-select
+          formControlName="product_id"
+          [options]="products()"
+          optionLabel="label"
+          [filter]="true"
+          filterPlaceholder="Buscar producto..."
+          [placeholder]="loadingProducts() ? 'Cargando productos...' : 'Sin producto vinculado'"
+          [showClear]="true"
+          styleClass="w-100 select-multiline"
+          [loading]="loadingProducts()"
+          [disabled]="loadingProducts()"
+        >
+          <ng-template #selectedItem let-opt>
+            <span class="text-primary fw-semibold me-1" style="font-size:.8rem;">{{ opt.labName }}</span>{{ opt.label }}
+          </ng-template>
+          <ng-template #item let-opt>
+            <div style="line-height:1.3;">
+              <div class="text-primary fw-semibold" style="font-size:.75rem;">{{ opt.labName }}</div>
+              <div style="font-size:.85rem;">{{ opt.label }}</div>
+            </div>
+          </ng-template>
+        </p-select>
+        <div class="form-text">Al hacer clic en el banner se abrirá el detalle de este producto.</div>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label" for="starts_at">Desde</label>
+        <input cFormControl type="date" id="starts_at" formControlName="starts_at" />
+        <div class="form-text">Opcional.</div>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label" for="ends_at">Hasta</label>
+        <input cFormControl type="date" id="ends_at" formControlName="ends_at" />
+        <div class="form-text">Opcional.</div>
+      </div>
+
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="active" formControlName="active" />
+          <label class="form-check-label" for="active">Activo</label>
+        </div>
+      </div>
+
+    </div>
+
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+  <button type="submit" form="bannerForm" class="btn btn-primary" [disabled]="form.invalid || saving()">
+    @if (saving()) {
+      <c-spinner size="sm" class="me-1" />Guardando...
+    } @else {
+      {{ isEdit ? 'Guardar cambios' : 'Crear' }}
+    }
+  </button>
+</div>

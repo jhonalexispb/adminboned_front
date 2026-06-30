@@ -5,6 +5,8 @@ export interface PaginatedResponse<T> {
     last_page: number;
     per_page: number;
     total: number;
+    /** Solo presente en /quotations: umbral configurado de días para marcar una cotización de catálogo como esperando aprobación. */
+    stale_threshold_days?: number;
   };
   links: {
     next: string | null;

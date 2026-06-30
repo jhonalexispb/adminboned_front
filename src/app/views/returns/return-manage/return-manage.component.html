@@ -240,7 +240,8 @@
 <!-- Modal extraído como componente -->
 <app-manage-return-modal
   [return_]="selected()"
+  [loadingDetail]="loadingDetail()"
   (processed)="onProcessed($event)"
   (rejected)="onRejected($event)"
   (reverted)="onReverted($event)"
-  (closed)="selected.set(null)" />
+  (closed)="closeModal()" />

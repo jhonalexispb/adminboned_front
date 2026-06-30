@@ -138,8 +138,7 @@
     <c-card class="mb-3" [class.border-warning]="isLowStock(group)">
 
       <!-- Header del grupo -->
-      <c-card-header class="d-flex justify-content-between align-items-center py-2 px-3 flex-wrap gap-2"
-                     [class.bg-warning-subtle]="isLowStock(group)">
+      <c-card-header class="d-flex justify-content-between align-items-center py-2 px-3 flex-wrap gap-2">
         <div class="d-flex align-items-center gap-2 flex-wrap">
           @if (group.product.laboratory) {
             <span class="text-info">{{ group.product.laboratory.name }}</span>
@@ -149,7 +148,7 @@
             <code class="small text-body-secondary bg-body-secondary px-1 rounded">{{ group.product.sku }}</code>
           }
           @if (isLowStock(group)) {
-            <c-badge color="warning" textColor="dark">
+            <c-badge color="danger">
               <fa-icon icon="triangle-exclamation" class="me-1" />Stock bajo
             </c-badge>
           }
@@ -159,8 +158,8 @@
         <div class="d-flex align-items-center gap-3 text-end small">
           <div>
             <div class="text-body-secondary" style="font-size:.72rem">EN ALMACÉN</div>
-            <strong class="fs-5" [class.text-success]="!isLowStock(group)"
-                    [class.text-warning]="isLowStock(group)">
+            <strong class="fs-5" [class.text-success]="group.activeStock > 0"
+                    [class.text-danger]="group.activeStock === 0">
               {{ group.activeStock }}
             </strong>
           </div>
@@ -197,8 +196,6 @@
         <div class="d-flex flex-column gap-2">
           @for (item of group.lots; track item.lot_id) {
             <div class="rounded border p-2"
-                 [class.bg-danger-subtle]="expiryStatus(item) === 'expired'"
-                 [class.bg-warning-subtle]="expiryStatus(item) === 'soon'"
                  [class.opacity-75]="item.status === 'blocked'">
 
               <div class="d-flex justify-content-between align-items-start mb-1">
@@ -296,9 +293,7 @@
             </thead>
             <tbody>
               @for (item of group.lots; track item.lot_id) {
-                <tr [class.bg-danger-subtle]="expiryStatus(item) === 'expired'"
-                    [class.bg-warning-subtle]="expiryStatus(item) === 'soon'"
-                    [class.opacity-75]="item.status === 'blocked'">
+                <tr [class.opacity-75]="item.status === 'blocked'">
 
                   <!-- Lote -->
                   <td class="ps-3">

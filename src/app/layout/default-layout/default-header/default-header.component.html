@@ -59,8 +59,9 @@
 
 <!-- ── Notificaciones ──────────────────────────────────────────────────── -->
 <ng-template #notificationsDropdown>
-  <c-dropdown alignment="end" variant="nav-item">
-    <button [caret]="false" cDropdownToggle class="position-relative px-2"
+  <div class="nav-item d-flex align-items-center">
+    <button class="nav-link py-0 px-2 position-relative border-0 bg-transparent"
+            (click)="alertsService.notificationsOpen.set(true)"
             aria-label="Notificaciones">
       <svg cIcon name="cilBell" size="lg"></svg>
       @if (alerts().total > 0) {
@@ -71,64 +72,7 @@
         </c-badge>
       }
     </button>
-
-    <div cDropdownMenu class="p-0" style="min-width: 320px; max-width: 360px">
-      <div class="d-flex align-items-center justify-content-between px-3 py-2 bg-body-secondary rounded-top">
-        <span class="fw-semibold d-flex align-items-center gap-2">
-          <svg cIcon name="cilBell" size="sm"></svg>
-          Notificaciones
-        </span>
-        @if (alerts().total > 0) {
-          <c-badge color="danger" shape="rounded-pill">
-            {{ alerts().total }} pendiente{{ alerts().total !== 1 ? 's' : '' }}
-          </c-badge>
-        }
-      </div>
-
-      <div style="max-height: 360px; overflow-y: auto">
-        @for (item of notificationItems(); track item.route) {
-          <a cDropdownItem [routerLink]="item.route"
-             class="d-flex align-items-center gap-3 py-2">
-            <span class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                  [class]="'bg-' + item.color + '-subtle text-' + item.color + '-emphasis'"
-                  style="width:36px;height:36px">
-              <svg cIcon [name]="item.icon" size="lg"></svg>
-            </span>
-            <span class="flex-grow-1">
-              <span class="small d-block">{{ item.label }}</span>
-              <span class="text-body-secondary" style="font-size:0.7rem">
-                @if (item.count > 0) {
-                  {{ item.count }} {{ item.count === 1 ? 'pendiente' : 'pendientes' }}
-                } @else {
-                  Sin pendientes
-                }
-              </span>
-            </span>
-            @if (item.count > 0) {
-              <c-badge [color]="item.color" shape="rounded-pill" class="flex-shrink-0">
-                {{ item.count > 99 ? '99+' : item.count }}
-              </c-badge>
-            } @else {
-              <svg cIcon name="cilCheckCircle" class="text-success flex-shrink-0" size="lg"></svg>
-            }
-          </a>
-        } @empty {
-          <div class="text-center text-body-secondary py-4 px-3">
-            <svg cIcon name="cilCheckCircle" size="xl" class="text-success mb-2"></svg>
-            <div class="small">No hay notificaciones disponibles</div>
-          </div>
-        }
-      </div>
-
-      <hr cDropdownDivider class="my-0" />
-      <button cDropdownItem
-              class="small text-body-secondary text-center d-flex align-items-center justify-content-center gap-2 py-2"
-              (click)="alertsService.load()">
-        <svg cIcon name="cilLoopCircular" size="sm"></svg>
-        Actualizar
-      </button>
-    </div>
-  </c-dropdown>
+  </div>
 </ng-template>
 
 <!-- ── Tema ────────────────────────────────────────────────────────────── -->

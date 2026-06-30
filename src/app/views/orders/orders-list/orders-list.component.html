@@ -1,4 +1,8 @@
 <app-page-header title="Pedidos" subtitle="Órdenes de venta generadas desde cotizaciones aprobadas">
+  <button cButton color="primary" variant="outline" size="sm" (click)="load()" [disabled]="loading()">
+    <fa-icon icon="arrows-rotate" [class.fa-spin]="loading()" class="me-1" />
+    Actualizar
+  </button>
 </app-page-header>
 
 <!-- ── Filtros ─────────────────────────────────────────────────────────────── -->
@@ -499,7 +503,8 @@
                     </div>
                     <!-- Descargas -->
                     <div class="d-flex gap-2 flex-shrink-0 align-self-end align-self-md-center flex-wrap">
-                      @if (doc.document_type === 'sale_note' || doc.pdf_url) {
+                      @if (doc.document_type === 'sale_note') {
+                        <!-- Nota de venta: PDF propio con spinner -->
                         <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
                                 style="min-width:48px; font-size:.72rem;"
                                 [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
@@ -508,26 +513,29 @@
                           @else { <fa-icon icon="file-pdf" style="font-size:.95rem;" /> }
                           <small>PDF</small>
                         </button>
-                      }
-                      @if (doc.xml_url) {
-                        <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
-                                style="min-width:48px; font-size:.72rem;"
-                                [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':xml'"
-                                (click)="openDocFile(doc, 'xml')">
-                          @if (downloadingKey() === 'sale-documents:' + doc.id + ':xml') { <c-spinner size="sm" /> }
-                          @else { <fa-icon icon="file-code" style="font-size:.95rem;" /> }
-                          <small>XML</small>
-                        </button>
-                      }
-                      @if (doc.cdr_url) {
-                        <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
-                                style="min-width:48px; font-size:.72rem;"
-                                [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':cdr'"
-                                (click)="openDocFile(doc, 'cdr')">
-                          @if (downloadingKey() === 'sale-documents:' + doc.id + ':cdr') { <c-spinner size="sm" /> }
-                          @else { <fa-icon icon="file-zipper" style="font-size:.95rem;" /> }
-                          <small>CDR</small>
-                        </button>
+                      } @else {
+                        <!-- Factura / Boleta: links ApiSunat -->
+                        @if (doc.pdf_url) {
+                          <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center"
+                                  style="min-width:48px; font-size:.72rem;" (click)="openDocFile(doc, 'pdf')">
+                            <fa-icon icon="file-pdf" style="font-size:.95rem;" /><small>PDF</small>
+                          </button>
+                        }
+                        @if (doc.xml_url) {
+                          <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center"
+                                  style="min-width:48px; font-size:.72rem;" (click)="openDocFile(doc, 'xml')">
+                            <fa-icon icon="file-code" style="font-size:.95rem;" /><small>XML</small>
+                          </button>
+                        }
+                        @if (doc.cdr_url) {
+                          <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center"
+                                  style="min-width:48px; font-size:.72rem;" (click)="openDocFile(doc, 'cdr')">
+                            <fa-icon icon="file-zipper" style="font-size:.95rem;" /><small>CDR</small>
+                          </button>
+                        }
+                        @if (!doc.pdf_url && !doc.xml_url) {
+                          <span class="text-body-secondary small align-self-center">Sin archivos SUNAT</span>
+                        }
                       }
                     </div>
                   </div>
@@ -540,20 +548,35 @@
                         <div class="d-flex align-items-center justify-content-between gap-2 py-1 border-bottom" style="font-size:.82rem;">
                           <div class="d-flex gap-3 flex-wrap">
                             <span class="font-monospace fw-semibold">{{ cn.full_number ?? '—' }}</span>
-                            <c-badge color="info">NC</c-badge>
+                            <c-badge [color]="cn.is_internal ? 'secondary' : 'info'">
+                              {{ cn.is_internal ? 'NC interna' : 'NC SUNAT' }}
+                            </c-badge>
                             <span class="text-body-secondary">S/ {{ cn.total | number:'1.2-2' }}</span>
                             @if (cn.reason) { <span class="text-body-secondary fst-italic">{{ cn.reason }}</span> }
                           </div>
                           <div class="d-flex gap-1">
-                            @if (cn.pdf_url) {
+                            @if (cn.is_internal) {
+                              <!-- NC interna: PDF propio con spinner -->
                               <button class="btn btn-xs btn-secondary" style="font-size:.68rem; padding:2px 6px;"
                                       [disabled]="downloadingKey() === 'credit-notes:' + cn.id + ':pdf'"
-                                      (click)="openCreditNoteFile(cn, 'pdf')">PDF</button>
-                            }
-                            @if (cn.xml_url) {
-                              <button class="btn btn-xs btn-info text-white" style="font-size:.68rem; padding:2px 6px;"
-                                      [disabled]="downloadingKey() === 'credit-notes:' + cn.id + ':xml'"
-                                      (click)="openCreditNoteFile(cn, 'xml')">XML</button>
+                                      (click)="openCreditNoteFile(cn, 'pdf')">
+                                @if (downloadingKey() === 'credit-notes:' + cn.id + ':pdf') { <c-spinner size="sm" /> }
+                                @else { PDF }
+                              </button>
+                            } @else {
+                              <!-- NC SUNAT: links directos -->
+                              @if (cn.pdf_url) {
+                                <button class="btn btn-xs btn-secondary" style="font-size:.68rem; padding:2px 6px;"
+                                        (click)="openCreditNoteFile(cn, 'pdf')">PDF</button>
+                              }
+                              @if (cn.xml_url) {
+                                <button class="btn btn-xs btn-info text-white" style="font-size:.68rem; padding:2px 6px;"
+                                        (click)="openCreditNoteFile(cn, 'xml')">XML</button>
+                              }
+                              @if (cn.cdr_url) {
+                                <button class="btn btn-xs btn-warning text-dark" style="font-size:.68rem; padding:2px 6px;"
+                                        (click)="openCreditNoteFile(cn, 'cdr')">CDR</button>
+                              }
                             }
                           </div>
                         </div>
@@ -561,23 +584,47 @@
                     </div>
                   }
 
+                  <!-- Anulación pendiente de confirmación SUNAT -->
+                  @if (doc.void_pending && doc.id === o.sale_documents![0].id) {
+                    <div class="border-top pt-3 mt-3">
+                      <div class="alert alert-warning py-2 small d-flex gap-2 align-items-center mb-2">
+                        <fa-icon icon="hourglass-half" />
+                        <span>Comunicación de baja enviada. SUNAT aún no confirma la anulación.</span>
+                      </div>
+                      <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+                              [disabled]="consultingVoidId() === doc.id"
+                              (click)="consultarAnulacion(doc.id)">
+                        @if (consultingVoidId() === doc.id) { <c-spinner size="sm" /> } @else { <fa-icon icon="rotate" /> }
+                        <span>Consultar anulación</span>
+                      </button>
+                    </div>
+                  }
+
                   <!-- Acciones (solo en el doc más reciente y aceptado) -->
-                  @if (doc.status === 'accepted' && doc.id === o.sale_documents![0].id) {
-                    <div class="border-top pt-3 mt-3 d-flex gap-2 flex-wrap">
-                      @if (doc.document_type !== 'sale_note') {
-                        <button class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1"
-                                (click)="openNCModal(docsOrder()!)">
-                          <fa-icon icon="file-invoice" /><span>Nota de Crédito</span>
-                        </button>
-                      }
-                      @if (canVoid(doc)) {
+                  @if (doc.status === 'accepted' && !doc.void_pending && doc.id === o.sale_documents![0].id) {
+                    @if (doc.document_type === 'sale_note' && doc.credit_notes?.some(cn => cn.is_internal)) {
+                      <div class="border-top pt-3 mt-3">
+                        <div class="alert alert-secondary py-2 small mb-0 d-flex align-items-center gap-2">
+                          <fa-icon icon="circle-info" />
+                          <span>Esta nota de venta no se puede anular porque tiene notas de crédito internas asociadas.</span>
+                        </div>
+                      </div>
+                    } @else if (doc.document_type !== 'sale_note' && doc.credit_notes?.some(cn => !cn.is_internal)) {
+                      <div class="border-top pt-3 mt-3">
+                        <div class="alert alert-secondary py-2 small mb-0 d-flex align-items-center gap-2">
+                          <fa-icon icon="circle-info" />
+                          <span>Este documento no se puede anular porque tiene notas de crédito electrónicas asociadas.</span>
+                        </div>
+                      </div>
+                    } @else if (canVoid(doc)) {
+                      <div class="border-top pt-3 mt-3">
                         <button class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
                                 (click)="openVoidModal(docsOrder()!)">
                           <fa-icon icon="ban" />
                           <span>{{ doc.document_type === 'sale_note' ? 'Anular nota' : 'Anular' }}</span>
                         </button>
-                      }
-                    </div>
+                      </div>
+                    }
                   }
                 </div>
               }
@@ -789,8 +836,9 @@
 
       @if (o.sale_document?.document_type !== 'sale_note') {
         <div class="alert alert-warning py-2 small mb-3">
-          Esta acción envía una <strong>Comunicación de Baja</strong> a SUNAT. Solo se puede anular documentos
-          del mes actual o del mes anterior (primeros días). Una vez anulado, no se puede revertir.
+          Esta acción envía una <strong>Comunicación de Baja</strong> a SUNAT.
+          Solo se pueden anular facturas y boletas el <strong>mismo día</strong> de su emisión.
+          Una vez anulado, no se puede revertir.
         </div>
       }
 
@@ -821,56 +869,3 @@
   (saved)="onGuideSaved($event)"
   (cancelled)="guideOrder.set(null)" />
 
-<!-- ── Modal Nota de Crédito ─────────────────────────────────────────────── -->
-@if (ncOrder(); as o) {
-  <c-modal [visible]="true" alignment="center" (visibleChange)="!$event && ncOrder.set(null)">
-    <c-modal-header>
-      <h6 cModalTitle class="mb-0 fw-bold">
-        <fa-icon icon="file-invoice" class="me-2 text-warning" />Nota de Crédito — {{ o.sale_document?.full_number }}
-      </h6>
-    </c-modal-header>
-    <c-modal-body class="p-4">
-
-      <div class="mb-3">
-        <label class="form-label fw-medium">Motivo <span class="text-danger">*</span></label>
-        <select class="form-select" [(ngModel)]="ncForm.motivo_code">
-          @for (m of motivoOptions; track m.code) {
-            <option [value]="m.code">{{ m.code }} — {{ m.label }}</option>
-          }
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label fw-medium">Descripción adicional <span class="text-muted small">(opcional)</span></label>
-        <input type="text" class="form-control" placeholder="Detalle del motivo..."
-               [(ngModel)]="ncForm.reason" />
-      </div>
-
-      <div class="row g-3">
-        <div class="col-6">
-          <label class="form-label fw-medium">Subtotal (sin IGV) <span class="text-danger">*</span></label>
-          <div class="input-group">
-            <span class="input-group-text">S/</span>
-            <input type="number" class="form-control" min="0.01" step="0.01"
-                   [(ngModel)]="ncForm.subtotal" />
-          </div>
-          <div class="form-text">Total original: S/ {{ o.sale_document?.total | number:'1.2-2' }}</div>
-        </div>
-        <div class="col-6">
-          <label class="form-label fw-medium">Fecha de emisión <span class="text-danger">*</span></label>
-          <input type="date" class="form-control" [(ngModel)]="ncForm.issue_date" />
-        </div>
-      </div>
-
-    </c-modal-body>
-    <c-modal-footer class="py-2">
-      <button class="btn btn-secondary btn-sm" [disabled]="ncSubmitting()"
-              (click)="ncOrder.set(null)">Cancelar</button>
-      <button class="btn btn-warning btn-sm" [disabled]="ncSubmitting() || !ncForm.subtotal"
-              (click)="submitNC()">
-        @if (ncSubmitting()) { <c-spinner size="sm" class="me-1" />Emitiendo… }
-        @else { <fa-icon icon="paper-plane" class="me-1" />Emitir NC }
-      </button>
-    </c-modal-footer>
-  </c-modal>
-}

@@ -94,7 +94,14 @@
 
       <div class="mb-3">
         <label class="form-label fw-medium">Fecha de emisión</label>
-        <input type="date" class="form-control" [(ngModel)]="issueDate" />
+        <input type="date" class="form-control" [(ngModel)]="issueDate" [min]="minDate" [max]="maxDate" />
+        @if (o.document_type === 'invoice' || o.document_type === 'receipt') {
+          <div class="form-text">
+            <fa-icon icon="circle-info" class="me-1" />
+            @if (o.document_type === 'invoice') { Facturas: puedes emitir hasta 3 días antes de hoy (desde el {{ minDate | date:'dd/MM/yyyy' }}). }
+            @else { Boletas: puedes emitir hasta 4 días antes de hoy (desde el {{ minDate | date:'dd/MM/yyyy' }}). }
+          </div>
+        }
       </div>
       <div>
         <label class="form-label fw-medium">Notas (opcional)</label>

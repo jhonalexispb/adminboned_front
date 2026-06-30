@@ -1,0 +1,221 @@
+@if (request; as r) {
+  <c-modal [visible]="true" size="lg" alignment="center"
+           (visibleChange)="!$event && close()">
+    <c-modal-header>
+      <div>
+        <h6 cModalTitle class="mb-0 fw-bold d-flex align-items-center gap-2">
+          <span class="font-monospace">{{ r.code }}</span>
+          <c-badge [color]="statusColors[r.status]" style="font-size:.7rem;">
+            {{ statusLabels[r.status] }}
+          </c-badge>
+        </h6>
+        <div class="text-body-secondary mt-1" style="font-size:.82rem;">
+          {{ clientName() }}
+          @if (r.client?.ruc) { <span class="ms-2">RUC {{ r.client!.ruc }}</span> }
+          <span class="ms-2">· {{ r.created_at | date:'dd/MM/yyyy HH:mm' }}</span>
+        </div>
+      </div>
+      <button type="button" class="btn-close ms-auto" (click)="close()"></button>
+    </c-modal-header>
+
+    <c-modal-body class="p-3">
+
+      @if (r.client_notes) {
+        <div class="bg-body-tertiary rounded-3 px-3 py-2 mb-3" style="font-size:.85rem;">
+          <div class="text-body-secondary small mb-1">Notas del cliente</div>
+          {{ r.client_notes }}
+        </div>
+      }
+
+      @if (r.seller_notes) {
+        <div class="bg-body-tertiary rounded-3 px-3 py-2 mb-3" style="font-size:.85rem;">
+          <div class="text-body-secondary small mb-1">Notas del vendedor</div>
+          {{ r.seller_notes }}
+        </div>
+      }
+
+      <!-- Mobile: tarjetas de ítems -->
+      <div class="d-md-none d-flex flex-column gap-2">
+        @for (item of r.items ?? []; track item.id) {
+          <div class="border rounded-3 p-2" style="font-size:.85rem;">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div class="flex-grow-1 min-width-0">
+                <div class="fw-semibold lh-sm">{{ item.product_name }}</div>
+                <div class="text-body-secondary" style="font-size:.72rem;">
+                  {{ item.product_sku }} @if (item.product_laboratory) { · {{ item.product_laboratory }} }
+                </div>
+              </div>
+              <c-badge [color]="itemStatusColors[item.item_status]" style="font-size:.65rem;">
+                {{ itemStatusLabels[item.item_status] }}
+              </c-badge>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <div>
+                @if (editing()) {
+                  <div class="input-group input-group-sm" style="width:115px;">
+                    <button type="button" class="btn btn-outline-secondary" (click)="decrementQty(item.id)">
+                      <fa-icon icon="minus" />
+                    </button>
+                    <input type="text" class="form-control text-center fw-bold p-0" readonly
+                           [value]="draftQuantities()[item.id]">
+                    <button type="button" class="btn btn-outline-secondary" (click)="incrementQty(item.id)">
+                      <fa-icon icon="plus" />
+                    </button>
+                  </div>
+                  @if ((draftQuantities()[item.id]) === 0) {
+                    <div class="text-danger mt-1" style="font-size:.72rem;">Se eliminará del pedido</div>
+                  }
+                } @else {
+                  <div>Cant. solicitada: <strong>{{ item.quantity_requested }}</strong></div>
+                  @if (item.quantity_available !== null) {
+                    <div class="text-body-secondary">Disponible: {{ item.quantity_available }}</div>
+                  }
+                }
+              </div>
+              <div class="text-end">
+                <div class="text-body-secondary" style="font-size:.75rem;">S/ {{ item.unit_price | number:'1.2-2' }} c/u</div>
+                <div class="fw-bold">S/ {{ item.subtotal | number:'1.2-2' }}</div>
+              </div>
+            </div>
+            @if (item.reason) {
+              <div class="mt-2 text-warning" style="font-size:.78rem;">
+                <fa-icon icon="triangle-exclamation" class="me-1" />{{ item.reason }}
+              </div>
+            }
+          </div>
+        } @empty {
+          <div class="text-center text-body-secondary py-3">Sin ítems.</div>
+        }
+      </div>
+
+      <!-- Desktop: tabla de ítems -->
+      <div class="table-responsive d-none d-md-block">
+        <table class="table table-sm align-middle mb-0" style="font-size:.85rem;">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="text-end" [style.width]="editing() ? '150px' : '90px'">Solicitado</th>
+              <th class="text-end" style="width:90px">Disponible</th>
+              <th style="width:110px">Estado</th>
+              <th class="text-end" style="width:90px">P. unit.</th>
+              <th class="text-end" style="width:100px">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of r.items ?? []; track item.id) {
+              <tr>
+                <td>
+                  <div class="fw-medium lh-sm">{{ item.product_name }}</div>
+                  <div class="text-body-secondary" style="font-size:.72rem;">
+                    {{ item.product_sku }} @if (item.product_laboratory) { · {{ item.product_laboratory }} }
+                  </div>
+                  @if (item.reason) {
+                    <div class="text-warning mt-1" style="font-size:.75rem;">
+                      <fa-icon icon="triangle-exclamation" class="me-1" />{{ item.reason }}
+                    </div>
+                  }
+                </td>
+                <td class="text-end">
+                  @if (editing()) {
+                    <div class="input-group input-group-sm justify-content-end ms-auto" style="max-width:120px;">
+                      <button type="button" class="btn btn-outline-secondary" (click)="decrementQty(item.id)">
+                        <fa-icon icon="minus" />
+                      </button>
+                      <input type="text" class="form-control text-center fw-bold p-0" readonly
+                             [value]="draftQuantities()[item.id]">
+                      <button type="button" class="btn btn-outline-secondary" (click)="incrementQty(item.id)">
+                        <fa-icon icon="plus" />
+                      </button>
+                    </div>
+                    @if ((draftQuantities()[item.id]) === 0) {
+                      <div class="text-danger mt-1" style="font-size:.7rem;">Se eliminará</div>
+                    }
+                  } @else {
+                    {{ item.quantity_requested }}
+                  }
+                </td>
+                <td class="text-end">{{ item.quantity_available ?? '—' }}</td>
+                <td>
+                  <c-badge [color]="itemStatusColors[item.item_status]" style="font-size:.7rem;">
+                    {{ itemStatusLabels[item.item_status] }}
+                  </c-badge>
+                </td>
+                <td class="text-end">S/ {{ item.unit_price | number:'1.2-2' }}</td>
+                <td class="text-end fw-semibold">S/ {{ item.subtotal | number:'1.2-2' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="text-center text-body-secondary py-3">Sin ítems.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-end mt-3 pt-2 border-top">
+        <div class="text-end">
+          <div class="text-body-secondary small">Total</div>
+          <div class="fw-bold" style="font-size:1.2rem;">S/ {{ r.total | number:'1.2-2' }}</div>
+        </div>
+      </div>
+
+    </c-modal-body>
+
+    <c-modal-footer class="py-2">
+      @if (editing()) {
+        <button class="btn btn-sm btn-secondary" [disabled]="saving()" (click)="cancelEdit()">Cancelar</button>
+        <button class="btn btn-sm btn-success text-white d-flex align-items-center gap-1"
+                [disabled]="saving()"
+                (click)="saveItems()">
+          @if (saving()) { <c-spinner size="sm" /> }
+          @else { <fa-icon icon="floppy-disk" /> }
+          Guardar cambios
+        </button>
+      } @else {
+        @if (canAcceptAvailable()) {
+          <button class="btn btn-sm btn-success text-white d-flex align-items-center gap-1"
+                  [disabled]="accepting()"
+                  (click)="acceptAvailable()">
+            @if (accepting()) { <c-spinner size="sm" /> }
+            @else { <fa-icon icon="check" /> }
+            Aceptar disponible
+          </button>
+        }
+        @if (canEdit()) {
+          <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" (click)="startEdit()">
+            <fa-icon icon="pen" />
+            Editar ítems
+          </button>
+        }
+        @if (canValidate()) {
+          <button class="btn btn-sm btn-info text-white d-flex align-items-center gap-1"
+                  [disabled]="validating()"
+                  (click)="validateStock()">
+            @if (validating()) { <c-spinner size="sm" /> }
+            @else { <fa-icon icon="magnifying-glass" /> }
+            Validar disponibilidad
+          </button>
+        }
+        @if (canConvert()) {
+          <button class="btn btn-sm btn-success text-white d-flex align-items-center gap-1"
+                  [disabled]="converting()"
+                  (click)="convert()">
+            @if (converting()) { <c-spinner size="sm" /> }
+            @else { <fa-icon icon="arrow-right" /> }
+            Convertir
+          </button>
+        }
+        @if (canCancel()) {
+          <button class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
+                  [disabled]="cancelling()"
+                  (click)="cancel()">
+            @if (cancelling()) { <c-spinner size="sm" /> }
+            @else { <fa-icon icon="xmark" /> }
+            Cancelar pedido
+          </button>
+        }
+        <button class="btn btn-secondary btn-sm" (click)="close()">Cerrar</button>
+      }
+    </c-modal-footer>
+  </c-modal>
+}

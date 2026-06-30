@@ -1,5 +1,5 @@
 import { Component, effect, inject, input, output, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import {
@@ -15,7 +15,7 @@ import { Order, SaleDocument } from '../../quotations/sales.model';
   selector: 'app-document-sale-modal',
   standalone: true,
   imports: [
-    FormsModule, DecimalPipe, FaIconComponent, ButtonDirective, SpinnerComponent,
+    FormsModule, DatePipe, DecimalPipe, FaIconComponent, ButtonDirective, SpinnerComponent,
     ModalComponent, ModalHeaderComponent, ModalTitleDirective, ModalBodyComponent, ModalFooterComponent,
   ],
   templateUrl: './document-sale-modal.component.html',
@@ -62,6 +62,18 @@ export class DocumentSaleModalComponent {
 
   get needsSeriesSelection(): boolean {
     return this.activeSeries().length > 1;
+  }
+
+  get minDate(): string {
+    const type = this.order()?.document_type;
+    const days = type === 'invoice' ? 3 : type === 'receipt' ? 4 : 0;
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  get maxDate(): string {
+    return new Date().toISOString().slice(0, 10);
   }
 
   save(): void {

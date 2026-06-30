@@ -31,7 +31,8 @@ export class ReturnManageComponent implements OnInit {
   total    = signal(0);
   lastPage = signal(1);
 
-  selected = signal<ReturnRecord | null>(null);
+  selected      = signal<ReturnRecord | null>(null);
+  loadingDetail = signal(false);
 
   selectedClient: ClientOption | null = null;
 
@@ -92,33 +93,40 @@ export class ReturnManageComponent implements OnInit {
   // ── Modal procesar ────────────────────────────────────────────────────────
 
   openProcess(r: ReturnRecord): void {
-    if (r.items) {
-      this.selected.set(r);
-    } else {
+    this.selected.set(r);
+    if (!r.items?.length) {
+      this.loadingDetail.set(true);
       this.svc.get(r.id).subscribe({
-        next: res => this.selected.set(res.return),
-        error: () => {},
+        next: res => {
+          this.selected.set(res.return);
+          this.loadingDetail.set(false);
+        },
+        error: () => this.loadingDetail.set(false),
       });
-      this.selected.set(r);
     }
+  }
+
+  closeModal(): void {
+    this.selected.set(null);
+    this.loadingDetail.set(false);
   }
 
   onProcessed(r: ReturnRecord): void {
     this.returns.update(list => list.filter(x => x.id !== r.id));
     this.total.update(n => n - 1);
-    this.selected.set(null);
+    this.closeModal();
   }
 
   onRejected(r: ReturnRecord): void {
     this.returns.update(list => list.filter(x => x.id !== r.id));
     this.total.update(n => n - 1);
-    this.selected.set(null);
+    this.closeModal();
   }
 
   onReverted(r: ReturnRecord): void {
     this.returns.update(list => list.filter(x => x.id !== r.id));
     this.total.update(n => n - 1);
-    this.selected.set(null);
+    this.closeModal();
     this.toast.success('Solicitud revertida. El usuario podrá editarla.');
   }
 

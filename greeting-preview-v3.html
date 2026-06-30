@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Vista previa — Más opciones para tarde y noche</title>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #f1f3f6;
+    padding: 2rem;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.1rem; margin-bottom: .25rem; }
+  p.hint { color: #666; font-size: .85rem; margin-bottom: 1.5rem; max-width: 700px; }
+  .label { font-size: .85rem; color: #444; margin: 1.75rem 0 .35rem; font-weight: 600; }
+  .row { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; }
+  .col-desktop { flex: 1 1 420px; max-width: 420px; }
+  .tag { font-size: .7rem; color: #999; margin-bottom: .35rem; }
+
+  /* ── Base (igual a dashboard.component.scss) ─────────────────────────── */
+  .dash-greeting {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 200px;
+    padding: 1.5rem 1.75rem;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    color: #fff;
+    box-shadow: 0 .75rem 2rem -1rem rgba(0, 0, 0, .35);
+  }
+  .dash-greeting-scene {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 60%;
+    animation: scene-zoom 24s ease-in-out infinite alternate;
+  }
+  .dash-greeting-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(110deg, rgba(8, 14, 32, .72) 0%, rgba(8, 14, 32, .35) 45%, rgba(8, 14, 32, .08) 85%);
+  }
+  .dash-greeting--afternoon .dash-greeting-overlay {
+    background: linear-gradient(110deg, rgba(40, 18, 10, .68) 0%, rgba(60, 28, 14, .32) 45%, rgba(60, 28, 14, .06) 85%);
+  }
+  .dash-greeting--night .dash-greeting-overlay {
+    background: linear-gradient(110deg, rgba(3, 6, 20, .62) 0%, rgba(3, 6, 20, .28) 45%, rgba(3, 6, 20, .06) 85%);
+  }
+  .dash-greeting-glow {
+    position: absolute;
+    top: 18%;
+    right: 18%;
+    width: 9rem;
+    height: 9rem;
+    border-radius: 50%;
+    background: radial-gradient(#fff6d18a, transparent 70%);
+    animation: glow-pulse 4s ease infinite;
+    z-index: 0;
+    mix-blend-mode: screen;
+  }
+  .dash-greeting-glow--sunset {
+    top: 28%;
+    right: 30%;
+    background: radial-gradient(#ffb37a8c, transparent 70%);
+  }
+  .dash-greeting-glow--night {
+    top: 12%;
+    right: 22%;
+    background: radial-gradient(#d6dcff80, transparent 70%);
+  }
+  .dash-greeting-body {
+    position: relative;
+    z-index: 2;
+    min-width: 0;
+  }
+  .dash-greeting-title {
+    font-weight: 700;
+    font-size: 1.4rem;
+    margin-bottom: .15rem;
+    text-shadow: 0 2px 10px #00000080;
+  }
+  .dash-greeting-message, .dash-greeting-date {
+    text-shadow: 0 1px 6px #00000080;
+  }
+  .dash-greeting-message {
+    font-size: .92rem;
+    color: #ffffffeb;
+  }
+  .dash-greeting-date {
+    font-size: .78rem;
+    color: #ffffffcc;
+    text-transform: capitalize;
+    margin-top: .35rem;
+  }
+  @keyframes scene-zoom {
+    from { transform: scale(1); }
+    to   { transform: scale(1.08); }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { opacity: .5;  transform: scale(1); }
+    50%      { opacity: .85; transform: scale(1.18); }
+  }
+
+  /* ═══ Rayos de sol giratorios (reutilizado de v2) ════════════════════ */
+  .dash-greeting-rays {
+    position: absolute;
+    top: 18%;
+    right: 18%;
+    width: 16rem;
+    height: 16rem;
+    transform: translate(45%, -45%);
+    background: repeating-conic-gradient(from 0deg, rgba(255,200,140,.22) 0deg 3deg, transparent 3deg 20deg);
+    border-radius: 50%;
+    animation: rays-spin 90s linear infinite;
+    mix-blend-mode: screen;
+    z-index: 0;
+  }
+  @keyframes rays-spin {
+    from { transform: translate(45%, -45%) rotate(0deg); }
+    to   { transform: translate(45%, -45%) rotate(360deg); }
+  }
+
+  /* ═══ Pájaros volando (reutilizado de v2) ═════════════════════════════ */
+  .dash-greeting-birds { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .bird { position: absolute; width: 16px; height: 16px; }
+  .bird::before, .bird::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 8px;
+    height: 8px;
+    border: 1.5px solid rgba(255,255,255,.85);
+    border-radius: 50%;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+  }
+  .bird::before { left: 0; }
+  .bird::after  { left: 6px; transform: scaleX(-1); }
+  .bird--1 { top: 22%; left: 55%; animation: bird-fly 26s linear infinite; }
+  .bird--2 { top: 35%; left: 70%; animation: bird-fly 32s linear infinite; animation-delay: -8s; transform: scale(.75); }
+  .bird--3 { top: 15%; left: 40%; animation: bird-fly 22s linear infinite; animation-delay: -14s; transform: scale(.6); }
+  @keyframes bird-fly {
+    0%   { transform: translate(0, 0); opacity: 0; }
+    8%   { opacity: 1; }
+    50%  { transform: translate(-70px, -18px); }
+    92%  { opacity: 1; }
+    100% { transform: translate(-150px, 4px); opacity: 0; }
+  }
+
+  /* ═══ Partículas doradas (reutilizado de v2) ══════════════════════════ */
+  .dash-greeting-dust { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  .dust {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #ffd9a0;
+    box-shadow: 0 0 6px 1px #ffb86b;
+    animation: dust-float 7s ease-in infinite;
+  }
+  .dust--1 { left: 30%; bottom: 10%; animation-delay: 0s; }
+  .dust--2 { left: 50%; bottom: 5%;  animation-delay: 1.5s; width: 3px; height: 3px; }
+  .dust--3 { left: 65%; bottom: 18%; animation-delay: 3s; }
+  .dust--4 { left: 78%; bottom: 8%;  animation-delay: 4.5s; width: 3px; height: 3px; }
+  .dust--5 { left: 42%; bottom: 22%; animation-delay: 2.2s; width: 2px; height: 2px; }
+  @keyframes dust-float {
+    0%   { transform: translateY(0) scale(1); opacity: 0; }
+    15%  { opacity: 1; }
+    100% { transform: translateY(-90px) scale(.4); opacity: 0; }
+  }
+
+  /* ═══ NUEVO: sol asomando en el horizonte ════════════════════════════ */
+  .sun-disc {
+    position: absolute;
+    bottom: -2.5rem;
+    right: 12%;
+    width: 8rem;
+    height: 8rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 35%, #ffe2a8, #ff9d5c 60%, transparent 100%);
+    box-shadow: 0 0 70px 18px rgba(255,160,80,.35);
+    z-index: 0;
+    animation: glow-pulse 5s ease infinite;
+  }
+
+  /* ═══ NUEVO: nubes (genérico, día/tarde/noche con distinto tinte) ════ */
+  .dash-greeting-clouds { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .cloud {
+    position: absolute;
+    border-radius: 50px;
+    filter: blur(.5px);
+  }
+  .cloud::before, .cloud::after {
+    content: '';
+    position: absolute;
+    background: inherit;
+    border-radius: 50%;
+  }
+  .cloud--sunset { background: #ffd9b8cc; }
+  .cloud--night  { background: rgba(30,36,60,.55); filter: blur(2px); }
+
+  .cloud--a { width: 64px; height: 22px; top: 14%; left: -20%; animation: cloud-drift 38s linear infinite; }
+  .cloud--a::before { width: 32px; height: 32px; top: -16px; left: 8px; }
+  .cloud--a::after  { width: 24px; height: 24px; top: -10px; left: 34px; }
+
+  .cloud--b { width: 46px; height: 16px; top: 55%; left: -15%; animation: cloud-drift 52s linear infinite; animation-delay: -18s; opacity: .7; }
+  .cloud--b::before { width: 22px; height: 22px; top: -10px; left: 6px; }
+  .cloud--b::after  { width: 18px; height: 18px; top: -7px; left: 24px; }
+
+  .cloud--c { width: 38px; height: 14px; top: 30%; left: -25%; animation: cloud-drift 46s linear infinite; animation-delay: -30s; opacity: .55; }
+  .cloud--c::before { width: 18px; height: 18px; top: -8px; left: 5px; }
+  .cloud--c::after  { width: 14px; height: 14px; top: -6px; left: 20px; }
+
+  @keyframes cloud-drift {
+    from { transform: translateX(0); }
+    to   { transform: translateX(420px); }
+  }
+
+  /* ═══ Estrellas + estrella fugaz (igual a la implementación actual) ═══ */
+  .dash-greeting-stars {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .dash-greeting-stars::before,
+  .dash-greeting-stars::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #fff;
+    animation: star-twinkle 3s ease infinite;
+    box-shadow: 40px 30px #fff, 110px 65px #fff, 170px 25px #fff;
+  }
+  .dash-greeting-stars::after {
+    animation-delay: 1.5s;
+    box-shadow: 20px 80px #fff, 130px 40px #fff;
+  }
+  .dash-greeting-shooting-star {
+    position: absolute;
+    top: 18%;
+    left: 70%;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: #fff;
+    z-index: 0;
+    animation: shoot 9s linear infinite;
+  }
+  .dash-greeting-shooting-star::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(to left, #fff, transparent);
+    transform: translateY(-50%) rotate(-35deg);
+    transform-origin: left center;
+  }
+  @keyframes star-twinkle {
+    0%, 100% { opacity: .2; }
+    50%      { opacity: 1; }
+  }
+  @keyframes shoot {
+    0%, 75%   { opacity: 0; transform: translate(0, 0); }
+    78%       { opacity: 1; }
+    92%, 100% { opacity: 0; transform: translate(-90px, 55px); }
+  }
+
+  /* ═══ NUEVO: cielo estrellado denso ══════════════════════════════════ */
+  .dash-greeting-stars-dense {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .dash-greeting-stars-dense::before,
+  .dash-greeting-stars-dense::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: #fff;
+    animation: star-twinkle 3s ease infinite;
+  }
+  .dash-greeting-stars-dense::before {
+    box-shadow: 30px 20px #fff, 80px 50px #fff, 140px 15px #fff, 200px 70px #fff,
+                260px 30px #fff, 320px 90px #fff, 40px 110px #fff, 180px 130px #fff,
+                10px 150px #fff, 350px 140px #fff;
+  }
+  .dash-greeting-stars-dense::after {
+    animation-delay: 1.5s;
+    box-shadow: 60px 90px #fff, 120px 40px #fff, 220px 100px #fff, 300px 60px #fff,
+                20px 60px #fff, 360px 20px #fff, 100px 150px #fff, 240px 140px #fff;
+  }
+
+  /* ═══ NUEVO: luna con cráteres ═══════════════════════════════════════ */
+  .moon {
+    position: absolute;
+    top: 10%;
+    right: 14%;
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ffffff, #e3e3f0 55%, #c7c7da 100%);
+    box-shadow: 0 0 50px 12px rgba(255,255,255,.3);
+    z-index: 0;
+    overflow: hidden;
+  }
+  .moon .crater {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(140,140,165,.35);
+  }
+  .moon .crater--1 { width: 14px; height: 14px; top: 18%; left: 25%; }
+  .moon .crater--2 { width: 9px;  height: 9px;  top: 52%; left: 60%; }
+  .moon .crater--3 { width: 7px;  height: 7px;  top: 68%; left: 28%; }
+</style>
+</head>
+<body>
+  <h1>Vista previa — Más opciones para tarde y noche</h1>
+  <p class="hint">
+    Para "día" te quedas con nubes flotando + pájaros volando (sin rayos). Aquí van más alternativas
+    para "tarde" y para "noche" (con luna + cráteres, como la del mockup viejo que te gustó).
+  </p>
+
+  <div class="label">Tarde — Opción 3: sol asomando en el horizonte + pájaros</div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting dash-greeting--afternoon">
+        <img class="dash-greeting-scene" src="src/assets/images/login/scene-sunset.webp" alt="">
+        <div class="dash-greeting-overlay"></div>
+        <div class="sun-disc"></div>
+        <div class="dash-greeting-birds">
+          <div class="bird bird--1"></div>
+          <div class="bird bird--2"></div>
+          <div class="bird bird--3"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas tardes, Jhon!</div>
+          <div class="dash-greeting-message">Vas a mitad de camino, ¡sigue así!</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Tarde — Opción 4: nubes de atardecer (tintadas) + partículas doradas</div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting dash-greeting--afternoon">
+        <img class="dash-greeting-scene" src="src/assets/images/login/scene-sunset.webp" alt="">
+        <div class="dash-greeting-overlay"></div>
+        <div class="dash-greeting-glow dash-greeting-glow--sunset"></div>
+        <div class="dash-greeting-clouds">
+          <div class="cloud cloud--sunset cloud--a"></div>
+          <div class="cloud cloud--sunset cloud--b"></div>
+          <div class="cloud cloud--sunset cloud--c"></div>
+        </div>
+        <div class="dash-greeting-dust">
+          <div class="dust dust--1"></div>
+          <div class="dust dust--2"></div>
+          <div class="dust dust--3"></div>
+          <div class="dust dust--4"></div>
+          <div class="dust dust--5"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas tardes, Jhon!</div>
+          <div class="dash-greeting-message">Vas a mitad de camino, ¡sigue así!</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Tarde — Opción 5: todo combinado — rayos cálidos + pájaros + partículas doradas</div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting dash-greeting--afternoon">
+        <img class="dash-greeting-scene" src="src/assets/images/login/scene-sunset.webp" alt="">
+        <div class="dash-greeting-overlay"></div>
+        <div class="dash-greeting-rays"></div>
+        <div class="dash-greeting-glow dash-greeting-glow--sunset"></div>
+        <div class="dash-greeting-birds">
+          <div class="bird bird--1"></div>
+          <div class="bird bird--2"></div>
+        </div>
+        <div class="dash-greeting-dust">
+          <div class="dust dust--1"></div>
+          <div class="dust dust--2"></div>
+          <div class="dust dust--3"></div>
+          <div class="dust dust--4"></div>
+          <div class="dust dust--5"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas tardes, Jhon!</div>
+          <div class="dash-greeting-message">Vas a mitad de camino, ¡sigue así!</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Noche — Opción 1: luna con cráteres + estrellas + estrella fugaz</div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting dash-greeting--night">
+        <img class="dash-greeting-scene" src="src/assets/images/login/scene-night.webp" alt="">
+        <div class="dash-greeting-overlay"></div>
+        <div class="dash-greeting-stars"></div>
+        <div class="dash-greeting-shooting-star"></div>
+        <div class="moon">
+          <div class="crater crater--1"></div>
+          <div class="crater crater--2"></div>
+          <div class="crater crater--3"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas noches, Jhon!</div>
+          <div class="dash-greeting-message">Descansa, mañana seguimos creciendo juntos.</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Noche — Opción 2: cielo estrellado denso + estrella fugaz (sin luna)</div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting dash-greeting--night">
+        <img class="dash-greeting-scene" src="src/assets/images/login/scene-night.webp" alt="">
+        <div class="dash-greeting-overlay"></div>
+        <div class="dash-greeting-stars-dense"></div>
+        <div class="dash-greeting-shooting-star"></div>
+        <div class="dash-greeting-glow dash-greeting-glow--night"></div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas noches, Jhon!</div>
+          <div class="dash-greeting-message">Descansa, mañana seguimos creciendo juntos.</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Noche — Opción 3: luna con cráteres + nubes nocturnas pasando + estrellas (sin estrella fugaz)</div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting dash-greeting--night">
+        <img class="dash-greeting-scene" src="src/assets/images/login/scene-night.webp" alt="">
+        <div class="dash-greeting-overlay"></div>
+        <div class="dash-greeting-stars"></div>
+        <div class="moon">
+          <div class="crater crater--1"></div>
+          <div class="crater crater--2"></div>
+          <div class="crater crater--3"></div>
+        </div>
+        <div class="dash-greeting-clouds">
+          <div class="cloud cloud--night cloud--a"></div>
+          <div class="cloud cloud--night cloud--b"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas noches, Jhon!</div>
+          <div class="dash-greeting-message">Descansa, mañana seguimos creciendo juntos.</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

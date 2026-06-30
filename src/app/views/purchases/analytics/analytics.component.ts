@@ -53,7 +53,7 @@ export class AnalyticsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadAnalytics();
-    this.productService.list({ active: true, per_page: 500 })
+    this.productService.list({ active: true, per_page: 100000 })
       .subscribe(r => this.products.set(r.data));
   }
 

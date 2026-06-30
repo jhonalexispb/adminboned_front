@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { NgScrollbar } from 'ngx-scrollbar';
 
@@ -19,9 +19,14 @@ import {
 import { DefaultHeaderComponent } from './';
 import { NavItem, navItems } from './_nav';
 import { AuthService } from '../../core/services/auth.service';
+import { EmpresaService } from '../../core/services/empresa.service';
 import { CollectionService } from '../../views/payments/collection.service';
 import { UserDeposit } from '../../views/payments/collection.model';
 import { RegisterDepositModalComponent } from '../../views/payments/register-deposit-modal/register-deposit-modal.component';
+import { NotificationsModalComponent } from './notifications-modal/notifications-modal.component';
+
+const LOGO_CACHE_KEY = 'empresa_logo_url';
+const BRAND_NAME_CACHE_KEY = 'empresa_brand_name';
 
 @Component({
   selector: 'app-dashboard',
@@ -33,12 +38,16 @@ import { RegisterDepositModalComponent } from '../../views/payments/register-dep
     SidebarToggleDirective, SidebarTogglerDirective,
     ContainerComponent, DefaultHeaderComponent,
     IconDirective, NgScrollbar, RouterOutlet, RouterLink, ShadowOnScrollDirective,
-    RegisterDepositModalComponent,
+    RegisterDepositModalComponent, NotificationsModalComponent,
   ],
 })
-export class DefaultLayoutComponent {
+export class DefaultLayoutComponent implements OnInit {
   private auth = inject(AuthService);
+  private empresaService = inject(EmpresaService);
   collectionService = inject(CollectionService);
+
+  logoUrl   = signal<string | null>(localStorage.getItem(LOGO_CACHE_KEY));
+  brandName = signal<string | null>(localStorage.getItem(BRAND_NAME_CACHE_KEY));
 
   readonly navItems = computed<INavData[]>(() => {
     const user = this.auth.user();
@@ -46,6 +55,28 @@ export class DefaultLayoutComponent {
     const isSuperAdmin = user.roles.includes('super_admin');
     return filterNav(navItems, user.permissions, isSuperAdmin);
   });
+
+  ngOnInit(): void {
+    this.empresaService.getPublic().subscribe({
+      next: info => {
+        this.logoUrl.set(info?.logo_url ?? null);
+        if (info?.logo_url) {
+          localStorage.setItem(LOGO_CACHE_KEY, info.logo_url);
+        } else {
+          localStorage.removeItem(LOGO_CACHE_KEY);
+        }
+
+        const name = info?.nombre_comercial || info?.razon_social || null;
+        this.brandName.set(name);
+        if (name) {
+          localStorage.setItem(BRAND_NAME_CACHE_KEY, name);
+        } else {
+          localStorage.removeItem(BRAND_NAME_CACHE_KEY);
+        }
+      },
+      error: () => {},
+    });
+  }
 
   onDepositRegistered(_event: { deposit: UserDeposit }): void {
     this.collectionService.showNewDeposit.set(false);

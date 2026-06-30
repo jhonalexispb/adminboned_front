@@ -1,0 +1,79 @@
+<div class="modal-header">
+  <h5 class="modal-title">Acceso al catálogo público</h5>
+  <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+
+  <div class="mb-3">
+    <div class="fw-semibold">{{ client.business_name || client.name }}</div>
+    @if (client.ruc) {
+      <div class="text-body-secondary small">RUC {{ client.ruc }}</div>
+    } @else if (client.dni) {
+      <div class="text-body-secondary small">DNI {{ client.dni }}</div>
+    }
+  </div>
+
+  @if (error) {
+    <div class="alert alert-danger py-2">{{ error }}</div>
+  }
+
+  @if (isEnabled) {
+    <div class="alert py-2 d-flex align-items-center gap-2"
+         [class]="isExpired ? 'alert-warning' : 'alert-success'">
+      <fa-icon [icon]="isExpired ? 'triangle-exclamation' : 'circle-check'" />
+      <div class="small">
+        @if (!client.catalog_access_expires_at) {
+          Acceso activo, sin fecha de vencimiento.
+        } @else if (isExpired) {
+          Acceso activo, pero el plazo venció el {{ client.catalog_access_expires_at | date:'d MMM yyyy, HH:mm' }}.
+          Puedes llamar al cliente para recordarle enviar su pedido.
+        } @else {
+          Acceso activo hasta el {{ client.catalog_access_expires_at | date:'d MMM yyyy, HH:mm' }}.
+        }
+      </div>
+    </div>
+    <p class="text-body-secondary small mb-2">
+      Puedes extender el plazo o desactivar el acceso del cliente al catálogo.
+    </p>
+  } @else {
+    <p class="text-body-secondary small mb-2">
+      El cliente podrá identificarse con su RUC en el catálogo público y enviar pedidos.
+    </p>
+  }
+
+  <label class="form-label small mb-1">¿Hasta cuándo le habilitas el acceso?</label>
+  <select class="form-select form-select-sm mb-2" [(ngModel)]="durationOption">
+    <option value="7">7 días</option>
+    <option value="15">15 días</option>
+    <option value="30">30 días</option>
+    <option value="60">60 días</option>
+    <option value="90">90 días</option>
+    <option value="custom">Fecha personalizada</option>
+    <option value="none">Sin vencimiento</option>
+  </select>
+
+  @if (durationOption === 'custom') {
+    <input type="datetime-local" class="form-control form-control-sm" [(ngModel)]="customDate" />
+  }
+
+  <div class="form-text">
+    El plazo es solo un recordatorio para ti: al vencer, no se bloquea al cliente, pero
+    aparecerá en tus notificaciones para que lo contactes y le hagas recordar su pedido.
+  </div>
+
+</div>
+
+<div class="modal-footer">
+  @if (isEnabled) {
+    <button type="button" class="btn btn-outline-danger" [disabled]="saving()" (click)="deactivate()">
+      Desactivar acceso
+    </button>
+  }
+  <button type="button" class="btn btn-primary" [disabled]="saving()" (click)="activate()">
+    @if (saving()) {
+      <c-spinner size="sm" class="me-1" />
+    }
+    {{ isEnabled ? 'Actualizar plazo' : 'Activar acceso' }}
+  </button>
+</div>

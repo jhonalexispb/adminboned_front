@@ -14,6 +14,7 @@ export interface ProductFilters {
   per_page?: number;
   page?: number;
   for_sale?: boolean;
+  no_paginate?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -32,6 +33,7 @@ export class ProductService {
     if (filters.page)                                          params = params.set('page', String(filters.page));
     if (filters.supplier_id)                                   params = params.set('supplier_id', String(filters.supplier_id));
     if (filters.for_sale)                                      params = params.set('for_sale', 'true');
+    if (filters.no_paginate)                                   params = params.set('no_paginate', '1');
     return this.http.get<PaginatedResponse<Product>>(this.url, { params });
   }
 

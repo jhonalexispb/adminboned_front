@@ -1,0 +1,379 @@
+<%
+
+    const fix = (number, fraction, force0) => parseFloat(number) ? (new Intl.NumberFormat('en-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: typeof fraction === 'number' ? fraction : 2 }).format(number)).replace(/(\s|[PEN])/g, '') : (force0 ? '0.00' : '')
+
+    const emisor_logo = getCloudImgUrl(persona?.logo || 'logoMin')
+    const serie_numero    = json?.['cbc:ID']?._text || ''
+    const fecha_emision   = json?.['cbc:IssueDate']?._text || ''
+    const hora_emision    = json?.['cbc:IssueTime']?._text || ''
+
+    // Remitente (emisor de la guia)
+    const remitente_ruc            = json?.['cac:DespatchSupplierParty']?.['cac:Party']?.['cac:PartyIdentification']?.['cbc:ID']?._text || ''
+    const remitente_tipo_id        = json?.['cac:DespatchSupplierParty']?.['cac:Party']?.['cac:PartyIdentification']?.['cbc:ID']?._attributes?.schemeID || ''
+    const remitente_razon_social   = json?.['cac:DespatchSupplierParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cbc:RegistrationName']?._text || persona?.name || ''
+    const remitente_nombre_comercial = json?.['cac:DespatchSupplierParty']?.['cac:Party']?.['cac:PartyName']?.['cbc:Name']?._text || persona?.tradename || ''
+    const remitente_direccion      = json?.['cac:DespatchSupplierParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cac:RegistrationAddress']?.['cac:AddressLine']?.['cbc:Line']?._text || persona?.address || ''
+    const remitente_descripcion    = persona?.description || ''
+    const remitente_mensaje_pie    = persona?.footerMessage || ''
+
+    // Destinatario
+    const destinatario_id          = json?.['cac:DeliveryCustomerParty']?.['cac:Party']?.['cac:PartyIdentification']?.['cbc:ID']?._text || ''
+    const destinatario_tipo_id     = catalogoFn('06', json?.['cac:DeliveryCustomerParty']?.['cac:Party']?.['cac:PartyIdentification']?.['cbc:ID']?._attributes?.schemeID) || ''
+    const destinatario_nombre      = json?.['cac:DeliveryCustomerParty']?.['cac:Party']?.['cac:PartyLegalEntity']?.['cbc:RegistrationName']?._text || ''
+
+    // Datos del traslado
+    const codigo_motivo_traslado   = json?.['cac:Shipment']?.['cbc:HandlingCode']?._text || ''
+    const motivo_traslado          = catalogoFn('20', codigo_motivo_traslado) || codigo_motivo_traslado
+    const notas_guia               = json?.['cac:Shipment']?.['cbc:HandlingInstructions']?._text || ''
+    const peso_bruto               = json?.['cac:Shipment']?.['cbc:GrossWeightMeasure']?._text || ''
+    const unidad_peso              = json?.['cac:Shipment']?.['cbc:GrossWeightMeasure']?._attributes?.unitCode || ''
+
+    // Modo de traslado y fecha de inicio
+    const codigo_modo_traslado     = json?.['cac:Shipment']?.['cac:ShipmentStage']?.['cbc:TransportModeCode']?._text || ''
+    const modo_traslado_label      = codigo_modo_traslado === '01' ? 'Publico' : codigo_modo_traslado === '02' ? 'Privado' : codigo_modo_traslado
+    const fecha_inicio_traslado    = json?.['cac:Shipment']?.['cac:ShipmentStage']?.['cac:TransitPeriod']?.['cbc:StartDate']?._text || ''
+
+    // Transportista (solo modo publico)
+    const transportista_ruc        = json?.['cac:Shipment']?.['cac:ShipmentStage']?.['cac:CarrierParty']?.['cac:PartyIdentification']?.['cbc:ID']?._text || ''
+    const transportista_nombre     = json?.['cac:Shipment']?.['cac:ShipmentStage']?.['cac:CarrierParty']?.['cac:PartyLegalEntity']?.['cbc:RegistrationName']?._text || ''
+
+    // Puntos de partida y llegada
+    const punto_partida_dir        = json?.['cac:Shipment']?.['cac:Delivery']?.['cac:Despatch']?.['cac:DespatchAddress']?.['cac:AddressLine']?.['cbc:Line']?._text || ''
+    const punto_partida_ubigeo     = json?.['cac:Shipment']?.['cac:Delivery']?.['cac:Despatch']?.['cac:DespatchAddress']?.['cbc:ID']?._text || ''
+    const punto_llegada_dir        = json?.['cac:Shipment']?.['cac:Delivery']?.['cac:DeliveryAddress']?.['cac:AddressLine']?.['cbc:Line']?._text || ''
+    const punto_llegada_ubigeo     = json?.['cac:Shipment']?.['cac:Delivery']?.['cac:DeliveryAddress']?.['cbc:ID']?._text || ''
+
+    // Documentos relacionados (factura o boleta)
+    const docs_relacionados = (json?.['cac:AdditionalDocumentReference'] || []).map(function(e) {
+        const tipoCode  = e['cbc:DocumentTypeCode']?._text || ''
+        const tipoLabel = tipoCode === '01' ? 'FACTURA' : tipoCode === '03' ? 'BOLETA' : tipoCode
+        return { tipo: tipoLabel, numero: e['cbc:ID']?._text || '' }
+    })
+
+    // parsearDesc: parte "LAB - PRODUCTO Lote: XX Venc: DD/MM/YYYY"
+    const parsearDesc = function(desc) {
+        const raw = (desc || '').trim()
+        const idx = raw.search(/\blote\b/i)
+        if (idx < 0) return { nombre: raw, lote: '', vence: '' }
+        const nombre = raw.slice(0, idx).replace(/[-\s]+$/, '').trim()
+        const resto  = raw.slice(idx)
+        const lote   = (resto.match(/lote[:\s]+(\S+)/i) || [])[1] || ''
+        const vence  = (resto.match(/venc\S*[:\s]+(\S+)/i) || [])[1] || ''
+        return { nombre: nombre, lote: lote, vence: vence }
+    }
+
+    // Items de la guia — cac:DespatchLine / cbc:DeliveredQuantity
+    const items = (json?.['cac:DespatchLine'] || []).map(function(e) {
+        const qty           = parseFloat(e['cbc:DeliveredQuantity']?._text) || 0
+        const unidad_codigo = e['cbc:DeliveredQuantity']?._attributes?.unitCode || 'NIU'
+        const desc          = parsearDesc(e['cac:Item']?.['cbc:Description']?._text || '')
+        return {
+            qty:           qty,
+            unidad_codigo: unidad_codigo,
+            nombre:        desc.nombre,
+            lote:          desc.lote,
+            vence:         desc.vence,
+        }
+    })
+
+    const searchUrl = (fileName || '').replace(/-/g, '|') + '|' + (remitente_tipo_id || '') + '|' + (destinatario_id || '')
+%>
+
+<style>
+    @page { margin: 8mm; }
+    * { box-sizing: border-box; }
+
+    body { font-family: 'Yantramanav', sans-serif; font-size: 9.8pt; line-height: 1.3; color: #1a1a1a; }
+
+    .container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; padding: 0; }
+
+    .row    { display: flex; flex-direction: row; flex-wrap: wrap; }
+    .col    { flex: 1; flex-basis: 0; max-width: 100%; }
+    .col-2  { flex-basis: 16.667%; max-width: 16.667%; }
+    .col-3  { flex-basis: 25%;     max-width: 25%; }
+    .col-4  { flex-basis: 33.333%; max-width: 33.333%; }
+    .col-5  { flex-basis: 41.667%; max-width: 41.667%; }
+    .col-6  { flex-basis: 50%;     max-width: 50%; }
+    .col-7  { flex-basis: 58.333%; max-width: 58.333%; }
+    .col-8  { flex-basis: 66.667%; max-width: 66.667%; }
+    .col-12 { flex-basis: 100%;    max-width: 100%; }
+
+    .between { justify-content: space-between; }
+    .end     { justify-content: flex-end; }
+    .middle  { align-items: center; }
+    .center  { text-align: center; justify-content: center; }
+    .right   { text-align: right; }
+    .bold    { font-weight: 700; }
+    .no-break{ page-break-inside: avoid; }
+
+    /* ── Header ── */
+    .header { margin-bottom: 12px; }
+    .header .logo img {
+        max-width: 230px;
+        max-height: 75px;
+        width: auto;
+        height: auto;
+        display: block;
+    }
+    .header .company-info { padding: 0 14px; }
+    .header .company-info .name    { font-size: 15pt; font-weight: 700; }
+    .header .company-info .address { font-size: 9pt; color: #333333; margin-top: 3px; line-height: 1.5; }
+
+    .header .ruc-box {
+        width: 210px;
+        border: 2.5px solid #0D4F81;
+        border-radius: 4px;
+        padding: 10px 12px;
+        text-align: center;
+        color: #0D4F81;
+    }
+    .header .ruc-box .doc-type { font-size: 9pt; font-weight: 700; margin-bottom: 4px; line-height: 1.3; }
+    .header .ruc-box .ruc-num  { font-size: 9.5pt; font-weight: 700; }
+    .header .ruc-box .serie    { font-size: 11pt; font-weight: 700; margin-top: 4px; border-top: 1.5px solid #0D4F81; padding-top: 6px; }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 2px solid #0D4F81; margin: 10px 0; }
+
+    /* ── Info labels ── */
+    .info-row { display: flex; flex-direction: row; margin-bottom: 2px; font-size: 9.5pt; }
+    .info-row .lbl { width: 130px; font-weight: 700; text-transform: uppercase; color: #333333; flex-shrink: 0; }
+    .info-row .val { flex: 1; text-transform: uppercase; }
+
+    /* ── Bloque traslado (puntos partida / llegada) ── */
+    .traslado-box {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 3px;
+        padding: 7px 10px;
+        margin-bottom: 10px;
+    }
+    .traslado-arrow {
+        font-size: 12pt;
+        color: #0D4F81;
+        font-weight: 700;
+        padding: 0 8px;
+        align-self: center;
+    }
+
+    /* ── Bloque doc relacionado ── */
+    .doc-ref-box {
+        background: #f0f5fb;
+        border-left: 3px solid #0D4F81;
+        border-radius: 3px;
+        padding: 6px 10px;
+        margin-bottom: 10px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        font-size: 9.5pt;
+    }
+    .doc-ref-box .lbl { font-weight: 700; color: #0D4F81; text-transform: uppercase; white-space: nowrap; }
+    .doc-ref-box .val { font-weight: 700; text-transform: uppercase; }
+
+    /* ── Items table ── */
+    table.items-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; table-layout: auto; }
+    table.items-table thead th {
+        background: #0D4F81;
+        color: #ffffff;
+        padding: 6px 6px;
+        font-size: 9pt;
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+    table.items-table tbody tr:nth-child(even) { background: #f8fafc; }
+    table.items-table tbody td { padding: 6px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; font-size: 9.5pt; }
+
+    .product-name { font-weight: 700; text-transform: uppercase; word-break: break-word; }
+    .col-lote, .col-venc { white-space: nowrap; text-align: center; font-size: 8.5pt; }
+
+    /* ── Footer ── */
+    .footer { margin-top: 14px; border-top: 1px solid #e5e7eb; padding-top: 8px; font-size: 8.5pt; color: #333333; }
+    .footer .qr img { width: 90px; }
+    .thanks { margin-top: 14px; text-align: center; font-size: 9pt; color: #333333; border-top: 1px solid #e5e7eb; padding-top: 10px; }
+</style>
+
+<div class="container">
+
+    <!-- ══ HEADER ══════════════════════════════════════════════════════ -->
+    <div class="header row between middle">
+
+        <div class="logo">
+            <img src="<%= emisor_logo %>" />
+        </div>
+
+        <div class="company-info col">
+            <div class="name"><%= remitente_nombre_comercial || remitente_razon_social %></div>
+            <% if (remitente_nombre_comercial && remitente_razon_social) { %>
+            <div style="font-size:9.5pt; font-weight:700; color:#333333;"><%= remitente_razon_social %></div>
+            <% } %>
+            <div class="address"><%= remitente_direccion %></div>
+            <% if (remitente_descripcion) { %>
+            <div class="address" style="margin-top:4px;"><%= remitente_descripcion %></div>
+            <% } %>
+        </div>
+
+        <div class="ruc-box">
+            <div class="ruc-num">R.U.C. N° <%= remitente_ruc %></div>
+            <div class="doc-type">GUIA DE REMISION REMITENTE ELECTRONICA</div>
+            <div class="serie"><%= serie_numero %></div>
+        </div>
+
+    </div>
+
+    <hr class="divider" />
+
+    <!-- ══ DESTINATARIO + DATOS DEL TRASLADO ════════════════════════ -->
+    <div class="row" style="margin-bottom:10px;">
+
+        <div class="col-7">
+            <% if (destinatario_nombre) { %>
+            <div class="info-row">
+                <div class="lbl">Destinatario:</div>
+                <div class="val bold"><%= destinatario_nombre %></div>
+            </div>
+            <% } %>
+            <% if (destinatario_id) { %>
+            <div class="info-row">
+                <div class="lbl"><%= destinatario_tipo_id %>:</div>
+                <div class="val"><%= destinatario_id %></div>
+            </div>
+            <% } %>
+        </div>
+
+        <div class="col-5" style="padding-left:12px;">
+            <div class="info-row">
+                <div class="lbl">Emision:</div>
+                <div class="val"><%= fecha_emision %> <%= hora_emision %></div>
+            </div>
+            <div class="info-row">
+                <div class="lbl">Inicio traslado:</div>
+                <div class="val bold"><%= fecha_inicio_traslado %></div>
+            </div>
+            <% if (motivo_traslado) { %>
+            <div class="info-row">
+                <div class="lbl">Motivo:</div>
+                <div class="val"><%= codigo_motivo_traslado %> - <%= motivo_traslado %></div>
+            </div>
+            <% } %>
+            <% if (modo_traslado_label) { %>
+            <div class="info-row">
+                <div class="lbl">Modalidad:</div>
+                <div class="val"><%= modo_traslado_label %></div>
+            </div>
+            <% } %>
+        </div>
+
+    </div>
+
+    <!-- ══ RUTA (PARTIDA → LLEGADA) ══════════════════════════════════ -->
+    <div class="traslado-box row middle" style="margin-bottom:10px;">
+        <div class="col">
+            <div style="font-size:8pt; font-weight:700; color:#333333; text-transform:uppercase; margin-bottom:3px;">Punto de partida</div>
+            <div style="font-weight:700; text-transform:uppercase;"><%= punto_partida_dir %></div>
+            <% if (punto_partida_ubigeo) { %>
+            <div style="font-size:8.5pt; color:#333333;"><%= ubigeoFn(punto_partida_ubigeo) %></div>
+            <% } %>
+        </div>
+        <div class="traslado-arrow">&#8594;</div>
+        <div class="col">
+            <div style="font-size:8pt; font-weight:700; color:#333333; text-transform:uppercase; margin-bottom:3px;">Punto de llegada</div>
+            <div style="font-weight:700; text-transform:uppercase;"><%= punto_llegada_dir %></div>
+            <% if (punto_llegada_ubigeo) { %>
+            <div style="font-size:8.5pt; color:#333333;"><%= ubigeoFn(punto_llegada_ubigeo) %></div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- ══ PESO + TRANSPORTISTA ══════════════════════════════════════ -->
+    <div class="row" style="margin-bottom:10px; gap:12px;">
+        <div>
+            <div class="info-row">
+                <div class="lbl">Peso bruto:</div>
+                <div class="val bold"><%= fix(peso_bruto, 3) %> <%= unidad_peso %></div>
+            </div>
+        </div>
+        <% if (transportista_ruc) { %>
+        <div class="col">
+            <div class="info-row">
+                <div class="lbl">Transportista:</div>
+                <div class="val bold"><%= transportista_nombre %></div>
+            </div>
+            <div class="info-row">
+                <div class="lbl">RUC transportista:</div>
+                <div class="val"><%= transportista_ruc %></div>
+            </div>
+        </div>
+        <% } %>
+    </div>
+
+    <!-- ══ DOCUMENTOS RELACIONADOS ═══════════════════════════════════ -->
+    <% docs_relacionados.map(function(d) { %>
+    <div class="doc-ref-box">
+        <div class="lbl">Ref. <%= d.tipo %>:</div>
+        <div class="val"><%= d.numero %></div>
+    </div>
+    <% }) %>
+
+    <!-- ══ NOTAS DE LA GUIA ═══════════════════════════════════════════ -->
+    <% if (notas_guia) { %>
+    <div style="font-size:8.5pt; color:#333333; margin-bottom:8px; border-left:3px solid #e5e7eb; padding-left:8px;">
+        <span style="font-weight:700; text-transform:uppercase;">Obs.: </span><%= notas_guia %>
+    </div>
+    <% } %>
+
+    <!-- ══ TABLA DE PRODUCTOS ═════════════════════════════════════════ -->
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="text-align:center; width:45px;">CANT.</th>
+                <th style="text-align:left;">DESCRIPCION</th>
+                <th style="text-align:center; white-space:nowrap;">LOTE</th>
+                <th style="text-align:center; white-space:nowrap;">VENCIM.</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% items.map(function(e) { %>
+            <tr>
+                <td style="text-align:center; white-space:nowrap;">
+                    <%= fix(e.qty, 0) %> <span style="font-size:8.5pt; color:#333333;"><%= e.unidad_codigo %></span>
+                </td>
+                <td>
+                    <span class="product-name"><%= e.nombre %></span>
+                </td>
+                <td class="col-lote"><%= e.lote || '-' %></td>
+                <td class="col-venc"><%= e.vence || '-' %></td>
+            </tr>
+            <% }) %>
+        </tbody>
+    </table>
+
+    <!-- ══ FOOTER ═════════════════════════════════════════════════════ -->
+    <div class="footer row no-break">
+        <% if (urlQR) { %>
+        <div class="qr" style="margin-right:8px;">
+            <img src="<%= urlQR %>" />
+        </div>
+        <% } %>
+        <div class="col">
+            <div class="bold" style="font-size:8pt;"><%= data?.qr?.digest %></div>
+            <div style="margin-top:3px;">
+                Representacion Impresa de la GUIA DE REMISION REMITENTE ELECTRONICA.
+                <% if (production) { %>
+                Consultar validez en
+                <a href="https://<%= domain %>/buscar?<%= searchUrl %>" target="_blank"><%= domain %>/buscar</a>
+                <% } else { %>
+                Generada en <a href="https://<%= domain %>/" target="_blank"><%= domain %></a>
+                <% } %>
+            </div>
+            <% if (remitente_mensaje_pie) { %>
+            <div style="margin-top:4px;"><%= remitente_mensaje_pie %></div>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="thanks">
+        Gracias por su preferencia. Estamos a su disposicion para cualquier consulta.
+    </div>
+
+</div>

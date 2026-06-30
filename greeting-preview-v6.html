@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Vista previa — Atardecer sanador</title>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #f0ede8;
+    padding: 2rem;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.1rem; margin-bottom: .25rem; }
+  p.hint { color: #666; font-size: .85rem; margin-bottom: .5rem; max-width: 700px; }
+  .palette { display: flex; gap: .35rem; margin-bottom: 1.25rem; }
+  .swatch { width: 28px; height: 14px; border-radius: 4px; }
+  .label { font-size: .85rem; color: #444; margin: 1.75rem 0 .2rem; font-weight: 600; }
+  .sublabel { font-size: .78rem; color: #888; margin-bottom: .4rem; font-style: italic; }
+  .row { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: flex-start; }
+  .col-desktop { flex: 1 1 420px; max-width: 420px; }
+  .tag { font-size: .7rem; color: #999; margin-bottom: .35rem; }
+
+  /* ── Base ─────────────────────────────────────────────────────────── */
+  .dash-greeting {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 200px;
+    padding: 1.5rem 1.75rem;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    color: #fff;
+    box-shadow: 0 .75rem 2.5rem -1rem rgba(0,0,0,.3);
+    animation: scene-zoom 24s ease-in-out infinite alternate;
+  }
+  .dash-greeting-body { position: relative; z-index: 2; min-width: 0; }
+  .dash-greeting-title {
+    font-weight: 700; font-size: 1.4rem; margin-bottom: .15rem;
+    text-shadow: 0 2px 14px rgba(0,0,0,.5);
+  }
+  .dash-greeting-message {
+    font-size: .92rem; color: #ffffffee;
+    text-shadow: 0 1px 8px rgba(0,0,0,.45);
+  }
+  .dash-greeting-date {
+    font-size: .78rem; color: #ffffffcc; text-transform: capitalize;
+    margin-top: .35rem; text-shadow: 0 1px 8px rgba(0,0,0,.45);
+  }
+  .text-veil {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(105deg, rgba(8,4,12,.55) 0%, rgba(8,4,12,.18) 45%, transparent 72%);
+  }
+  @keyframes scene-zoom {
+    from { transform: scale(1); }
+    to   { transform: scale(1.06); }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { opacity: .5;  transform: scale(1); }
+    50%      { opacity: .85; transform: scale(1.12); }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     OPCIÓN I — "Rosa sanador"
+     Morado suave → malva → rosa polvorienta → melocotón → dorado suave
+     Psicología: calma la mente, libera tensión, fomenta el amor propio
+     ════════════════════════════════════════════════════════════════════ */
+  .sky--rose {
+    background: linear-gradient(168deg,
+      #4a3858 0%,      /* ciruela suave — introspección, paz interior */
+      #7a5070 20%,     /* malva — equilibrio emocional, calma */
+      #b07080 38%,     /* rosa antiguo — amor propio, ternura */
+      #cc9080 55%,     /* coral suave — calidez, aceptación */
+      #ddb888 72%,     /* ámbar melocotón — esperanza, optimismo */
+      #f0d8b0 88%,     /* dorado suave — consuelo, luz interior */
+      #f8edd8 100%     /* crema — paz, claridad */
+    );
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     OPCIÓN II — "Mar y tierra"
+     Verde azulado → lavanda → coral tenue → dorado cálido
+     Psicología: verde/teal = regeneración; lavanda = alivio del estrés;
+     dorado = esperanza y vitalidad
+     ════════════════════════════════════════════════════════════════════ */
+  .sky--teal {
+    background: linear-gradient(168deg,
+      #2e4858 0%,      /* azul pizarra — serenidad, confianza */
+      #506070 18%,     /* azul grisáceo — claridad mental */
+      #7a7090 34%,     /* lavanda gris — alivio del estrés */
+      #a87878 50%,     /* mauve coral — calidez acogedora */
+      #c89c70 66%,     /* ámbar terroso — enraizamiento, estabilidad */
+      #e0c090 82%,     /* dorado tenue — luz de esperanza */
+      #f5e4c4 100%     /* arena clara — descanso, calma */
+    );
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     OPCIÓN III — "Horizonte zen"
+     Índigo suave → rosa cuarzo → durazno → miel
+     Psicología: los colores del cuarzo rosa son los más reconocidos
+     para sanación emocional y reducción de ansiedad
+     ════════════════════════════════════════════════════════════════════ */
+  .sky--zen {
+    background: linear-gradient(168deg,
+      #3c3858 0%,      /* índigo suave — meditación, paz profunda */
+      #6a5878 18%,     /* lila grisáceo — introspección suave */
+      #a07888 35%,     /* cuarzo rosa — sanación emocional */
+      #c89888 52%,     /* rosa melocotón — ternura, compasión */
+      #d8b080 68%,     /* miel suave — dulzura, reconfort */
+      #ecd0a0 84%,     /* dorado claro — calidez sin agresividad */
+      #f8e8d0 100%     /* crema dorada — serenidad total */
+    );
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     SOL — esquina superior derecha, suave y cálido
+     ════════════════════════════════════════════════════════════════════ */
+  .css-sun {
+    position: absolute;
+    top: -2.5rem;
+    right: -2rem;
+    width: 9rem;
+    height: 9rem;
+    border-radius: 50%;
+    z-index: 0;
+    animation: glow-pulse 5s ease infinite;
+  }
+  .sky--rose .css-sun {
+    background: radial-gradient(circle at 44% 44%, #fff8ee, #fdd890 38%, #e8a870 68%, transparent 100%);
+    box-shadow: 0 0 60px 18px rgba(220,160,100,.32);
+  }
+  .sky--teal .css-sun {
+    background: radial-gradient(circle at 44% 44%, #fff8e4, #fdd070 36%, #e09848 66%, transparent 100%);
+    box-shadow: 0 0 60px 18px rgba(200,150,80,.32);
+  }
+  .sky--zen .css-sun {
+    background: radial-gradient(circle at 44% 44%, #fffaf0, #fce098 36%, #e8b868 66%, transparent 100%);
+    box-shadow: 0 0 60px 18px rgba(230,170,90,.3);
+  }
+
+  /* Halo suave desde esquina superior derecha */
+  .sun-halo {
+    position: absolute;
+    top: -5rem; right: -5rem;
+    width: 20rem; height: 20rem;
+    border-radius: 50%;
+    mix-blend-mode: screen;
+    z-index: 0;
+    animation: glow-pulse 7s ease infinite;
+    animation-delay: 1s;
+  }
+  .sky--rose .sun-halo { background: radial-gradient(circle, rgba(220,160,120,.24), transparent 65%); }
+  .sky--teal .sun-halo { background: radial-gradient(circle, rgba(200,150,90,.24),  transparent 65%); }
+  .sky--zen  .sun-halo { background: radial-gradient(circle, rgba(230,175,100,.22), transparent 65%); }
+
+  /* ════════════════════════════════════════════════════════════════════
+     NUBES — muy suaves, casi etéreas
+     ════════════════════════════════════════════════════════════════════ */
+  .clouds { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .cloud {
+    position: absolute;
+    border-radius: 50px;
+    opacity: .62;
+  }
+  .cloud::before, .cloud::after {
+    content: ''; position: absolute;
+    background: inherit; border-radius: 50%;
+  }
+  .sky--rose .cloud { background: rgba(255,230,220,.65); }
+  .sky--teal .cloud { background: rgba(230,225,220,.60); }
+  .sky--zen  .cloud { background: rgba(255,235,225,.60); }
+
+  .cloud--a { width: 72px; height: 24px; top: 13%; left: -20%; animation: cloud-drift 40s linear infinite; }
+  .cloud--a::before { width: 34px; height: 34px; top: -18px; left: 9px; }
+  .cloud--a::after  { width: 26px; height: 26px; top: -12px; left: 37px; }
+
+  .cloud--b { width: 54px; height: 18px; top: 52%; left: -16%; animation: cloud-drift 56s linear infinite; animation-delay: -20s; opacity: .45; }
+  .cloud--b::before { width: 24px; height: 24px; top: -12px; left: 7px; }
+  .cloud--b::after  { width: 20px; height: 20px; top: -8px;  left: 27px; }
+
+  .cloud--c { width: 42px; height: 14px; top: 30%; left: -26%; animation: cloud-drift 48s linear infinite; animation-delay: -34s; opacity: .38; }
+  .cloud--c::before { width: 20px; height: 20px; top: -10px; left: 5px; }
+  .cloud--c::after  { width: 16px; height: 16px; top: -7px;  left: 22px; }
+
+  @keyframes cloud-drift {
+    from { transform: translateX(0); }
+    to   { transform: translateX(460px); }
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     HOJAS — terracota, ocre, verde salvia; colores tierra/otoño
+     ════════════════════════════════════════════════════════════════════ */
+  .leaves { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .leaf {
+    position: absolute;
+    border-radius: 0 60% 0 60%;
+    animation: leaf-fall linear infinite;
+  }
+  .leaf--terra  { background: #b05c38; }   /* terracota — enraizamiento */
+  .leaf--ocre   { background: #a87c30; }   /* ocre — calidez, tierra */
+  .leaf--sage   { background: #6a8858; }   /* verde salvia — sanación, naturaleza */
+  .leaf--rose   { background: #a85858; }   /* rosa viejo — amor, aceptación */
+  .leaf--sienna { background: #904830; }   /* siena — estabilidad */
+
+  .leaf--1 { left: 70%; top: -5%; width: 13px; height: 13px; animation-duration: 10s;  animation-delay:  0s;  }
+  .leaf--2 { left: 58%; top: -5%; width:  9px; height:  9px; animation-duration: 12s;  animation-delay: -2s;  }
+  .leaf--3 { left: 80%; top: -5%; width: 11px; height: 11px; animation-duration:  9s;  animation-delay: -6s;  }
+  .leaf--4 { left: 64%; top: -5%; width:  8px; height:  8px; animation-duration: 13s;  animation-delay: -1s;  }
+  .leaf--5 { left: 87%; top: -5%; width: 10px; height: 10px; animation-duration: 11s;  animation-delay: -8s;  }
+  .leaf--6 { left: 74%; top: -5%; width:  7px; height:  7px; animation-duration: 14s;  animation-delay: -3s;  }
+  .leaf--7 { left: 55%; top: -5%; width: 12px; height: 12px; animation-duration:  8s;  animation-delay:-10s;  }
+  .leaf--8 { left: 91%; top: -5%; width:  9px; height:  9px; animation-duration: 10s;  animation-delay: -5s;  }
+
+  @keyframes leaf-fall {
+    0%   { transform: translateY(-10px) translateX(  0px) rotate(  0deg); opacity: 0; }
+    8%   { opacity: .85; }
+    35%  { transform: translateY( 65px) translateX(-22px) rotate(130deg); }
+    65%  { transform: translateY(130px) translateX( 12px) rotate(280deg); }
+    90%  { opacity: .6; }
+    100% { transform: translateY(220px) translateX( -8px) rotate(440deg); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <h1>Vista previa — Atardecer sanador (psicología del color)</h1>
+  <p class="hint">Tres paletas diseñadas con colores que generan calma, alivian el estrés y reconfortan según la psicología del color.</p>
+
+  <div class="label">Tarde — Opción I: "Rosa sanador"</div>
+  <div class="sublabel">Ciruela → malva → rosa antiguo → melocotón → dorado suave · Libera tensión, fomenta el amor propio, calidez acogedora</div>
+  <div class="palette">
+    <div class="swatch" style="background:#4a3858"></div>
+    <div class="swatch" style="background:#7a5070"></div>
+    <div class="swatch" style="background:#b07080"></div>
+    <div class="swatch" style="background:#cc9080"></div>
+    <div class="swatch" style="background:#ddb888"></div>
+    <div class="swatch" style="background:#f0d8b0"></div>
+  </div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting sky--rose">
+        <div class="text-veil"></div>
+        <div class="sun-halo"></div>
+        <div class="css-sun"></div>
+        <div class="clouds">
+          <div class="cloud cloud--a"></div>
+          <div class="cloud cloud--b"></div>
+          <div class="cloud cloud--c"></div>
+        </div>
+        <div class="leaves">
+          <div class="leaf leaf--terra  leaf--1"></div>
+          <div class="leaf leaf--rose   leaf--2"></div>
+          <div class="leaf leaf--ocre   leaf--3"></div>
+          <div class="leaf leaf--sage   leaf--4"></div>
+          <div class="leaf leaf--sienna leaf--5"></div>
+          <div class="leaf leaf--terra  leaf--6"></div>
+          <div class="leaf leaf--rose   leaf--7"></div>
+          <div class="leaf leaf--ocre   leaf--8"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas tardes, Jhon!</div>
+          <div class="dash-greeting-message">Vas a mitad de camino, ¡sigue así!</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Tarde — Opción II: "Mar y tierra"</div>
+  <div class="sublabel">Azul pizarra → lavanda → coral suave → dorado cálido · Serenidad, alivio del estrés, enraizamiento y esperanza</div>
+  <div class="palette">
+    <div class="swatch" style="background:#2e4858"></div>
+    <div class="swatch" style="background:#506070"></div>
+    <div class="swatch" style="background:#7a7090"></div>
+    <div class="swatch" style="background:#a87878"></div>
+    <div class="swatch" style="background:#c89c70"></div>
+    <div class="swatch" style="background:#e0c090"></div>
+  </div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting sky--teal">
+        <div class="text-veil"></div>
+        <div class="sun-halo"></div>
+        <div class="css-sun"></div>
+        <div class="clouds">
+          <div class="cloud cloud--a"></div>
+          <div class="cloud cloud--b"></div>
+          <div class="cloud cloud--c"></div>
+        </div>
+        <div class="leaves">
+          <div class="leaf leaf--terra  leaf--1"></div>
+          <div class="leaf leaf--sage   leaf--2"></div>
+          <div class="leaf leaf--ocre   leaf--3"></div>
+          <div class="leaf leaf--sienna leaf--4"></div>
+          <div class="leaf leaf--sage   leaf--5"></div>
+          <div class="leaf leaf--terra  leaf--6"></div>
+          <div class="leaf leaf--ocre   leaf--7"></div>
+          <div class="leaf leaf--rose   leaf--8"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas tardes, Jhon!</div>
+          <div class="dash-greeting-message">Vas a mitad de camino, ¡sigue así!</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label">Tarde — Opción III: "Horizonte zen"</div>
+  <div class="sublabel">Índigo suave → cuarzo rosa → durazno → miel · El cuarzo rosa es el color más reconocido en sanación emocional y reducción de ansiedad</div>
+  <div class="palette">
+    <div class="swatch" style="background:#3c3858"></div>
+    <div class="swatch" style="background:#6a5878"></div>
+    <div class="swatch" style="background:#a07888"></div>
+    <div class="swatch" style="background:#c89888"></div>
+    <div class="swatch" style="background:#d8b080"></div>
+    <div class="swatch" style="background:#ecd0a0"></div>
+  </div>
+  <div class="row">
+    <div class="col-desktop">
+      <div class="tag">Escritorio</div>
+      <div class="dash-greeting sky--zen">
+        <div class="text-veil"></div>
+        <div class="sun-halo"></div>
+        <div class="css-sun"></div>
+        <div class="clouds">
+          <div class="cloud cloud--a"></div>
+          <div class="cloud cloud--b"></div>
+          <div class="cloud cloud--c"></div>
+        </div>
+        <div class="leaves">
+          <div class="leaf leaf--rose   leaf--1"></div>
+          <div class="leaf leaf--terra  leaf--2"></div>
+          <div class="leaf leaf--ocre   leaf--3"></div>
+          <div class="leaf leaf--rose   leaf--4"></div>
+          <div class="leaf leaf--sienna leaf--5"></div>
+          <div class="leaf leaf--sage   leaf--6"></div>
+          <div class="leaf leaf--terra  leaf--7"></div>
+          <div class="leaf leaf--ocre   leaf--8"></div>
+        </div>
+        <div class="dash-greeting-body">
+          <div class="dash-greeting-title">Buenas tardes, Jhon!</div>
+          <div class="dash-greeting-message">Vas a mitad de camino, ¡sigue así!</div>
+          <div class="dash-greeting-date">domingo 14 de junio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

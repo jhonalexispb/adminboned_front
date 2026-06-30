@@ -121,7 +121,7 @@ export class ReceiptFormComponent implements OnInit {
 
     forkJoin({
       suppliers: this.supplierService.list({ active: true, per_page: 200 }),
-      products:  this.productService.list({ active: true, per_page: 500 }),
+      products:  this.productService.list({ active: true, per_page: 100000 }),
     }).subscribe(({ suppliers, products }) => {
       this.suppliers.set(suppliers.data);
       this.products.set(products.data);

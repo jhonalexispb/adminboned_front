@@ -122,35 +122,34 @@
             <div class="text-body-secondary mb-1" style="font-size:.78rem;">{{ nc.reason }}</div>
           }
           <div class="d-flex gap-1 overflow-auto" style="scrollbar-width:none;">
-            @if (nc.pdf_url) {
+            @if (nc.is_internal) {
               <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
                       style="min-width:52px; font-size:.68rem;"
                       [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':pdf'"
-                      (click)="downloadDoc('credit-notes', nc.id, 'pdf', nc.full_number ?? nc.id)">
+                      (click)="openCreditNote(nc, 'pdf')">
                 @if (downloadingKey() === 'credit-notes:' + nc.id + ':pdf') { <c-spinner size="sm" /> }
                 @else { <fa-icon icon="file-pdf" style="font-size:.9rem;" /> }
                 <small>PDF</small>
               </button>
-            }
-            @if (nc.xml_url) {
-              <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
-                      style="min-width:52px; font-size:.68rem;"
-                      [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':xml'"
-                      (click)="downloadDoc('credit-notes', nc.id, 'xml', nc.full_number ?? nc.id)">
-                @if (downloadingKey() === 'credit-notes:' + nc.id + ':xml') { <c-spinner size="sm" /> }
-                @else { <fa-icon icon="file-code" style="font-size:.9rem;" /> }
-                <small>XML</small>
-              </button>
-            }
-            @if (nc.cdr_url) {
-              <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
-                      style="min-width:52px; font-size:.68rem;"
-                      [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':cdr'"
-                      (click)="downloadDoc('credit-notes', nc.id, 'cdr', nc.full_number ?? nc.id)">
-                @if (downloadingKey() === 'credit-notes:' + nc.id + ':cdr') { <c-spinner size="sm" /> }
-                @else { <fa-icon icon="file-zipper" style="font-size:.9rem;" /> }
-                <small>CDR</small>
-              </button>
+            } @else {
+              @if (nc.pdf_url) {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;" (click)="openCreditNote(nc, 'pdf')">
+                  <fa-icon icon="file-pdf" style="font-size:.9rem;" /><small>PDF</small>
+                </button>
+              }
+              @if (nc.xml_url) {
+                <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;" (click)="openCreditNote(nc, 'xml')">
+                  <fa-icon icon="file-code" style="font-size:.9rem;" /><small>XML</small>
+                </button>
+              }
+              @if (nc.cdr_url) {
+                <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;" (click)="openCreditNote(nc, 'cdr')">
+                  <fa-icon icon="file-zipper" style="font-size:.9rem;" /><small>CDR</small>
+                </button>
+              }
             }
             @if (nc.status === 'sent') {
               <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
@@ -220,35 +219,34 @@
               </td>
               <td (click)="$event.stopPropagation()">
                 <div class="d-flex gap-1 flex-nowrap overflow-auto" style="scrollbar-width:none;">
-                  @if (nc.pdf_url) {
+                  @if (nc.is_internal) {
                     <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
                             style="min-width:40px; font-size:.68rem;"
                             [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':pdf'"
-                            (click)="downloadDoc('credit-notes', nc.id, 'pdf', nc.full_number ?? nc.id)" title="PDF">
+                            (click)="openCreditNote(nc, 'pdf')" title="PDF">
                       @if (downloadingKey() === 'credit-notes:' + nc.id + ':pdf') { <c-spinner size="sm" /> }
                       @else { <fa-icon icon="file-pdf" /> }
                       <small>PDF</small>
                     </button>
-                  }
-                  @if (nc.xml_url) {
-                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
-                            style="min-width:40px; font-size:.68rem;"
-                            [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':xml'"
-                            (click)="downloadDoc('credit-notes', nc.id, 'xml', nc.full_number ?? nc.id)" title="XML">
-                      @if (downloadingKey() === 'credit-notes:' + nc.id + ':xml') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-code" /> }
-                      <small>XML</small>
-                    </button>
-                  }
-                  @if (nc.cdr_url) {
-                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
-                            style="min-width:40px; font-size:.68rem;"
-                            [disabled]="downloadingKey() === 'credit-notes:' + nc.id + ':cdr'"
-                            (click)="downloadDoc('credit-notes', nc.id, 'cdr', nc.full_number ?? nc.id)" title="CDR">
-                      @if (downloadingKey() === 'credit-notes:' + nc.id + ':cdr') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-zipper" /> }
-                      <small>CDR</small>
-                    </button>
+                  } @else {
+                    @if (nc.pdf_url) {
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                              style="min-width:40px; font-size:.68rem;" (click)="openCreditNote(nc, 'pdf')" title="PDF">
+                        <fa-icon icon="file-pdf" /><small>PDF</small>
+                      </button>
+                    }
+                    @if (nc.xml_url) {
+                      <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                              style="min-width:40px; font-size:.68rem;" (click)="openCreditNote(nc, 'xml')" title="XML">
+                        <fa-icon icon="file-code" /><small>XML</small>
+                      </button>
+                    }
+                    @if (nc.cdr_url) {
+                      <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                              style="min-width:40px; font-size:.68rem;" (click)="openCreditNote(nc, 'cdr')" title="CDR">
+                        <fa-icon icon="file-zipper" /><small>CDR</small>
+                      </button>
+                    }
                   }
                   @if (nc.status === 'sent') {
                     <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
@@ -312,32 +310,20 @@
           <div class="d-flex gap-1 overflow-auto" style="scrollbar-width:none;">
             @if (g.pdf_url) {
               <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
-                      style="min-width:52px; font-size:.68rem;"
-                      [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':pdf'"
-                      (click)="downloadDoc('shipping-guides', g.id, 'pdf', g.full_number ?? g.id)">
-                @if (downloadingKey() === 'shipping-guides:' + g.id + ':pdf') { <c-spinner size="sm" /> }
-                @else { <fa-icon icon="file-pdf" style="font-size:.9rem;" /> }
-                <small>PDF</small>
+                      style="min-width:52px; font-size:.68rem;" (click)="openFile(g.pdf_url)">
+                <fa-icon icon="file-pdf" style="font-size:.9rem;" /><small>PDF</small>
               </button>
             }
             @if (g.xml_url) {
               <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
-                      style="min-width:52px; font-size:.68rem;"
-                      [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':xml'"
-                      (click)="downloadDoc('shipping-guides', g.id, 'xml', g.full_number ?? g.id)">
-                @if (downloadingKey() === 'shipping-guides:' + g.id + ':xml') { <c-spinner size="sm" /> }
-                @else { <fa-icon icon="file-code" style="font-size:.9rem;" /> }
-                <small>XML</small>
+                      style="min-width:52px; font-size:.68rem;" (click)="openFile(g.xml_url)">
+                <fa-icon icon="file-code" style="font-size:.9rem;" /><small>XML</small>
               </button>
             }
             @if (g.cdr_url) {
               <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
-                      style="min-width:52px; font-size:.68rem;"
-                      [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':cdr'"
-                      (click)="downloadDoc('shipping-guides', g.id, 'cdr', g.full_number ?? g.id)">
-                @if (downloadingKey() === 'shipping-guides:' + g.id + ':cdr') { <c-spinner size="sm" /> }
-                @else { <fa-icon icon="file-zipper" style="font-size:.9rem;" /> }
-                <small>CDR</small>
+                      style="min-width:52px; font-size:.68rem;" (click)="openFile(g.cdr_url)">
+                <fa-icon icon="file-zipper" style="font-size:.9rem;" /><small>CDR</small>
               </button>
             }
             @if (g.sunat_status === 'sent') {
@@ -401,32 +387,20 @@
                 <div class="d-flex gap-1 align-items-center flex-nowrap overflow-auto" style="scrollbar-width:none;">
                   @if (g.pdf_url) {
                     <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
-                            style="min-width:40px; font-size:.68rem;"
-                            [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':pdf'"
-                            (click)="downloadDoc('shipping-guides', g.id, 'pdf', g.full_number ?? g.id)" title="PDF">
-                      @if (downloadingKey() === 'shipping-guides:' + g.id + ':pdf') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-pdf" /> }
-                      <small>PDF</small>
+                            style="min-width:40px; font-size:.68rem;" (click)="openFile(g.pdf_url)" title="PDF">
+                      <fa-icon icon="file-pdf" /><small>PDF</small>
                     </button>
                   }
                   @if (g.xml_url) {
                     <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
-                            style="min-width:40px; font-size:.68rem;"
-                            [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':xml'"
-                            (click)="downloadDoc('shipping-guides', g.id, 'xml', g.full_number ?? g.id)" title="XML">
-                      @if (downloadingKey() === 'shipping-guides:' + g.id + ':xml') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-code" /> }
-                      <small>XML</small>
+                            style="min-width:40px; font-size:.68rem;" (click)="openFile(g.xml_url)" title="XML">
+                      <fa-icon icon="file-code" /><small>XML</small>
                     </button>
                   }
                   @if (g.cdr_url) {
                     <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
-                            style="min-width:40px; font-size:.68rem;"
-                            [disabled]="downloadingKey() === 'shipping-guides:' + g.id + ':cdr'"
-                            (click)="downloadDoc('shipping-guides', g.id, 'cdr', g.full_number ?? g.id)" title="CDR">
-                      @if (downloadingKey() === 'shipping-guides:' + g.id + ':cdr') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-zipper" /> }
-                      <small>CDR</small>
+                            style="min-width:40px; font-size:.68rem;" (click)="openFile(g.cdr_url)" title="CDR">
+                      <fa-icon icon="file-zipper" /><small>CDR</small>
                     </button>
                   }
                   @if (g.sunat_status === 'sent') {
@@ -492,39 +466,43 @@
               @if (clientId(doc)) {
                 <div class="text-body-secondary" style="font-size:.78rem;">{{ clientId(doc) }}</div>
               }
+              @if (doc.status === 'voided' && doc.void_reason) {
+                <div class="text-danger-emphasis" style="font-size:.75rem;">
+                  <fa-icon icon="ban" class="me-1" />{{ doc.void_reason }}
+                </div>
+              }
             </div>
             <div class="fw-bold ms-2 text-nowrap">S/ {{ doc.total | number:'1.2-2' }}</div>
           </div>
           <div class="d-flex gap-1 overflow-auto" style="scrollbar-width:none;">
-            @if (doc.document_type === 'sale_note' || doc.pdf_url) {
+            @if (doc.document_type === 'sale_note') {
               <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
                       style="min-width:52px; font-size:.68rem;"
                       [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
-                      (click)="downloadDoc('sale-documents', doc.id, 'pdf', doc.full_number ?? doc.id)" title="PDF">
+                      (click)="openSaleDoc(doc, 'pdf')">
                 @if (downloadingKey() === 'sale-documents:' + doc.id + ':pdf') { <c-spinner size="sm" /> }
                 @else { <fa-icon icon="file-pdf" style="font-size:.9rem;" /> }
                 <small>PDF</small>
               </button>
-            }
-            @if (doc.xml_url) {
-              <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
-                      style="min-width:52px; font-size:.68rem;"
-                      [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':xml'"
-                      (click)="downloadDoc('sale-documents', doc.id, 'xml', doc.full_number ?? doc.id)" title="XML">
-                @if (downloadingKey() === 'sale-documents:' + doc.id + ':xml') { <c-spinner size="sm" /> }
-                @else { <fa-icon icon="file-code" style="font-size:.9rem;" /> }
-                <small>XML</small>
-              </button>
-            }
-            @if (doc.cdr_url) {
-              <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
-                      style="min-width:52px; font-size:.68rem;"
-                      [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':cdr'"
-                      (click)="downloadDoc('sale-documents', doc.id, 'cdr', doc.full_number ?? doc.id)" title="CDR">
-                @if (downloadingKey() === 'sale-documents:' + doc.id + ':cdr') { <c-spinner size="sm" /> }
-                @else { <fa-icon icon="file-zipper" style="font-size:.9rem;" /> }
-                <small>CDR</small>
-              </button>
+            } @else {
+              @if (doc.pdf_url) {
+                <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;" (click)="openSaleDoc(doc, 'pdf')">
+                  <fa-icon icon="file-pdf" style="font-size:.9rem;" /><small>PDF</small>
+                </button>
+              }
+              @if (doc.xml_url) {
+                <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;" (click)="openSaleDoc(doc, 'xml')">
+                  <fa-icon icon="file-code" style="font-size:.9rem;" /><small>XML</small>
+                </button>
+              }
+              @if (doc.cdr_url) {
+                <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                        style="min-width:52px; font-size:.68rem;" (click)="openSaleDoc(doc, 'cdr')">
+                  <fa-icon icon="file-zipper" style="font-size:.9rem;" /><small>CDR</small>
+                </button>
+              }
             }
             @if (doc.status === 'sent') {
               <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
@@ -566,12 +544,13 @@
             <th style="width:90px">Fecha</th>
             <th class="text-end" style="width:105px">Total</th>
             <th style="width:190px">Estado</th>
+            <th style="width:200px">Motivo anulación</th>
             <th style="width:280px">Archivos</th>
           </tr>
         </thead>
         <tbody>
           @if (!documents().length) {
-            <tr><td colspan="6" class="text-center text-body-secondary py-5">Sin resultados.</td></tr>
+            <tr><td colspan="7" class="text-center text-body-secondary py-5">Sin resultados.</td></tr>
           }
           @for (doc of documents(); track doc.id) {
             <tr>
@@ -594,37 +573,43 @@
               <td>
                 <c-badge [textBgColor]="displayStatusColor(doc)">{{ displayStatusLabel(doc) }}</c-badge>
               </td>
+              <td class="small text-body-secondary">
+                @if (doc.status === 'voided' && doc.void_reason) {
+                  <span class="text-danger-emphasis">{{ doc.void_reason }}</span>
+                } @else {
+                  —
+                }
+              </td>
               <td (click)="$event.stopPropagation()">
                 <div class="d-flex gap-1 align-items-center flex-nowrap overflow-auto" style="scrollbar-width:none;">
-                  @if (doc.document_type === 'sale_note' || doc.pdf_url) {
+                  @if (doc.document_type === 'sale_note') {
                     <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
                             style="min-width:40px; font-size:.68rem;"
                             [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':pdf'"
-                            (click)="downloadDoc('sale-documents', doc.id, 'pdf', doc.full_number ?? doc.id)" title="PDF">
+                            (click)="openSaleDoc(doc, 'pdf')" title="PDF">
                       @if (downloadingKey() === 'sale-documents:' + doc.id + ':pdf') { <c-spinner size="sm" /> }
                       @else { <fa-icon icon="file-pdf" /> }
                       <small>PDF</small>
                     </button>
-                  }
-                  @if (doc.xml_url) {
-                    <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
-                            style="min-width:40px; font-size:.68rem;"
-                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':xml'"
-                            (click)="downloadDoc('sale-documents', doc.id, 'xml', doc.full_number ?? doc.id)" title="XML">
-                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':xml') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-code" /> }
-                      <small>XML</small>
-                    </button>
-                  }
-                  @if (doc.cdr_url) {
-                    <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
-                            style="min-width:40px; font-size:.68rem;"
-                            [disabled]="downloadingKey() === 'sale-documents:' + doc.id + ':cdr'"
-                            (click)="downloadDoc('sale-documents', doc.id, 'cdr', doc.full_number ?? doc.id)" title="CDR">
-                      @if (downloadingKey() === 'sale-documents:' + doc.id + ':cdr') { <c-spinner size="sm" /> }
-                      @else { <fa-icon icon="file-zipper" /> }
-                      <small>CDR</small>
-                    </button>
+                  } @else {
+                    @if (doc.pdf_url) {
+                      <button class="btn btn-sm btn-secondary d-flex flex-column align-items-center flex-shrink-0"
+                              style="min-width:40px; font-size:.68rem;" (click)="openSaleDoc(doc, 'pdf')" title="PDF">
+                        <fa-icon icon="file-pdf" /><small>PDF</small>
+                      </button>
+                    }
+                    @if (doc.xml_url) {
+                      <button class="btn btn-sm btn-info text-white d-flex flex-column align-items-center flex-shrink-0"
+                              style="min-width:40px; font-size:.68rem;" (click)="openSaleDoc(doc, 'xml')" title="XML">
+                        <fa-icon icon="file-code" /><small>XML</small>
+                      </button>
+                    }
+                    @if (doc.cdr_url) {
+                      <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
+                              style="min-width:40px; font-size:.68rem;" (click)="openSaleDoc(doc, 'cdr')" title="CDR">
+                        <fa-icon icon="file-zipper" /><small>CDR</small>
+                      </button>
+                    }
                   }
                   @if (doc.status === 'sent') {
                     <button class="btn btn-sm btn-warning text-dark d-flex flex-column align-items-center flex-shrink-0"
@@ -688,7 +673,7 @@
         <span class="text-body-secondary ms-auto">S/ {{ doc.total | number:'1.2-2' }}</span>
       </div>
 
-      @if (isPriorPeriod(doc)) {
+      @if (isPriorPeriod(doc) && doc.document_type !== 'sale_note') {
         <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.82rem;">
           <fa-icon icon="triangle-exclamation" class="me-1" />
           Este documento es de un período anterior. SUNAT podría rechazar la anulación — en ese caso emite una Nota de Crédito.

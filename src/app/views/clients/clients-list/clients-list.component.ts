@@ -8,6 +8,7 @@ import {
 import { ClientService, ClientFilters } from '../client.service';
 import { Client } from '../client.model';
 import { ClientModalComponent } from '../client-modal/client-modal.component';
+import { CatalogAccessModalComponent } from '../catalog-access-modal/catalog-access-modal.component';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
 import { ConfirmModalComponent } from '../../../shared/components/confirm-modal/confirm-modal.component';
@@ -31,7 +32,8 @@ export class ClientsListComponent implements OnInit {
   total    = signal(0);
   lastPage = signal(1);
 
-  filters: ClientFilters = { search: '', active: '', per_page: 15, page: 1 };
+  filters: ClientFilters = { search: '', active: '', catalog_enabled: '', per_page: 15, page: 1 };
+  view: 'all' | 'catalog' = 'all';
 
   showConfirm  = signal(false);
   deletingId   = signal<number | null>(null);
@@ -60,6 +62,30 @@ export class ClientsListComponent implements OnInit {
 
   onSearch(): void { this.filters.page = 1; this.load(); }
 
+  setView(view: 'all' | 'catalog'): void {
+    if (this.view === view) return;
+    this.view = view;
+    this.filters.catalog_enabled = view === 'catalog' ? true : '';
+    this.filters.page = 1;
+    this.load();
+  }
+
+  isCatalogExpired(client: Client): boolean {
+    return !!client.catalog_access_expires_at && new Date(client.catalog_access_expires_at) < new Date();
+  }
+
+  catalogBadgeClass(client: Client): string {
+    if (!client.catalog_enabled) return 'bg-secondary-subtle text-secondary-emphasis';
+    return this.isCatalogExpired(client) ? 'bg-warning-subtle text-warning-emphasis' : 'bg-info-subtle text-info-emphasis';
+  }
+
+  catalogBadgeLabel(client: Client): string {
+    if (!client.catalog_enabled) return 'Sin acceso';
+    if (!client.catalog_access_expires_at) return 'Activo · sin vencimiento';
+    const date = new Date(client.catalog_access_expires_at).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return this.isCatalogExpired(client) ? `Vencido el ${date}` : `Activo hasta ${date}`;
+  }
+
   goToPage(page: number): void {
     if (page < 1 || page > this.lastPage()) return;
     this.filters.page = page;
@@ -75,6 +101,12 @@ export class ClientsListComponent implements OnInit {
 
   openEdit(client: Client): void {
     const ref = this.ngbModal.open(ClientModalComponent, this.modalOpts);
+    ref.componentInstance.client = client;
+    ref.result.then(() => this.load(), () => {});
+  }
+
+  openCatalogAccess(client: Client): void {
+    const ref = this.ngbModal.open(CatalogAccessModalComponent, { centered: true, animation: false });
     ref.componentInstance.client = client;
     ref.result.then(() => this.load(), () => {});
   }
