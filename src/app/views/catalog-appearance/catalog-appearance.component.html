@@ -32,6 +32,13 @@
             <span>Imagen más grande</span>
           </div>
         </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="showStock" [(ngModel)]="showStock" />
+            <label class="form-check-label" for="showStock">Mostrar stock en el catálogo</label>
+          </div>
+        </div>
+
         <div class="col-md-4">
           <button class="btn btn-primary" [disabled]="savingSettings()" (click)="saveSettings()">
             @if (savingSettings()) {

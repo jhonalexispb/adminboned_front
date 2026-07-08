@@ -32,6 +32,7 @@ export class CatalogAppearanceComponent implements OnInit {
   bannerDurationSeconds = 4;
   eventDisplayFrequency: 'always' | 'daily' = 'daily';
   cardImageRatio = 60;
+  showStock = true;
 
   showConfirm   = signal(false);
   confirmTarget: { type: 'event' | 'banner' | 'message'; id: number; name: string } | null = null;
@@ -78,6 +79,7 @@ export class CatalogAppearanceComponent implements OnInit {
           this.bannerDurationSeconds = res.banner_duration_ms / 1000;
           this.eventDisplayFrequency = res.event_display_frequency;
           this.cardImageRatio = res.card_image_ratio ?? 60;
+          this.showStock = res.show_stock ?? true;
           resolve();
         },
         error: () => resolve(),
@@ -91,6 +93,7 @@ export class CatalogAppearanceComponent implements OnInit {
       banner_duration_ms: Math.round(this.bannerDurationSeconds * 1000),
       event_display_frequency: this.eventDisplayFrequency,
       card_image_ratio: this.cardImageRatio,
+      show_stock: this.showStock,
     }).subscribe({
       next: res => {
         this.settings.set(res.settings);
