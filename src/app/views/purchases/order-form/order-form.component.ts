@@ -104,7 +104,7 @@ export class OrderFormComponent implements OnInit {
     this.loadingProducts.set(true);
     forkJoin({
       suppliers: this.supplierService.list({ active: true, per_page: 200 }),
-      products:  this.productService.list({ active: true, for_sale: true, per_page: 100000 }),
+      products:  this.productService.list({ active: true, for_purchase: true, per_page: 100000 }),
     }).subscribe(({ suppliers, products }) => {
       this.suppliers.set(suppliers.data);
       this.products.set(products.data);
@@ -118,7 +118,7 @@ export class OrderFormComponent implements OnInit {
     this.form.get('supplier_id')!.valueChanges.pipe(
       tap(() => this.loadingProducts.set(true)),
       switchMap(supplierId => this.productService.list({
-        active: true, for_sale: true, per_page: 100000,
+        active: true, for_purchase: true, per_page: 100000,
         ...(supplierId ? { supplier_id: supplierId } : {}),
       })),
       takeUntilDestroyed(this.destroyRef),
@@ -139,8 +139,8 @@ export class OrderFormComponent implements OnInit {
           notes:         o.notes ?? null,
         });
         this.items.set((o.items ?? []).map((item: any) => ({
-          product_id:           item.product_id,
-          product:              this.products().find(p => p.id === item.product_id) ?? { name: item.product_name ?? '—', laboratory: item.product_laboratory ? { id: 0, name: item.product_laboratory } : null } as Product,
+          product_id:           Number(item.product_id),
+          product:              this.products().find(p => p.id === Number(item.product_id)) ?? { name: item.product_name ?? '—', laboratory: item.product_laboratory ? { id: 0, name: item.product_laboratory } : null } as Product,
           expected_quantity:    item.expected_quantity,
           bonus_quantity:       item.bonus_quantity ?? 0,
           unit_cost:            Number(item.unit_cost),

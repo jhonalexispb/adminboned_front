@@ -159,7 +159,7 @@ export class RegisterPaymentModalComponent {
 
   get isOverPaid(): boolean {
     if (this.isEditMode || !this.order()) return false;
-    return (this.alreadyPaid + this.totalEntered) > +this.order()!.total;
+    return Math.round((this.alreadyPaid + this.totalEntered) * 100) > Math.round(+this.order()!.total * 100);
   }
 
   get isValid(): boolean {
@@ -239,7 +239,7 @@ export class RegisterPaymentModalComponent {
         next: results => {
           const collections  = results.map(r => r.collection);
           const totalCovered = this.alreadyPaid + this.totalEntered;
-          const isFullyPaid  = totalCovered >= +o.total;
+          const isFullyPaid  = Math.round(totalCovered * 100) >= Math.round(+o.total * 100);
 
           const finish = (order?: any) => {
             this.saving.set(false);

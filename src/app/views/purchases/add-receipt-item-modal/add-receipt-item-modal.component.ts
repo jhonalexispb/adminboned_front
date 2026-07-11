@@ -1,5 +1,5 @@
-import { Component, Input, OnInit, signal, computed } from '@angular/core';
-import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
+import { Component, Input, OnInit, signal, computed, ChangeDetectorRef } from '@angular/core';
+import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import {
@@ -37,7 +37,7 @@ export interface ReceiptItemData {
   selector: 'app-add-receipt-item-modal',
   standalone: true,
   imports: [
-    ReactiveFormsModule, DecimalPipe, FaIconComponent, Select,
+    ReactiveFormsModule, FormsModule, DecimalPipe, FaIconComponent, Select,
     FormControlDirective,
   ],
   template: `
@@ -48,63 +48,76 @@ export interface ReceiptItemData {
 
     <div class="modal-body">
 
-      <!-- Selector de producto (siempre visible) -->
+      <!-- Selector / display de producto -->
       <div class="mb-3">
         <label class="form-label small text-body-secondary mb-1">
           Producto <span class="text-danger">*</span>
         </label>
-        <div class="d-flex gap-1">
-          <div class="flex-grow-1" style="min-width:0;">
-            <p-select
-              [formControl]="$any(form.get('product_id'))"
-              [options]="products"
-              optionLabel="name" optionValue="id"
-              [filter]="true" filterBy="name,sku,laboratory.name"
-              filterPlaceholder="Buscar por nombre o SKU..."
-              placeholder="Seleccionar producto"
-              emptyMessage="Sin resultados"
-              [style]="{ width: '100%' }"
-              appendTo="body"
-              scrollHeight="250px"
-              (onChange)="onProductChange($event.value)">
-              <ng-template #selectedItem let-p>
-                @if (p.laboratory) {
-                  <span class="text-info me-1">{{ p.laboratory.name }}</span>
-                }
-                {{ p.name }}
-              </ng-template>
-              <ng-template #item let-p>
-                <div style="max-width:100%;overflow:hidden;">
-                  <div class="d-flex align-items-start justify-content-between gap-2">
-                    <div class="small fw-medium"
-                         style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;flex:1;">
-                      @if (p.laboratory?.name) {
-                        <span class="text-info me-1">{{ p.laboratory?.name }}</span>
-                      }{{ p.name }}
-                    </div>
-                    @if (addedProductIds.includes(p.id)) {
-                      <span class="badge bg-success flex-shrink-0" style="font-size:.6rem;align-self:center;">
-                        ✓ En recepción
-                      </span>
-                    }
-                  </div>
-                  <div class="d-flex gap-2 mt-1 flex-wrap" style="font-size:.7rem;">
-                    @if (p.lots_info) {
-                      <span class="text-success">Stock: <strong>{{ p.lots_info.total_stock }}</strong></span>
-                    }
-                    @if (p.cost_price) {
-                      <span class="text-body-secondary">Costo: S/{{ p.cost_price | number:'1.2-2' }}</span>
-                    }
-                  </div>
-                </div>
-              </ng-template>
-            </p-select>
+
+        @if (_editItem) {
+          <!-- Edición: producto fijo, mostrar como texto -->
+          <div class="border rounded px-3 py-2" style="background:var(--cui-tertiary-bg);font-size:.9rem;">
+            @if (_editItem.product.laboratory?.name) {
+              <span class="text-info fw-medium me-1">{{ _editItem.product.laboratory?.name }}</span>
+            }
+            <span class="fw-semibold">{{ _editItem.product.name }}</span>
           </div>
-          <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0"
-                  title="Crear nuevo producto" (click)="openNewProduct()">
-            <fa-icon icon="plus" />
-          </button>
-        </div>
+        } @else {
+          <!-- Alta: selector interactivo -->
+          <div class="d-flex gap-1">
+            <div class="flex-grow-1" style="min-width:0;">
+              <p-select
+                [ngModel]="selectedProduct()"
+                (ngModelChange)="onProductSelectChange($event)"
+                [options]="products"
+                optionLabel="name"
+                dataKey="id"
+                [filter]="true" filterBy="name,sku,laboratory.name"
+                filterPlaceholder="Buscar por nombre o SKU..."
+                placeholder="Seleccionar producto"
+                emptyMessage="Sin resultados"
+                [style]="{ width: '100%' }"
+                appendTo="body"
+                scrollHeight="250px">
+                <ng-template #selectedItem let-p>
+                  @if (p.laboratory) {
+                    <span class="text-info me-1">{{ p.laboratory.name }}</span>
+                  }
+                  {{ p.name }}
+                </ng-template>
+                <ng-template #item let-p>
+                  <div style="max-width:100%;overflow:hidden;">
+                    <div class="d-flex align-items-start justify-content-between gap-2">
+                      <div class="small fw-medium"
+                           style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;flex:1;">
+                        @if (p.laboratory?.name) {
+                          <span class="text-info me-1">{{ p.laboratory?.name }}</span>
+                        }{{ p.name }}
+                      </div>
+                      @if (addedProductIds.includes(p.id)) {
+                        <span class="badge bg-success flex-shrink-0" style="font-size:.6rem;align-self:center;">
+                          ✓ En recepción
+                        </span>
+                      }
+                    </div>
+                    <div class="d-flex gap-2 mt-1 flex-wrap" style="font-size:.7rem;">
+                      @if (p.lots_info) {
+                        <span class="text-success">Stock: <strong>{{ p.lots_info.total_stock }}</strong></span>
+                      }
+                      @if (p.cost_price) {
+                        <span class="text-body-secondary">Costo: S/{{ p.cost_price | number:'1.2-2' }}</span>
+                      }
+                    </div>
+                  </div>
+                </ng-template>
+              </p-select>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                    title="Crear nuevo producto" (click)="openNewProduct()">
+              <fa-icon icon="plus" />
+            </button>
+          </div>
+        }
       </div>
 
       <!-- ── TAB AGREGAR ──────────────────────────────────────────────────── -->
@@ -133,8 +146,8 @@ export interface ReceiptItemData {
           </div>
         }
 
-        <!-- Info del producto seleccionado -->
-        @if (selectedProduct(); as p) {
+        <!-- Info del producto seleccionado (solo en modo agregar) -->
+        @if (!_editItem && selectedProduct(); as p) {
           <div class="border rounded p-2 mb-2" style="font-size:.82rem;background:var(--cui-tertiary-bg)">
             <div class="fw-semibold lh-sm mb-1">
               @if (p.laboratory?.name) {
@@ -349,12 +362,23 @@ export interface ReceiptItemData {
   `,
 })
 export class AddReceiptItemModalComponent implements OnInit {
-  @Input() products:        Product[]         = [];
-  @Input() editItem:        ReceiptItemData | null = null;
-  @Input() addedProductIds: number[]          = [];
+  @Input() products:        Product[]  = [];
+  @Input() addedProductIds: number[]   = [];
   @Input() expectedQuantity:    number | null = null;
   @Input() expectedBonus:       number | null = null;
   @Input() alreadyReceived:     number | null = null;
+
+  protected _editItem: ReceiptItemData | null = null;
+  @Input()
+  set editItem(val: ReceiptItemData | null) {
+    this._editItem = val;
+    // ng-bootstrap setea componentInstance DESPUÉS de que ngOnInit ya corrió,
+    // así que reaccionamos aquí cuando el form ya existe.
+    if (val && this.form) {
+      this._applyEdit(val);
+    }
+  }
+  get editItem(): ReceiptItemData | null { return this._editItem; }
 
   form!: FormGroup;
   activeSection     = signal<'agregar' | 'historial'>('agregar');
@@ -384,28 +408,54 @@ export class AddReceiptItemModalComponent implements OnInit {
     public modal: NgbActiveModal,
     private fb: FormBuilder,
     private ngbModal: NgbModal,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
     this.form = this.fb.group({
-      product_id:    [this.editItem?.product_id ?? null, Validators.required],
-      unit_cost:     [this.editItem?.unit_cost ?? 0, [Validators.required, Validators.min(0)]],
-      quantity:      [this.editItem?.quantity ?? (this.pendingQty || 1)],
-      bonus_quantity:[this.editItem?.bonus_quantity ?? 0],
-      item_notes:    [this.editItem?.item_notes ?? null],
+      product_id:    [null, Validators.required],
+      unit_cost:     [0, [Validators.required, Validators.min(0)]],
+      quantity:      [this.pendingQty || 1],
+      bonus_quantity:[0],
+      item_notes:    [null],
     });
 
-    if (this.editItem) {
-      this.applyProduct(this.editItem.product_id);
-      this.lots.set(this.editItem.lots.map(l => ({ ...l })));
-      this.bonusLots.set(this.editItem.bonus_lots.map(l => ({ ...l })));
+    // Por si editItem ya estaba seteado antes de ngOnInit (casos edge)
+    if (this._editItem) {
+      this._applyEdit(this._editItem);
     }
   }
 
-  onProductChange(productId: number): void {
-    this.applyProduct(productId);
-    const p = this.products.find(p => p.id === productId);
-    if (p?.cost_price) this.form.patchValue({ unit_cost: Number(p.cost_price) });
+  private _applyEdit(item: ReceiptItemData): void {
+    // Preferir el producto del array products (tiene todos los campos como tracks_lot).
+    // item.product viene de la orden de compra y puede no tener tracks_lot.
+    const p = this.products.find(prod => prod.id === item.product_id) ?? item.product;
+
+    this.selectedProductId.set(p.id);
+    this.selectedProduct.set(p);
+    this.tracksLot.set(p.tracks_lot ?? false);
+
+    this.lots.set(
+      item.lots.length
+        ? item.lots.map(l => ({ ...l }))
+        : p.tracks_lot ? [{ lot_number: null, expiry_date: null, quantity: this.pendingQty || 1 }] : []
+    );
+    this.bonusLots.set(item.bonus_lots.map(l => ({ ...l })));
+
+    this.form.patchValue({
+      product_id:    p.id,
+      unit_cost:     item.unit_cost,
+      quantity:      item.quantity,
+      bonus_quantity: item.bonus_quantity,
+      item_notes:    item.item_notes,
+    });
+  }
+
+  onProductSelectChange(product: Product): void {
+    if (!product) return;
+    this.form.patchValue({ product_id: product.id });
+    this.applyProduct(product.id);
+    if (product.cost_price) this.form.patchValue({ unit_cost: Number(product.cost_price) });
   }
 
   private applyProduct(productId: number): void {
@@ -468,7 +518,7 @@ export class AddReceiptItemModalComponent implements OnInit {
   confirm(): void {
     if (!this.canConfirm()) return;
     const raw     = this.form.getRawValue();
-    const product = this.products.find(p => p.id === raw.product_id)!;
+    const product = this.selectedProduct() ?? this._editItem?.product!;
 
     const result: ReceiptItemData = {
       product_id:        raw.product_id,

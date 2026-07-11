@@ -95,6 +95,23 @@ export interface CashHistoryDay {
   uncovered: number;
 }
 
+export interface UserDebtCollection {
+  id: number;
+  code: string;
+  amount: number;
+  date: string;
+  days_ago: number;
+  order_code: string | null;
+  client_name: string | null;
+}
+
+export interface UserDebtSummary {
+  id: number;
+  name: string;
+  total_debt: number;
+  collections: UserDebtCollection[];
+}
+
 export const COLLECTION_STATUS_LABEL: Record<string, string> = {
   collected: 'Cobrado',
   pending:   'Pendiente',

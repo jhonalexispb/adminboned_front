@@ -53,6 +53,10 @@
     <a class="btn btn-outline-warning btn-sm" routerLink="/inventory/reservations">
       <fa-icon icon="lock" class="me-1" />Reservas
     </a>
+
+    <button class="btn btn-primary btn-sm" (click)="openCreateLot()" [disabled]="!selectedProduct()">
+      <fa-icon icon="plus" class="me-1" />Nuevo lote
+    </button>
   </div>
 </app-page-header>
 

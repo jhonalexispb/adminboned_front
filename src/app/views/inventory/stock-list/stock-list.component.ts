@@ -17,6 +17,8 @@ import { Laboratory } from '../../laboratories/laboratory.model';
 import { InventoryService } from '../inventory.service';
 import { StockItem } from '../inventory.model';
 import { AdjustModalComponent, AdjustTarget } from '../adjust-modal/adjust-modal.component';
+import { CreateLotModalComponent } from '../create-lot-modal/create-lot-modal.component';
+import { Lot } from '../inventory.model';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 
@@ -190,5 +192,15 @@ export class StockListComponent implements OnInit {
     this.router.navigate(['/inventory/kardex'], {
       queryParams: { product_id: item.product.id },
     });
+  }
+
+  openCreateLot(): void {
+    const product = this.selectedProduct();
+    if (!product) return;
+    const ref = this.ngbModal.open(CreateLotModalComponent, { centered: true, size: 'sm' });
+    ref.componentInstance.product = product;
+    ref.result.then((_newLot: Lot) => {
+      this.load();
+    }, () => {});
   }
 }

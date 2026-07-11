@@ -8,7 +8,7 @@ import {
 } from '@coreui/angular';
 import { CollectionService } from '../collection.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderCollection, UserDeposit, Collector,
+import { OrderCollection, UserDeposit, Collector, UserDebtSummary,
          COLLECTION_STATUS_LABEL, COLLECTION_STATUS_COLOR,
          DEPOSIT_STATUS_LABEL, DEPOSIT_STATUS_COLOR } from '../collection.model';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
@@ -41,8 +41,9 @@ export class ManagePaymentsComponent implements OnInit {
   transfers = signal<OrderCollection[]>([]);
   deposits  = signal<UserDeposit[]>([]);
   cash      = signal<OrderCollection[]>([]);
+  debts     = signal<UserDebtSummary[]>([]);
   loading   = signal(true);
-  activeTab = signal<'deposits' | 'transfers' | 'cash'>('deposits');
+  activeTab = signal<'deposits' | 'transfers' | 'cash' | 'debts'>('deposits');
 
   actingId       = signal<number | null>(null);
   validatingItem = signal<ValidatingItem | null>(null);
@@ -52,6 +53,9 @@ export class ManagePaymentsComponent implements OnInit {
 
   deletingCollection = signal<OrderCollection | null>(null);
   deletingDeposit    = signal<UserDeposit | null>(null);
+
+  selectedDebtUser   = signal<UserDebtSummary | null>(null);
+  downloadingDebtPdf = signal(false);
 
   // Typed accessors for template narrowing
   readonly vDeposit = computed(() => {
@@ -117,6 +121,10 @@ export class ManagePaymentsComponent implements OnInit {
     }).subscribe({
       next: res => this.cash.set(res.data),
     });
+    this.svc.debtsSummary().subscribe({
+      next: res => this.debts.set(res.users),
+      error: () => {},
+    });
   }
 
   pendingDeposits  = () => this.deposits().filter(d => d.status === 'pending');
@@ -127,7 +135,7 @@ export class ManagePaymentsComponent implements OnInit {
   }
 
   /** Al cambiar de pestaña, el filtro de Estado ya no aplica (no se muestra en la pestaña de efectivo). */
-  selectTab(tab: 'deposits' | 'transfers' | 'cash'): void {
+  selectTab(tab: 'deposits' | 'transfers' | 'cash' | 'debts'): void {
     this.activeTab.set(tab);
     if (this.filters().status) {
       this.filters.update(f => ({ ...f, status: '' }));
@@ -144,11 +152,36 @@ export class ManagePaymentsComponent implements OnInit {
     this.loadAll();
   }
 
+  daysLabel(days: number): string {
+    if (days === 0) return 'Hoy';
+    if (days === 1) return 'Ayer';
+    return `${days}d`;
+  }
+
+  downloadDebtPdf(userId: number): void {
+    if (this.downloadingDebtPdf()) return;
+    this.downloadingDebtPdf.set(true);
+    this.svc.downloadDebtDetailPdf(userId).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href    = url;
+        a.download = `deuda-${userId}-${new Date().toISOString().slice(0, 10)}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.downloadingDebtPdf.set(false);
+      },
+      error: () => this.downloadingDebtPdf.set(false),
+    });
+  }
+
   downloadPdf(): void {
     if (this.downloadingPdf()) return;
+    const activeTab = this.activeTab();
+    if (activeTab === 'debts') return;
     this.downloadingPdf.set(true);
     const f   = this.filters();
-    const tab = this.activeTab();
+    const tab = activeTab;
     this.svc.downloadPaymentsPdf({
       tab,
       status: f.status || undefined, registered_by: f.person ?? undefined,

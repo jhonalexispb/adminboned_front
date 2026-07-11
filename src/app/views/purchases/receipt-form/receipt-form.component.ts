@@ -156,7 +156,7 @@ export class ReceiptFormComponent implements OnInit {
   }
 
   private orderItemToReceiptItem(item: any): ReceiptItemData | null {
-    const product = this.products().find(p => p.id === item.product_id)
+    const product = this.products().find(p => p.id === Number(item.product_id))
       ?? ({ name: item.product_name ?? '—', tracks_lot: false, laboratory: item.product_laboratory ? { id: 0, name: item.product_laboratory } : null } as Product);
     const expectedQty  = item.expected_quantity ?? 1;
     const bonusQty     = item.bonus_quantity ?? 0;
@@ -182,7 +182,7 @@ export class ReceiptFormComponent implements OnInit {
       : [];
 
     return {
-      product_id:        item.product_id,
+      product_id:        Number(item.product_id),
       product,
       unit_cost:         Number(item.unit_cost),
       item_notes:        item.notes ?? null,
@@ -226,12 +226,13 @@ export class ReceiptFormComponent implements OnInit {
     const map = new Map<number, ReceiptItemData>();
 
     for (const item of rawItems) {
-      const product = this.products().find(p => p.id === item.product_id)
+      const product = this.products().find(p => p.id === Number(item.product_id))
         ?? ({ name: item.product_name ?? '—', tracks_lot: false, laboratory: item.product_laboratory ? { id: 0, name: item.product_laboratory } : null } as Product);
+      const productId = Number(item.product_id);
 
-      if (!map.has(item.product_id)) {
-        map.set(item.product_id, {
-          product_id:        item.product_id,
+      if (!map.has(productId)) {
+        map.set(productId, {
+          product_id:        productId,
           product,
           unit_cost:         Number(item.unit_cost) || 0,
           item_notes:        item.notes ?? null,
@@ -245,7 +246,7 @@ export class ReceiptFormComponent implements OnInit {
         });
       }
 
-      const entry = map.get(item.product_id)!;
+      const entry = map.get(productId)!;
       const isBonusLot = Number(item.quantity) === 0 && Number(item.bonus_quantity) > 0;
 
       if (product.tracks_lot) {

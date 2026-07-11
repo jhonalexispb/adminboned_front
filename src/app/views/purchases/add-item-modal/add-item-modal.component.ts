@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, signal } from '@angular/core';
+import { Component, Input, OnInit, signal, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -10,6 +10,7 @@ import { Supplier } from '../../suppliers/supplier.model';
 import { SupplierLabsModalComponent } from '../../suppliers/supplier-labs-modal/supplier-labs-modal.component';
 import { ProductCostPanelComponent } from '../product-cost-panel/product-cost-panel.component';
 import { ProductQuickCreateModalComponent } from '../../products/product-quick-create-modal/product-quick-create-modal.component';
+import { PriceHistoryModalComponent } from '../price-history-modal/price-history-modal.component';
 
 export interface PurchaseItemData {
   product_id:           number;
@@ -95,7 +96,7 @@ export class AddItemModalComponent implements OnInit {
     });
     return Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
   }
 
   get filteredProducts(): Product[] {
@@ -114,7 +115,7 @@ export class AddItemModalComponent implements OnInit {
       const sa = a.lots_info?.available_stock ?? 0;
       const sb = b.lots_info?.available_stock ?? 0;
       if (sa !== sb) return sa - sb;
-      return a.name.localeCompare(b.name);
+      return (a.name ?? '').localeCompare(b.name ?? '');
     });
   }
 
@@ -127,6 +128,7 @@ export class AddItemModalComponent implements OnInit {
     private fb: FormBuilder,
     private ngbModal: NgbModal,
     private productService: ProductService,
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -233,8 +235,9 @@ export class AddItemModalComponent implements OnInit {
           globalMin: allPrices.length ? Math.min(...allPrices) : null,
           rows,
         };
+        this.cdr.detectChanges();
       },
-      error: () => { this.priceData[productId] = null; },
+      error: () => { this.priceData[productId] = null; this.cdr.detectChanges(); },
     });
   }
 
@@ -291,7 +294,7 @@ export class AddItemModalComponent implements OnInit {
     if (!this.supplier) return;
     this.loadingNewProducts.set(true);
     this.productService.list({
-      active: true, for_sale: true, per_page: 100000,
+      active: true, for_purchase: true, per_page: 100000,
       supplier_id: this.supplier.id,
     }).subscribe(res => {
       // Inicializar estado para productos nuevos que aún no existen
@@ -310,6 +313,14 @@ export class AddItemModalComponent implements OnInit {
       this.loadingNewProducts.set(false);
       this.onProductsUpdated?.(res.data);
     });
+  }
+
+  openPriceHistory(product: Product): void {
+    const ref = this.ngbModal.open(PriceHistoryModalComponent, { centered: true, size: 'lg' });
+    ref.componentInstance.productId    = product.id;
+    ref.componentInstance.productName  = product.name ?? '';
+    ref.componentInstance.enteredPrice = Number(this.itemState[product.id]?.unit_cost) || null;
+    ref.componentInstance.salePrice    = product.base_price ? Number(product.base_price) : null;
   }
 
   openNewProduct(): void {

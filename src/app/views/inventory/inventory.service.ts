@@ -105,6 +105,10 @@ export class InventoryService {
     return this.http.get<PaginatedResponse<Lot>>(`${this.base}/lots`, { params });
   }
 
+  createLot(payload: { product_id: number; lot_number?: string | null; expiry_date?: string | null }): Observable<{ message: string; lot: Lot }> {
+    return this.http.post<{ message: string; lot: Lot }>(`${this.base}/lots`, payload);
+  }
+
   toggleLotStatus(id: number): Observable<{ message: string; lot: Lot }> {
     return this.http.patch<{ message: string; lot: Lot }>(`${this.base}/lots/${id}/toggle-status`, {});
   }

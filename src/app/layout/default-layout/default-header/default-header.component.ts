@@ -64,9 +64,7 @@ export class DefaultHeaderComponent extends HeaderComponent implements OnInit {
 
   ngOnInit(): void {
     this.alertsService.load();
-    if (this.auth.hasPermission('payments')) {
-      this.collectionService.myDebt().subscribe({ error: () => {} });
-    }
+    this.collectionService.myDebt().subscribe({ error: () => {} });
   }
 
   openNewDeposit(): void {

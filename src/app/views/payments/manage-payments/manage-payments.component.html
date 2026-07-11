@@ -5,52 +5,73 @@
 </app-page-header>
 
 <!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
-<ul class="nav nav-tabs nav-fill mb-3">
-  <li class="nav-item">
-    <button class="nav-link w-100 d-flex flex-column flex-sm-row align-items-center justify-content-center gap-1 gap-sm-2"
-            [class.active]="activeTab() === 'deposits'"
-            (click)="selectTab('deposits')">
-      <span class="position-relative d-inline-flex p-1">
-        <fa-icon icon="building-columns" />
-        @if (pendingDeposits().length) {
-          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
-            {{ pendingDeposits().length }}
-          </span>
-        }
-      </span>
-      <span style="font-size:.75rem;">Depósit. Usuar.</span>
-    </button>
-  </li>
-  <li class="nav-item">
-    <button class="nav-link w-100 d-flex flex-column flex-sm-row align-items-center justify-content-center gap-1 gap-sm-2"
-            [class.active]="activeTab() === 'transfers'"
-            (click)="selectTab('transfers')">
-      <span class="position-relative d-inline-flex p-1">
-        <fa-icon icon="right-left" />
-        @if (pendingTransfers().length) {
-          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                style="font-size:.7rem; min-width:1.5em; padding:.25em .35em; line-height:1;">
-            {{ pendingTransfers().length }}
-          </span>
-        }
-      </span>
-      <span style="font-size:.75rem;">Transf. Clientes</span>
-    </button>
-  </li>
-  <li class="nav-item">
-    <button class="nav-link w-100 d-flex flex-column flex-sm-row align-items-center justify-content-center gap-1 gap-sm-2"
-            [class.active]="activeTab() === 'cash'"
-            (click)="selectTab('cash')">
-      <span class="position-relative d-inline-flex p-1">
+<div class="mb-3" style="overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
+  <ul class="nav nav-tabs flex-nowrap">
+    <li class="nav-item">
+      <button class="nav-link d-inline-flex align-items-center gap-2 py-2 px-3"
+              style="white-space:nowrap;"
+              [class.active]="activeTab() === 'deposits'"
+              (click)="selectTab('deposits')">
+        <span class="position-relative d-inline-flex">
+          <fa-icon icon="building-columns" />
+          @if (pendingDeposits().length) {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                  style="font-size:.65rem; min-width:1.4em; padding:.2em .3em; line-height:1;">
+              {{ pendingDeposits().length }}
+            </span>
+          }
+        </span>
+        <span style="font-size:.8rem;">Depósitos</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link d-inline-flex align-items-center gap-2 py-2 px-3"
+              style="white-space:nowrap;"
+              [class.active]="activeTab() === 'transfers'"
+              (click)="selectTab('transfers')">
+        <span class="position-relative d-inline-flex">
+          <fa-icon icon="right-left" />
+          @if (pendingTransfers().length) {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                  style="font-size:.65rem; min-width:1.4em; padding:.2em .3em; line-height:1;">
+              {{ pendingTransfers().length }}
+            </span>
+          }
+        </span>
+        <span style="font-size:.8rem;">Transferencias</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link d-inline-flex align-items-center gap-2 py-2 px-3"
+              style="white-space:nowrap;"
+              [class.active]="activeTab() === 'cash'"
+              (click)="selectTab('cash')">
         <fa-icon icon="money-bill-wave" />
-      </span>
-      <span style="font-size:.75rem;">Efectivo</span>
-    </button>
-  </li>
-</ul>
+        <span style="font-size:.8rem;">Efectivo</span>
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link d-inline-flex align-items-center gap-2 py-2 px-3"
+              style="white-space:nowrap;"
+              [class.active]="activeTab() === 'debts'"
+              (click)="selectTab('debts')">
+        <span class="position-relative d-inline-flex">
+          <fa-icon icon="hand-holding-dollar" />
+          @if (debts().length) {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                  style="font-size:.65rem; min-width:1.4em; padding:.2em .3em; line-height:1;">
+              {{ debts().length }}
+            </span>
+          }
+        </span>
+        <span style="font-size:.8rem;">Deudas</span>
+      </button>
+    </li>
+  </ul>
+</div>
 
 <!-- ── Filtros ────────────────────────────────────────────────────────────── -->
+@if (activeTab() !== 'debts') {
 <c-card class="mb-3">
   <c-card-body class="py-2 px-3">
     <div class="row g-2 align-items-end">
@@ -108,6 +129,7 @@
     </div>
   </c-card-body>
 </c-card>
+}
 
 @if (loading()) {
   <div class="text-center py-5"><c-spinner color="primary" /></div>
@@ -559,7 +581,152 @@
     }
   }
 
+  <!-- ══ DEUDAS ═══════════════════════════════════════════════════════════════ -->
+  @if (activeTab() === 'debts') {
+    @if (!debts().length) {
+      <div class="text-center text-body-secondary py-5 border rounded" style="font-size:.9rem;">
+        <fa-icon icon="circle-check" class="d-block mb-2" style="font-size:2rem; opacity:.3;" />
+        Sin deudas pendientes. Todos los usuarios están al día.
+      </div>
+    } @else {
+
+      <!-- Mobile -->
+      <div class="d-md-none d-flex flex-column gap-2">
+        @for (u of debts(); track u.id) {
+          <div class="card shadow-sm" style="border-radius:12px; overflow:hidden;">
+            <div class="p-3 d-flex align-items-center gap-3">
+              <div class="flex-grow-1" style="min-width:0;">
+                <div class="fw-bold" style="font-size:.9rem;">{{ u.name }}</div>
+                <div class="text-body-secondary" style="font-size:.74rem;">
+                  {{ u.collections.length }} cobro{{ u.collections.length !== 1 ? 's' : '' }} sin depositar
+                </div>
+              </div>
+              <div class="text-end flex-shrink-0">
+                <div class="fw-bold text-danger" style="font-size:.95rem;">S/ {{ u.total_debt | number:'1.2-2' }}</div>
+                <button class="btn btn-outline-primary btn-sm mt-1" (click)="selectedDebtUser.set(u)">
+                  <fa-icon icon="eye" class="me-1" />Ver detalle
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Desktop -->
+      <c-card class="d-none d-md-block">
+        <c-card-body class="p-0">
+          <table class="table mb-0 align-middle" style="font-size:.85rem;">
+            <thead style="font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;">
+              <tr>
+                <th class="ps-3">Usuario</th>
+                <th>Cobros sin depositar</th>
+                <th class="text-end">Deuda total</th>
+                <th style="width:100px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (u of debts(); track u.id) {
+                <tr>
+                  <td class="ps-3 fw-medium">{{ u.name }}</td>
+                  <td class="small text-body-secondary">
+                    {{ u.collections.length }} cobro{{ u.collections.length !== 1 ? 's' : '' }}
+                  </td>
+                  <td class="text-end fw-bold text-danger">S/ {{ u.total_debt | number:'1.2-2' }}</td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-primary" (click)="selectedDebtUser.set(u)">
+                      <fa-icon icon="eye" class="me-1" />Detalle
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </c-card-body>
+      </c-card>
+    }
+  }
+
 } <!-- /loading -->
+
+<!-- ══ MODAL DE DETALLE DE DEUDA ═════════════════════════════════════════════ -->
+@if (selectedDebtUser(); as u) {
+  <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.6); z-index:1055;">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg modal-fullscreen-sm-down">
+      <div class="modal-content" style="border-radius: clamp(0px,(100vw - 576px)*9999,8px);">
+        <!-- Header -->
+        <div class="modal-header py-2 px-3">
+          <div>
+            <div class="fw-bold">{{ u.name }}</div>
+            <div class="text-body-secondary" style="font-size:.76rem;">Detalle de deuda en efectivo</div>
+          </div>
+          <div class="d-flex align-items-center gap-2 ms-auto">
+            <span class="fw-bold text-danger" style="font-size:.95rem;">S/ {{ u.total_debt | number:'1.2-2' }}</span>
+            <button class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1"
+                    [disabled]="downloadingDebtPdf()"
+                    (click)="downloadDebtPdf(u.id)">
+              @if (downloadingDebtPdf()) {
+                <c-spinner size="sm" />
+              } @else {
+                <fa-icon icon="file-pdf" />
+              }
+              <span class="d-none d-sm-inline ms-1">PDF</span>
+            </button>
+            <button type="button" class="btn-close" (click)="selectedDebtUser.set(null)"></button>
+          </div>
+        </div>
+        <!-- Body -->
+        <div class="modal-body p-0">
+          <table class="table mb-0 align-middle" style="font-size:.83rem;">
+            <thead style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; background:#f8f9fa;">
+              <tr>
+                <th class="ps-3">Código</th>
+                <th>Pedido / Cliente</th>
+                <th>Fecha</th>
+                <th class="text-end">Monto</th>
+                <th class="pe-3">Antigüedad</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of u.collections; track c.id) {
+                <tr>
+                  <td class="ps-3 font-monospace small">{{ c.code }}</td>
+                  <td class="small">
+                    @if (c.order_code) {
+                      <div class="font-monospace text-body-secondary" style="font-size:.76rem;">{{ c.order_code }}</div>
+                    }
+                    @if (c.client_name) {
+                      <div>{{ c.client_name }}</div>
+                    }
+                  </td>
+                  <td class="small text-body-secondary" style="white-space:nowrap;">{{ c.date | date:'dd/MM/yy' }}</td>
+                  <td class="text-end fw-semibold">S/ {{ c.amount | number:'1.2-2' }}</td>
+                  <td class="pe-3">
+                    <span class="badge rounded-pill"
+                          style="font-size:.68rem;"
+                          [class.text-bg-secondary]="c.days_ago <= 3"
+                          [class.text-bg-warning]="c.days_ago > 3 && c.days_ago <= 7"
+                          [class.text-bg-danger]="c.days_ago > 7">
+                      {{ daysLabel(c.days_ago) }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr style="border-top:2px solid #dee2e6;">
+                <td colspan="3" class="ps-3 fw-semibold text-end text-body-secondary" style="font-size:.78rem;">
+                  TOTAL DEUDA
+                </td>
+                <td class="text-end fw-bold text-danger">S/ {{ u.total_debt | number:'1.2-2' }}</td>
+                <td class="pe-3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+}
 
 <!-- ── Lightbox de imagen ──────────────────────────────────────────────────── -->
 @if (voucherPreviewUrl()) {

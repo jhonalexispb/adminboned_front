@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Bank, BankPaymentMethod, OrderCollection, UserDeposit, MyDebt, Collector, CashHistoryDay } from './collection.model';
+import { Bank, BankPaymentMethod, OrderCollection, UserDeposit, MyDebt, Collector, CashHistoryDay, UserDebtSummary } from './collection.model';
 
 @Injectable({ providedIn: 'root' })
 export class CollectionService {
@@ -92,6 +92,16 @@ export class CollectionService {
   /** Historial diario de efectivo cobrado vs. depositado, con saldo (deuda) acumulado día a día. */
   myCashHistory(): Observable<{ days: CashHistoryDay[] }> {
     return this.http.get<{ days: CashHistoryDay[] }>(`${this.base}/collections/my-cash-history`);
+  }
+
+  /** Resumen de deudas por usuario — solo para administradores con payments_manage. */
+  debtsSummary(): Observable<{ users: UserDebtSummary[] }> {
+    return this.http.get<{ users: UserDebtSummary[] }>(`${this.base}/collections/debts-summary`);
+  }
+
+  /** PDF con el detalle de deuda de un usuario específico. */
+  downloadDebtDetailPdf(userId: number): Observable<Blob> {
+    return this.http.get(`${this.base}/collections/debts-summary/${userId}/pdf`, { responseType: 'blob' });
   }
 
   // ── Depósitos del repartidor ─────────────────────────────────────────────

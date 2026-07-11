@@ -121,10 +121,13 @@ export class OrderDetailComponent implements OnInit {
   downloadPdf(): void {
     this.downloading.set(true);
     this.purchaseService.downloadOrderPdf(this.orderId).subscribe(blob => {
+      const slug = (this.order()?.supplier?.name ?? 'proveedor').replace(/[^A-Za-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const d = new Date();
+      const date = `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
       const url = URL.createObjectURL(blob);
       const a   = document.createElement('a');
       a.href     = url;
-      a.download = `orden-${this.order()?.code ?? this.orderId}.pdf`;
+      a.download = `OC-${slug}-${date}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       this.downloading.set(false);
