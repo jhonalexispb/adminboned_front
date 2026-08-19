@@ -1,0 +1,1218 @@
+<app-page-header title="Gestión de Viáticos" subtitle="Revisión y aprobación de gastos del equipo" />
+
+<!-- Tabs -->
+<div class="btn-group mb-3" role="group">
+  <button type="button" class="btn btn-sm" [class.btn-primary]="activeTab() === 'gastos'"
+    [class.btn-outline-secondary]="activeTab() !== 'gastos'" (click)="selectTab('gastos')">
+    Gastos
+    @if (summary(); as s) { @if (s.pending_count > 0) { <c-badge color="warning" shape="rounded-pill" class="ms-1">{{ s.pending_count }}</c-badge> } }
+  </button>
+  <button type="button" class="btn btn-sm" [class.btn-primary]="activeTab() === 'vueltos'"
+    [class.btn-outline-secondary]="activeTab() !== 'vueltos'" (click)="selectTab('vueltos')">
+    Vueltos
+    @if (pendingReturnsCount() > 0) { <c-badge color="warning" shape="rounded-pill" class="ms-1">{{ pendingReturnsCount() }}</c-badge> }
+    @if (viaticoDebt(); as vd) { @if (vd.debt > 0) { <c-badge color="danger" shape="rounded-pill" class="ms-1">S/ {{ vd.debt | number:'1.2-2' }}</c-badge> } }
+  </button>
+  <button type="button" class="btn btn-sm" [class.btn-primary]="activeTab() === 'categorias'"
+    [class.btn-outline-secondary]="activeTab() !== 'categorias'" (click)="selectTab('categorias')">
+    Categorías
+  </button>
+</div>
+
+@if (activeTab() === 'gastos') {
+
+<!-- Resumen -->
+@if (summary()) {
+  @let s = summary()!;
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <c-card class="text-center">
+        <c-card-body>
+          <div class="fs-5 fw-bold">{{ s.total }}</div>
+          <div class="text-muted small">Total registros</div>
+        </c-card-body>
+      </c-card>
+    </div>
+    <div class="col-6 col-md-3">
+      <c-card class="text-center border-warning">
+        <c-card-body>
+          <div class="fs-5 fw-bold text-warning">S/ {{ s.pending_amount | number:'1.2-2' }}</div>
+          <div class="text-muted small">Por aprobar</div>
+        </c-card-body>
+      </c-card>
+    </div>
+    <div class="col-6 col-md-3">
+      <c-card class="text-center border-success">
+        <c-card-body>
+          <div class="fs-5 fw-bold text-success">S/ {{ s.approved_amount | number:'1.2-2' }}</div>
+          <div class="text-muted small">Aprobado</div>
+        </c-card-body>
+      </c-card>
+    </div>
+    <div class="col-6 col-md-3">
+      <c-card class="text-center border-primary">
+        <c-card-body>
+          <div class="fs-5 fw-bold text-primary">S/ {{ s.total_amount | number:'1.2-2' }}</div>
+          <div class="text-muted small">Total período</div>
+        </c-card-body>
+      </c-card>
+    </div>
+  </div>
+}
+
+<!-- Filtros -->
+<div class="row g-2 mb-3">
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Desde</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_from" (change)="applyFilters()" />
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Hasta</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_to" (change)="applyFilters()" />
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label small">Usuario</label>
+    <p-select [options]="userOptions" optionLabel="label" optionValue="value"
+      [(ngModel)]="filters.user_id" (onChange)="applyFilters()"
+      placeholder="Todos" styleClass="w-100 p-inputtext-sm" />
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Categoría</label>
+    <p-select [options]="categoryOptions()" optionLabel="label" optionValue="value"
+      [(ngModel)]="filters.category" (onChange)="applyFilters()"
+      placeholder="Todas" styleClass="w-100 p-inputtext-sm" />
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Estado</label>
+    <p-select [options]="statusOptions" optionLabel="label" optionValue="value"
+      [(ngModel)]="filters.status" (onChange)="applyFilters()"
+      placeholder="Todos" styleClass="w-100 p-inputtext-sm" />
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (items().length === 0) {
+  <div class="text-center text-muted py-5">
+    <div class="fs-1">🧾</div>
+    <div>No hay viáticos en el período seleccionado.</div>
+  </div>
+} @else {
+  <!-- Desktop table -->
+  <div class="d-none d-md-block">
+    <c-card>
+      <c-card-body class="p-0">
+        <table cTable hover responsive>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Usuario</th>
+              <th>Comisión</th>
+              <th>Categoría</th>
+              <th>Descripción</th>
+              <th class="text-end">Monto</th>
+              <th>Ubicación</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (v of items(); track v.id) {
+              @let st  = STATUS[v.status];
+              <tr>
+                <td class="text-nowrap">{{ v.date | date:'dd/MM/yyyy' }}</td>
+                <td>{{ v.user_name ?? '—' }}</td>
+                <td class="small">
+                  {{ v.comision_destination ?? '—' }}
+                  @if (v.comision_date_from) {
+                    <div class="text-muted">
+                      {{ v.comision_date_from | date:'dd/MM/yy' }}
+                      @if (v.comision_date_from !== v.comision_date_to) { → {{ v.comision_date_to | date:'dd/MM/yy' }} }
+                    </div>
+                  }
+                </td>
+                <td class="text-nowrap">{{ v.category }}</td>
+                <td class="text-muted small">{{ v.description ?? '—' }}</td>
+                <td class="text-end fw-bold">S/ {{ v.amount | number:'1.2-2' }}</td>
+                <td class="text-center">
+                  @if (v.lat != null) {
+                    <fa-icon [icon]="faLocationDot" class="text-success" title="{{ v.lat }}, {{ v.lng }}" />
+                  } @else {
+                    <span class="text-muted">—</span>
+                  }
+                </td>
+                <td><c-badge [color]="st.color">{{ st.label }}</c-badge></td>
+                <td>
+                  <div class="d-flex gap-1 align-items-center">
+                    @if (v.photo_url) {
+                      <a style="cursor:pointer" class="btn btn-sm btn-outline-secondary p-1" title="Ver comprobante"
+                         (click)="filePreview.open(v.photo_url!)">
+                        <fa-icon [icon]="faImage" />
+                      </a>
+                    }
+                    @if (v.review_notes) {
+                      <button type="button" class="btn btn-sm btn-outline-info p-1" (click)="toggleExpand(v.id)"
+                        [title]="expandedId() === v.id ? 'Ocultar notas' : 'Ver notas'">
+                        <fa-icon [icon]="expandedId() === v.id ? faChevronUp : faChevronDown" />
+                      </button>
+                    }
+                    @if (v.status === 'pending') {
+                      <button cButton color="success" size="sm" (click)="openApprove(v)" title="Aprobar">
+                        <fa-icon [icon]="faCheck" />
+                      </button>
+                      <button cButton color="danger" size="sm" (click)="openReject(v)" title="Rechazar">
+                        <fa-icon [icon]="faTimes" />
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+              @if (expandedId() === v.id && v.review_notes) {
+                <tr style="background:var(--bs-tertiary-bg);">
+                  <td colspan="9" class="small text-muted">
+                    <strong>Notas de revisión:</strong> {{ v.review_notes }}
+                    @if (v.reviewed_by) { <span class="ms-2">— {{ v.reviewed_by }} ({{ v.reviewed_at | date:'dd/MM/yyyy HH:mm' }})</span> }
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </c-card-body>
+    </c-card>
+  </div>
+
+  <!-- Mobile cards -->
+  <div class="d-md-none">
+    <div class="row g-3">
+      @for (v of items(); track v.id) {
+        @let st  = STATUS[v.status];
+        <div class="col-12">
+          <c-card [class.border-success]="v.status === 'approved'" [class.border-danger]="v.status === 'rejected'">
+            <c-card-body>
+              <div class="d-flex justify-content-between mb-2">
+                <div>
+                  <strong>{{ v.category }}</strong>
+                </div>
+                <c-badge [color]="st.color">{{ st.label }}</c-badge>
+              </div>
+              <div class="fw-bold text-primary fs-5 mb-1">S/ {{ v.amount | number:'1.2-2' }}</div>
+              <div class="small text-muted mb-1">{{ v.date | date:'dd/MM/yyyy' }} · {{ v.user_name }}</div>
+              @if (v.comision_destination) {
+                <div class="small text-muted mb-1">
+                  <fa-icon icon="route" class="me-1" />{{ v.comision_destination }}
+                  ({{ v.comision_date_from | date:'dd/MM/yy' }}
+                  @if (v.comision_date_from !== v.comision_date_to) { → {{ v.comision_date_to | date:'dd/MM/yy' }} }
+                  )
+                </div>
+              }
+              @if (v.description) { <div class="small text-muted mb-1">{{ v.description }}</div> }
+              @if (v.lat != null) {
+                <div class="small text-success mb-1">
+                  <fa-icon [icon]="faLocationDot" class="me-1" />
+                  {{ v.lat | number:'1.4-4' }}, {{ v.lng | number:'1.4-4' }}
+                </div>
+              }
+              @if (v.review_notes) {
+                <div class="alert alert-sm py-1 px-2 small mb-1"
+                  [class.alert-success]="v.status === 'approved'"
+                  [class.alert-danger]="v.status === 'rejected'">
+                  {{ v.review_notes }}
+                </div>
+              }
+              @if (v.status === 'pending') {
+                <div class="d-flex gap-2 mt-2">
+                  <button cButton color="success" size="sm" class="flex-fill" (click)="openApprove(v)">
+                    <fa-icon [icon]="faCheck" class="me-1" /> Aprobar
+                  </button>
+                  <button cButton color="danger" size="sm" class="flex-fill" (click)="openReject(v)">
+                    <fa-icon [icon]="faTimes" class="me-1" /> Rechazar
+                  </button>
+                </div>
+              }
+              @if (v.photo_url) {
+                <div class="mt-2">
+                  <a style="cursor:pointer" (click)="filePreview.open(v.photo_url!)">
+                    @if (isImage(v.photo_url)) {
+                      <img [src]="v.photo_url" alt="Comprobante" class="img-thumbnail" style="max-height:60px" />
+                    } @else {
+                      <span class="d-inline-flex align-items-center gap-1 text-danger">
+                        <fa-icon icon="file-pdf" style="font-size:1.4rem;" /><small>Ver PDF</small>
+                      </span>
+                    }
+                  </a>
+                </div>
+              }
+            </c-card-body>
+          </c-card>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <app-pagination [currentPage]="filters.page ?? 1" [lastPage]="lastPage()" [total]="total()"
+      (pageChange)="onPage($event)" />
+  </div>
+}
+
+} <!-- fin activeTab 'gastos' -->
+
+@if (activeTab() === 'vueltos') {
+
+  <!-- Resumen de mi deuda de efectivo -->
+  @if (viaticoDebt(); as vd) {
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <c-card class="text-center">
+          <c-card-body>
+            <div class="fs-5 fw-bold">S/ {{ vd.cash_received | number:'1.2-2' }}</div>
+            <div class="text-muted small">Efectivo recibido</div>
+          </c-card-body>
+        </c-card>
+      </div>
+      <div class="col-6 col-md-3">
+        <c-card class="text-center border-success">
+          <c-card-body>
+            <div class="fs-5 fw-bold text-success">S/ {{ vd.deposited | number:'1.2-2' }}</div>
+            <div class="text-muted small">Depositado (validado)</div>
+          </c-card-body>
+        </c-card>
+      </div>
+      <div class="col-6 col-md-3">
+        <c-card class="text-center border-warning">
+          <c-card-body>
+            <div class="fs-5 fw-bold text-warning">S/ {{ vd.deposited_pending | number:'1.2-2' }}</div>
+            <div class="text-muted small">Depositado (pendiente)</div>
+          </c-card-body>
+        </c-card>
+      </div>
+      <div class="col-6 col-md-3">
+        <c-card class="text-center border-danger">
+          <c-card-body>
+            <div class="fs-5 fw-bold text-danger">S/ {{ vd.debt | number:'1.2-2' }}</div>
+            <div class="text-muted small">Por rendir</div>
+          </c-card-body>
+        </c-card>
+      </div>
+    </div>
+  }
+
+  <div class="d-flex justify-content-end mb-3">
+    <button cButton color="success" (click)="showNewViaticoDeposit.set(true)">
+      <fa-icon icon="building-columns" class="me-1" />Registrar depósito
+    </button>
+  </div>
+
+  <!-- Vueltos sin registrar: el vendedor te entregó (o le entregaste) el dinero en persona,
+       tú registras cómo — efectivo o transferencia. Incluye las rechazadas para corregirlas. -->
+  @if (unregisteredReturns().length > 0) {
+    <c-card class="mb-4 border-primary">
+      <c-card-header class="py-2 small fw-bold">Vueltos por registrar</c-card-header>
+      <c-card-body class="p-2">
+        @for (r of unregisteredReturns(); track r.id) {
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom py-2 small">
+            <div>
+              <c-badge [color]="r.direction === 'to_company' ? 'warning' : 'info'" class="me-1">
+                {{ r.direction === 'to_company' ? 'Debe' : 'Se le debe' }}
+              </c-badge>
+              <strong>{{ r.user_name }}</strong> — S/ {{ r.amount | number:'1.2-2' }}
+              ({{ r.comision_destination }})
+              @if (r.status === 'rejected') {
+                <div class="text-danger mt-1">Rechazado: {{ r.notes }}</div>
+              }
+            </div>
+            @if (r.status === 'rejected') {
+              <button cButton color="danger" size="sm" (click)="openRegisterReturn(r)">
+                <fa-icon icon="pen" class="me-1" />Corregir
+              </button>
+            } @else {
+              <button cButton color="primary" size="sm" (click)="openRegisterReturn(r)">
+                <fa-icon icon="rotate-left" class="me-1" />Registrar
+              </button>
+            }
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- Devoluciones de vuelto (de vendedores) por validar -->
+  @if (pendingValidationReturns().length > 0) {
+    <c-card class="mb-4">
+      <c-card-header class="py-2 small fw-bold">Devoluciones de vuelto por validar</c-card-header>
+      <c-card-body class="p-2 p-md-0">
+
+        <!-- Mobile: tarjetas -->
+        <div class="d-md-none d-flex flex-column gap-2">
+          @for (r of pendingValidationReturns(); track r.id) {
+            <div class="border rounded p-2 small">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <strong>{{ r.user_name }}</strong>
+                  <div class="text-muted">{{ r.comision_destination }}</div>
+                </div>
+                <div class="fw-bold">S/ {{ r.amount | number:'1.2-2' }}</div>
+              </div>
+              <div class="text-muted mt-1">
+                {{ r.bank_name }} — {{ r.payment_method_name }}
+                <div class="font-monospace">{{ r.operation_number }}</div>
+                {{ r.operation_date | date:'dd/MM/yyyy' }} {{ r.operation_time }}
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                @if (r.voucher_url) {
+                  <a style="cursor:pointer" (click)="filePreview.open(r.voucher_url!)"><fa-icon icon="image" class="me-1" />Voucher</a>
+                } @else { <span></span> }
+                <div class="d-inline-flex gap-1">
+                  <button cButton color="success" size="sm" (click)="openValidateReturn(r, 'validate')">
+                    <fa-icon [icon]="faCheck" />
+                  </button>
+                  <button cButton color="danger" size="sm" (click)="openValidateReturn(r, 'reject')">
+                    <fa-icon [icon]="faTimes" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Desktop: tabla -->
+        <div class="table-responsive d-none d-md-block">
+          <table cTable hover small class="mb-0">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Comisión</th>
+                <th>Banco / Op.</th>
+                <th>Fecha</th>
+                <th class="text-end">Monto</th>
+                <th class="text-center">Voucher</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of pendingValidationReturns(); track r.id) {
+                <tr>
+                  <td class="small">{{ r.user_name }}</td>
+                  <td class="small text-muted">{{ r.comision_destination }}</td>
+                  <td class="small text-muted">
+                    {{ r.bank_name }} — {{ r.payment_method_name }}
+                    <div class="font-monospace">{{ r.operation_number }}</div>
+                  </td>
+                  <td class="text-nowrap small">
+                    {{ r.operation_date | date:'dd/MM/yyyy' }}
+                    @if (r.operation_time) { <div class="text-muted">{{ r.operation_time }}</div> }
+                  </td>
+                  <td class="text-end fw-bold">S/ {{ r.amount | number:'1.2-2' }}</td>
+                  <td class="text-center">
+                    @if (r.voucher_url) {
+                      <a style="cursor:pointer" (click)="filePreview.open(r.voucher_url!)"><fa-icon icon="image" /></a>
+                    }
+                  </td>
+                  <td class="text-end">
+                    <div class="d-inline-flex gap-1">
+                      <button cButton color="success" size="sm" (click)="openValidateReturn(r, 'validate')">
+                        <fa-icon [icon]="faCheck" />
+                      </button>
+                      <button cButton color="danger" size="sm" (click)="openValidateReturn(r, 'reject')">
+                        <fa-icon [icon]="faTimes" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- Efectivo recibido, informativo — se cubre automáticamente al validarse un depósito -->
+  @if (myCashDebts().length > 0) {
+    <c-card class="mb-4 border-warning">
+      <c-card-header class="py-2 small fw-bold">Efectivo recibido, pendiente de cubrir con depósito</c-card-header>
+      <c-card-body class="p-2">
+        @for (r of myCashDebts(); track r.id) {
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom py-2 small">
+            <div>
+              <strong>{{ r.user_name }}</strong> me entregó S/ {{ r.amount | number:'1.2-2' }}
+              ({{ r.comision_destination }})
+            </div>
+          </div>
+        }
+        <div class="text-body-secondary mt-2" style="font-size:.75rem;">
+          Se marcan como cubiertas automáticamente (de la más antigua a la más reciente) cuando
+          se valida un depósito por un monto suficiente.
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+
+  <!-- Movimientos de vuelto: depósitos por validar / historial de depósitos / historial de vueltos -->
+  <c-card>
+    <c-card-header class="py-2 px-2">
+      <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn" [class.btn-primary]="depositsSubTab() === 'pending'"
+          [class.btn-outline-secondary]="depositsSubTab() !== 'pending'" (click)="selectDepositsSubTab('pending')">
+          Por validar
+          @if (depositsNeedingAction().length > 0) {
+            <c-badge color="warning" shape="rounded-pill" class="ms-1">{{ depositsNeedingAction().length }}</c-badge>
+          }
+        </button>
+        <button type="button" class="btn" [class.btn-primary]="depositsSubTab() === 'historial'"
+          [class.btn-outline-secondary]="depositsSubTab() !== 'historial'" (click)="selectDepositsSubTab('historial')">
+          Historial de depósitos
+        </button>
+        <button type="button" class="btn" [class.btn-primary]="depositsSubTab() === 'returns'"
+          [class.btn-outline-secondary]="depositsSubTab() !== 'returns'" (click)="selectDepositsSubTab('returns')">
+          Historial de vueltos
+        </button>
+      </div>
+    </c-card-header>
+    <c-card-body class="p-0">
+
+      @if (depositsSubTab() === 'pending') {
+        @if (!depositsNeedingAction().length) {
+          <div class="text-center text-muted py-4 small">No hay depósitos de vuelto por validar.</div>
+        } @else {
+
+          <!-- Mobile: tarjetas -->
+          <div class="d-md-none d-flex flex-column gap-2 p-2">
+            @for (d of depositsNeedingAction(); track d.id) {
+              <div class="border rounded p-2 small">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="font-monospace text-muted">{{ d.code }}</div>
+                    <strong>{{ d.deposited_by_name }}</strong>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-bold">S/ {{ d.amount | number:'1.2-2' }}</div>
+                    <c-badge [color]="DEPOSIT_STATUS_COLOR[d.status]">{{ DEPOSIT_STATUS_LABEL[d.status] }}</c-badge>
+                  </div>
+                </div>
+                <div class="text-muted mt-1">
+                  {{ d.bank?.name }} — {{ d.payment_method?.name }}
+                  <div class="font-monospace">{{ d.operation_number }}</div>
+                </div>
+                @if (d.status === 'rejected' && d.notes) { <div class="text-danger mt-1">{{ d.notes }}</div> }
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  @if (d.voucher_url) {
+                    <a style="cursor:pointer" (click)="filePreview.open(d.voucher_url!)"><fa-icon icon="image" class="me-1" />Voucher</a>
+                  } @else { <span></span> }
+                  @if (d.status === 'rejected') {
+                    <div class="d-inline-flex gap-1">
+                      <button class="btn btn-sm btn-danger" (click)="editViaticoDeposit.set(d)">
+                        <fa-icon icon="pen" class="me-1" />Corregir
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" title="Eliminar" (click)="confirmDeleteDeposit(d)">
+                        <fa-icon icon="trash" />
+                      </button>
+                    </div>
+                  } @else {
+                    <button cButton color="primary" size="sm" (click)="openValidateDeposit(d)">Revisar</button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Desktop: tabla -->
+          <div class="table-responsive d-none d-md-block">
+            <table cTable hover small class="mb-0">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Usuario</th>
+                  <th>Banco / Op.</th>
+                  <th class="text-end">Monto</th>
+                  <th class="text-center">Voucher</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (d of depositsNeedingAction(); track d.id) {
+                  <tr>
+                    <td class="font-monospace small">{{ d.code }}</td>
+                    <td class="small">{{ d.deposited_by_name }}</td>
+                    <td class="small text-muted">
+                      {{ d.bank?.name }} — {{ d.payment_method?.name }}
+                      <div class="font-monospace">{{ d.operation_number }}</div>
+                    </td>
+                    <td class="text-end fw-bold">S/ {{ d.amount | number:'1.2-2' }}</td>
+                    <td class="text-center">
+                      @if (d.voucher_url) {
+                        <a style="cursor:pointer" (click)="filePreview.open(d.voucher_url!)"><fa-icon icon="image" /></a>
+                      }
+                    </td>
+                    <td>
+                      <c-badge [color]="DEPOSIT_STATUS_COLOR[d.status]">{{ DEPOSIT_STATUS_LABEL[d.status] }}</c-badge>
+                      @if (d.status === 'rejected' && d.notes) { <div class="text-danger small mt-1">{{ d.notes }}</div> }
+                    </td>
+                    <td class="text-end">
+                      @if (d.status === 'rejected') {
+                        <div class="d-inline-flex gap-1">
+                          <button class="btn btn-sm btn-danger" (click)="editViaticoDeposit.set(d)">
+                            <fa-icon icon="pen" class="me-1" />Corregir
+                          </button>
+                          <button class="btn btn-sm btn-outline-danger" title="Eliminar" (click)="confirmDeleteDeposit(d)">
+                            <fa-icon icon="trash" />
+                          </button>
+                        </div>
+                      } @else {
+                        <button cButton color="primary" size="sm" (click)="openValidateDeposit(d)">Revisar</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      @if (depositsSubTab() === 'historial') {
+        @if (loadingViaticoDeposits()) {
+          <div class="text-center py-4"><c-spinner color="primary" /></div>
+        } @else if (!myViaticoDeposits().length) {
+          <div class="text-center text-muted py-4 small">Aún no se registró ningún depósito de vuelto.</div>
+        } @else {
+
+          <!-- Mobile: tarjetas -->
+          <div class="d-md-none d-flex flex-column gap-2 p-2">
+            @for (d of myViaticoDeposits(); track d.id) {
+              <div class="border rounded p-2 small">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="font-monospace text-muted">{{ d.code }}</div>
+                    <strong>{{ d.deposited_by_name }}</strong>
+                    <div class="text-muted">{{ d.deposit_date | date:'dd/MM/yyyy' }}</div>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-bold">S/ {{ d.amount | number:'1.2-2' }}</div>
+                    <c-badge [color]="DEPOSIT_STATUS_COLOR[d.status]">{{ DEPOSIT_STATUS_LABEL[d.status] }}</c-badge>
+                  </div>
+                </div>
+                <div class="text-muted mt-1">
+                  {{ d.bank?.name }} — {{ d.payment_method?.name }}
+                  <div class="font-monospace">{{ d.operation_number }}</div>
+                </div>
+                @if (d.notes) { <div class="text-danger mt-1">{{ d.notes }}</div> }
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  @if (d.voucher_url) {
+                    <a style="cursor:pointer" (click)="filePreview.open(d.voucher_url!)"><fa-icon icon="image" class="me-1" />Voucher</a>
+                  } @else { <span></span> }
+                  @if (d.deposited_by === auth.user()?.id) {
+                    @if (d.status === 'rejected') {
+                      <div class="d-inline-flex gap-1">
+                        <button class="btn btn-sm btn-danger" (click)="editViaticoDeposit.set(d)">
+                          <fa-icon icon="pen" class="me-1" />Corregir
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" title="Eliminar" (click)="confirmDeleteDeposit(d)">
+                          <fa-icon icon="trash" />
+                        </button>
+                      </div>
+                    } @else if (d.status === 'pending') {
+                      <div class="d-inline-flex gap-1">
+                        <button class="btn btn-sm btn-outline-secondary" title="Editar" (click)="editViaticoDeposit.set(d)">
+                          <fa-icon icon="pen" />
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" title="Eliminar" (click)="confirmDeleteDeposit(d)">
+                          <fa-icon icon="trash" />
+                        </button>
+                      </div>
+                    }
+                  }
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Desktop: tabla -->
+          <div class="table-responsive d-none d-md-block">
+            <table cTable hover small class="mb-0">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Usuario</th>
+                  <th>Fecha</th>
+                  <th>Banco / Op.</th>
+                  <th class="text-end">Monto</th>
+                  <th class="text-center">Voucher</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (d of myViaticoDeposits(); track d.id) {
+                  <tr>
+                    <td class="font-monospace small">{{ d.code }}</td>
+                    <td class="small">{{ d.deposited_by_name }}</td>
+                    <td class="text-nowrap small">{{ d.deposit_date | date:'dd/MM/yyyy' }}</td>
+                    <td class="small text-muted">
+                      {{ d.bank?.name }} — {{ d.payment_method?.name }}
+                      <div class="font-monospace">{{ d.operation_number }}</div>
+                    </td>
+                    <td class="text-end fw-bold">S/ {{ d.amount | number:'1.2-2' }}</td>
+                    <td class="text-center">
+                      @if (d.voucher_url) {
+                        <a style="cursor:pointer" (click)="filePreview.open(d.voucher_url!)"><fa-icon icon="image" /></a>
+                      }
+                    </td>
+                    <td>
+                      <c-badge [color]="DEPOSIT_STATUS_COLOR[d.status]">{{ DEPOSIT_STATUS_LABEL[d.status] }}</c-badge>
+                      @if (d.notes) { <div class="text-danger small mt-1">{{ d.notes }}</div> }
+                    </td>
+                    <td class="text-end">
+                      @if (d.deposited_by === auth.user()?.id) {
+                        @if (d.status === 'rejected') {
+                          <div class="d-inline-flex gap-1">
+                            <button class="btn btn-sm btn-danger" (click)="editViaticoDeposit.set(d)">
+                              <fa-icon icon="pen" class="me-1" />Corregir
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" title="Eliminar" (click)="confirmDeleteDeposit(d)">
+                              <fa-icon icon="trash" />
+                            </button>
+                          </div>
+                        } @else if (d.status === 'pending') {
+                          <div class="d-inline-flex gap-1">
+                            <button class="btn btn-sm btn-outline-secondary" title="Editar" (click)="editViaticoDeposit.set(d)">
+                              <fa-icon icon="pen" />
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" title="Eliminar" (click)="confirmDeleteDeposit(d)">
+                              <fa-icon icon="trash" />
+                            </button>
+                          </div>
+                        }
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+
+      @if (depositsSubTab() === 'returns') {
+        @if (loadingReturnsHistory()) {
+          <div class="text-center py-4"><c-spinner color="primary" /></div>
+        } @else if (!returnsHistory().length) {
+          <div class="text-center text-muted py-4 small">Aún no hay devoluciones de vuelto registradas.</div>
+        } @else {
+
+          <!-- Mobile: tarjetas -->
+          <div class="d-md-none d-flex flex-column gap-2 p-2">
+            @for (r of returnsHistory(); track r.id) {
+              <div class="border rounded p-2 small">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <strong>{{ r.user_name }}</strong>
+                    <div class="text-muted">{{ r.comision_destination }} · {{ r.comision_date_from | date:'dd/MM/yyyy' }}</div>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-bold">S/ {{ r.amount | number:'1.2-2' }}</div>
+                    <c-badge [color]="r.direction === 'to_company' ? 'warning' : 'info'">
+                      {{ r.direction === 'to_company' ? 'Debe' : 'Se le debe' }}
+                    </c-badge>
+                  </div>
+                </div>
+                <div class="text-muted mt-1">
+                  @if (r.form === 'cash') {
+                    Efectivo — recibido por {{ r.received_by_name }}
+                  } @else if (r.form === 'deposit') {
+                    {{ r.bank_name }} / {{ r.payment_method_name }}
+                    <div class="font-monospace">{{ r.operation_number }}</div>
+                  } @else {
+                    <span>Sin registrar</span>
+                  }
+                </div>
+                @if (r.status === 'rejected' && r.notes) { <div class="text-danger mt-1">{{ r.notes }}</div> }
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  @if (r.voucher_url) {
+                    <a style="cursor:pointer" (click)="filePreview.open(r.voucher_url!)"><fa-icon icon="image" class="me-1" />Voucher</a>
+                  } @else { <span></span> }
+                  <c-badge [color]="r.status === 'validated' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'">
+                    {{ r.status === 'validated' ? 'Validado' : r.status === 'rejected' ? 'Rechazado' : 'Pendiente' }}
+                  </c-badge>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Desktop: tabla -->
+          <div class="table-responsive d-none d-md-block">
+            <table cTable hover small class="mb-0">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Tipo</th>
+                  <th>Comisión</th>
+                  <th>Forma</th>
+                  <th class="text-end">Monto</th>
+                  <th class="text-center">Voucher</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of returnsHistory(); track r.id) {
+                  <tr>
+                    <td class="small">{{ r.user_name }}</td>
+                    <td>
+                      <c-badge [color]="r.direction === 'to_company' ? 'warning' : 'info'">
+                        {{ r.direction === 'to_company' ? 'Debe' : 'Se le debe' }}
+                      </c-badge>
+                    </td>
+                    <td class="small text-muted">
+                      {{ r.comision_destination }}
+                      <div>{{ r.comision_date_from | date:'dd/MM/yyyy' }}</div>
+                    </td>
+                    <td class="small text-muted">
+                      @if (r.form === 'cash') {
+                        Efectivo — recibido por {{ r.received_by_name }}
+                      } @else if (r.form === 'deposit') {
+                        {{ r.bank_name }} / {{ r.payment_method_name }}
+                        <div class="font-monospace">{{ r.operation_number }}</div>
+                      } @else {
+                        <span class="text-muted">Sin registrar</span>
+                      }
+                    </td>
+                    <td class="text-end fw-bold">S/ {{ r.amount | number:'1.2-2' }}</td>
+                    <td class="text-center">
+                      @if (r.voucher_url) {
+                        <a style="cursor:pointer" (click)="filePreview.open(r.voucher_url!)"><fa-icon icon="image" /></a>
+                      }
+                    </td>
+                    <td>
+                      <c-badge [color]="r.status === 'validated' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'">
+                        {{ r.status === 'validated' ? 'Validado' : r.status === 'rejected' ? 'Rechazado' : 'Pendiente' }}
+                      </c-badge>
+                      @if (r.status === 'rejected' && r.notes) { <div class="text-danger small mt-1">{{ r.notes }}</div> }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="p-2">
+            <app-pagination [currentPage]="returnsHistoryPage()" [lastPage]="returnsHistoryLastPage()" [total]="returnsHistoryTotal()"
+              (pageChange)="loadReturnsHistory($event)" />
+          </div>
+        }
+      }
+
+    </c-card-body>
+  </c-card>
+
+}
+
+@if (activeTab() === 'categorias') {
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+      <label class="form-label small">Desde</label>
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_from" (change)="applyFilters()" />
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small">Hasta</label>
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_to" (change)="applyFilters()" />
+    </div>
+  </div>
+
+  @if (loadingCategories()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (categoriesSummary(); as cs) {
+    <div class="row g-3 mb-4">
+      @for (row of cs.by_category; track row.category) {
+        <div class="col-6 col-md-3">
+          <c-card class="text-center">
+            <c-card-body>
+              <div class="fs-5 fw-bold text-primary">S/ {{ +row.total | number:'1.2-2' }}</div>
+              <div class="text-muted small">{{ row.category }} ({{ row.qty }})</div>
+            </c-card-body>
+          </c-card>
+        </div>
+      }
+      @if (cs.by_category.length === 0) {
+        <div class="col-12 text-center text-muted py-3">Sin gastos registrados en este período.</div>
+      }
+    </div>
+
+    <c-card>
+      <c-card-header class="py-2 small fw-bold">Desglose por usuario</c-card-header>
+      <c-card-body class="p-0">
+        <table cTable hover responsive>
+          <thead>
+            <tr>
+              <th>Categoría</th>
+              <th>Usuario</th>
+              <th class="text-end">Cantidad</th>
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of cs.by_category_user; track row.category + '-' + row.user_id) {
+              <tr>
+                <td>{{ row.category }}</td>
+                <td>{{ row.user_name ?? '—' }}</td>
+                <td class="text-end">{{ row.qty }}</td>
+                <td class="text-end fw-bold">S/ {{ +row.total | number:'1.2-2' }}</td>
+              </tr>
+            }
+            @if (cs.by_category_user.length === 0) {
+              <tr><td colspan="4" class="text-center text-muted py-3">Sin datos.</td></tr>
+            }
+          </tbody>
+        </table>
+      </c-card-body>
+    </c-card>
+
+    <div class="mt-4">
+      <h6 class="text-muted">Categorías existentes</h6>
+      <div class="d-flex flex-wrap gap-2">
+        @for (c of categories(); track c.id) {
+          <span class="badge bg-secondary">{{ c.name }}</span>
+        }
+      </div>
+    </div>
+  }
+}
+
+<!-- ══ MODAL DE REVISIÓN DE VIÁTICO ══════════════════════════════════════════ -->
+@if (reviewModal() && reviewTarget(); as v) {
+  <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.6); z-index:1055;">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down" style="margin:0 auto;">
+      <div class="modal-content" style="border-radius:0; border-radius: clamp(0px, (100vw - 576px) * 9999, 8px);">
+
+        <!-- Header -->
+        <div class="modal-header py-2 px-3">
+          <div>
+            <div class="fw-bold" style="font-size:.9rem;">
+              {{ v.category }}
+              <span class="font-monospace text-body-secondary ms-1" style="font-size:.82rem;">#{{ v.id }}</span>
+            </div>
+            <div class="text-body-secondary" style="font-size:.75rem;">
+              {{ v.user_name ?? '—' }} · {{ v.date | date:'dd/MM/yyyy' }}
+            </div>
+          </div>
+          <button type="button" class="btn-close ms-auto" (click)="closeReview()"></button>
+        </div>
+
+        <!-- Foto / Factura: siempre primero, se ve directo si es imagen (sin necesidad de clic). -->
+        <div class="small text-body-secondary px-3 pt-2" style="font-size:.72rem;">Foto / Factura</div>
+        <ng-container [ngTemplateOutlet]="attachmentPreview" [ngTemplateOutletContext]="{
+          url: v.photo_url, alt: 'Foto / Factura', emptyText: 'Sin foto adjunta'
+        }" />
+
+        <!-- Voucher de transferencia: debajo, solo aplica si el gasto fue por transferencia
+             (es lo único que se pide en ese caso). También se ve directo si es imagen. -->
+        @if (v.payment_form === 'transfer') {
+          <div class="small text-body-secondary px-3 pt-2 border-top mt-2" style="font-size:.72rem;">Voucher de transferencia</div>
+          <ng-container [ngTemplateOutlet]="attachmentPreview" [ngTemplateOutletContext]="{
+            url: v.voucher_url, alt: 'Voucher', emptyText: 'Sin voucher adjunto'
+          }" />
+        }
+
+        <ng-template #attachmentPreview let-url="url" let-alt="alt" let-emptyText="emptyText">
+          @if (url) {
+            @if (isImage(url)) {
+              <div class="position-relative" style="background:#111;">
+                <div class="d-flex align-items-center justify-content-center"
+                     style="min-height:160px; max-height:38vh; overflow:hidden;">
+                  <img [src]="url" [alt]="alt"
+                       style="max-width:100%; max-height:38vh; object-fit:contain; display:block;" />
+                </div>
+                <div class="position-absolute bottom-0 end-0 p-2 d-flex gap-2">
+                  <a [href]="url" target="_blank" rel="noopener"
+                     class="btn btn-sm btn-dark fw-semibold" style="opacity:.85; backdrop-filter:blur(4px);">
+                    <fa-icon icon="arrow-up-right-from-square" class="me-1" />Ver completo
+                  </a>
+                  <a [href]="url" download
+                     class="btn btn-sm btn-dark fw-semibold" style="opacity:.85; backdrop-filter:blur(4px);">
+                    <fa-icon icon="download" class="me-1" />Descargar
+                  </a>
+                </div>
+              </div>
+            } @else {
+              <div class="d-flex flex-column align-items-center justify-content-center gap-3 py-4"
+                   style="background:var(--bs-tertiary-bg);">
+                <fa-icon icon="file-pdf" style="font-size:3rem; color:#dc3545; opacity:.85;" />
+                <div class="d-flex flex-wrap justify-content-center gap-2">
+                  <a [href]="url" target="_blank" rel="noopener" class="btn btn-outline-secondary fw-semibold px-4">
+                    <fa-icon icon="arrow-up-right-from-square" class="me-2" />Ver PDF
+                  </a>
+                  <a [href]="url" download class="btn btn-danger fw-semibold px-4">
+                    <fa-icon icon="download" class="me-2" />Descargar PDF
+                  </a>
+                </div>
+              </div>
+            }
+          } @else {
+            <div class="text-center py-3 text-body-secondary" style="background:var(--bs-tertiary-bg);">
+              <fa-icon icon="image" class="d-block mb-1" style="font-size:1.6rem; opacity:.25;" />
+              <span style="font-size:.82rem;">{{ emptyText }}</span>
+            </div>
+          }
+        </ng-template>
+
+        <!-- Detalles -->
+        <div class="px-3 pt-3 pb-2" style="font-size:.83rem;">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Usuario</div>
+              <div class="fw-semibold">{{ v.user_name ?? '—' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Monto</div>
+              <div class="fw-bold text-success" style="font-size:1.1rem;">S/ {{ v.amount | number:'1.2-2' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Categoría</div>
+              <div>{{ v.category }}</div>
+              @if (v.description) { <div class="text-body-secondary small">{{ v.description }}</div> }
+            </div>
+            <div class="col-6">
+              <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Banco / Método</div>
+              <div>{{ v.bank_name ?? '—' }}</div>
+              <div class="text-body-secondary small">{{ v.payment_method_name ?? '—' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">N° Operación</div>
+              <div class="font-monospace">{{ v.operation_number ?? '—' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Fecha / Hora</div>
+              <div>
+                {{ v.operation_date | date:'dd/MM/yyyy' }}
+                @if (v.operation_time) { {{ v.operation_time }} }
+              </div>
+            </div>
+          </div>
+
+          @if (v.document_type) {
+            <div class="mt-2 pt-2 border-top text-body-secondary" style="font-size:.78rem;">
+              <fa-icon icon="receipt" class="me-1" />
+              {{ DOCUMENT_TYPE_LABELS[v.document_type] }} {{ v.document_number }} — {{ v.establishment_name }}
+              ({{ v.document_date | date:'dd/MM/yyyy' }})
+            </div>
+          }
+        </div>
+
+        <!-- Contexto de presupuesto de la comisión -->
+        @if (loadingReviewItin()) {
+          <div class="text-center py-2"><c-spinner size="sm" color="primary" /></div>
+        } @else if (reviewItinContext(); as itin) {
+          @let rf = itin.resumen_financiero;
+          @let pct = usagePercent(itin);
+          <div class="px-3 pb-2">
+            <div class="p-2 bg-body-secondary rounded" style="font-size:.78rem;">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-body-secondary">
+                  <fa-icon icon="route" class="me-1" />{{ itin.destination }} — Adelanto S/ {{ rf.adelanto | number:'1.2-2' }}
+                </span>
+                <span class="fw-bold"
+                  [class.text-danger]="pct > 100" [class.text-warning]="pct > 80 && pct <= 100" [class.text-success]="pct <= 80">
+                  {{ pct }}% usado
+                </span>
+              </div>
+              <div class="progress mb-1" style="height:6px;">
+                <div class="progress-bar"
+                  [class.bg-success]="pct <= 80" [class.bg-warning]="pct > 80 && pct <= 100" [class.bg-danger]="pct > 100"
+                  [style.width.%]="pct > 100 ? 100 : pct"></div>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <span class="text-success">Aprobado: S/ {{ rf.aprobado | number:'1.2-2' }}</span>
+                @if (rf.pendiente_revision > 0) {
+                  <span class="text-warning">Pendiente: S/ {{ rf.pendiente_revision | number:'1.2-2' }}</span>
+                }
+                @if (rf.vuelto_o_faltante != null) {
+                  @if (rf.vuelto_o_faltante >= 0) {
+                    <span class="text-primary">Vuelto: S/ {{ rf.vuelto_o_faltante | number:'1.2-2' }}</span>
+                  } @else {
+                    <span class="text-danger">Gastó S/ {{ (-rf.vuelto_o_faltante) | number:'1.2-2' }} de más — le deben ese monto</span>
+                  }
+                }
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Acciones -->
+        <div class="px-3 pb-3">
+          @if (!rejectMode()) {
+            <div class="d-flex gap-2">
+              <button class="btn btn-success flex-grow-1 fw-semibold py-2"
+                      [disabled]="reviewSaving()" (click)="confirmApprove()">
+                @if (reviewSaving()) { <c-spinner size="sm" class="me-1" /> }
+                @else { <fa-icon icon="check" class="me-1" /> }
+                Aprobar
+              </button>
+              <button class="btn btn-outline-danger flex-grow-1 fw-semibold py-2"
+                      [disabled]="reviewSaving()" (click)="rejectMode.set(true)">
+                <fa-icon icon="xmark" class="me-1" />Rechazar
+              </button>
+            </div>
+          } @else {
+            <div class="border rounded-2 p-3" style="background:var(--bs-danger-bg-subtle); border-color:var(--bs-danger-border-subtle)!important;">
+              <label class="form-label fw-semibold text-danger mb-1" style="font-size:.85rem;">
+                <fa-icon icon="triangle-exclamation" class="me-1" />Motivo del rechazo
+                <span class="text-danger">*</span>
+              </label>
+              <textarea class="form-control mb-2" rows="2" [ngModel]="reviewNotes()" (ngModelChange)="reviewNotes.set($event)"
+                        placeholder="Ej: Voucher ilegible, monto incorrecto, N° de operación no coincide…"></textarea>
+              <div class="d-flex gap-2">
+                <button class="btn btn-secondary btn-sm flex-grow-1"
+                        [disabled]="reviewSaving()" (click)="rejectMode.set(false); reviewNotes.set('')">
+                  Cancelar
+                </button>
+                <button class="btn btn-danger btn-sm flex-grow-1 fw-semibold"
+                        [disabled]="reviewSaving() || !reviewNotes().trim()" (click)="confirmReject()">
+                  @if (reviewSaving()) { <c-spinner size="sm" class="me-1" /> }
+                  Confirmar rechazo
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Validar/rechazar comprobante de devolución de vuelto -->
+<c-modal [visible]="!!returnReviewTarget()" (visibleChange)="!$event && returnReviewTarget.set(null)" alignment="center" backdrop="static">
+  <c-modal-header>
+    <h5 class="modal-title">
+      @if (returnReviewAction() === 'validate') { Validar devolución } @else { Rechazar devolución }
+    </h5>
+  </c-modal-header>
+  <c-modal-body>
+    @if (returnReviewTarget(); as r) {
+      <div class="mb-3 p-3 bg-body-secondary rounded small">
+        <div><strong>{{ r.user_name }}</strong> — S/ {{ r.amount | number:'1.2-2' }}</div>
+        <div class="text-muted">
+          {{ r.comision_destination }} · {{ r.bank_name }} / {{ r.payment_method_name }} · Op. {{ r.operation_number }}
+          @if (r.operation_date) { · {{ r.operation_date | date:'dd/MM/yyyy' }} }
+          @if (r.operation_time) { {{ r.operation_time }} }
+        </div>
+      </div>
+      @if (r.voucher_url) {
+        @if (isImage(r.voucher_url)) {
+          <div class="position-relative mb-3" style="background:#111; border-radius:.375rem; overflow:hidden;">
+            <div class="d-flex align-items-center justify-content-center" style="min-height:160px; max-height:38vh;">
+              <img [src]="r.voucher_url" alt="Voucher" style="max-width:100%; max-height:38vh; object-fit:contain; display:block; cursor:zoom-in;"
+                   (click)="filePreview.open(r.voucher_url!)" />
+            </div>
+          </div>
+        } @else {
+          <div class="d-flex flex-column align-items-center justify-content-center gap-2 py-4 mb-3 rounded"
+               style="background:var(--bs-tertiary-bg);">
+            <fa-icon icon="file-pdf" style="font-size:2.5rem; color:#dc3545; opacity:.85;" />
+            <a [href]="r.voucher_url" download class="btn btn-sm btn-outline-secondary fw-semibold">
+              <fa-icon icon="download" class="me-1" />Descargar comprobante
+            </a>
+          </div>
+        }
+      }
+    }
+    <div>
+      <label class="form-label small">
+        Notas
+        @if (returnReviewAction() === 'reject') { <span class="text-danger">*</span> }
+      </label>
+      <textarea class="form-control" [ngModel]="returnReviewNotes()" (ngModelChange)="returnReviewNotes.set($event)"
+        rows="2" [placeholder]="returnReviewAction() === 'reject' ? 'Motivo del rechazo…' : 'Comentario (opcional)…'"></textarea>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="returnReviewTarget.set(null)" [disabled]="returnReviewSaving()">
+      Cancelar
+    </button>
+    <button cButton [color]="returnReviewAction() === 'validate' ? 'success' : 'danger'"
+      (click)="doValidateReturn()"
+      [disabled]="returnReviewSaving() || (returnReviewAction() === 'reject' && !returnReviewNotes().trim())">
+      @if (returnReviewSaving()) { <fa-icon [icon]="faSpinner" class="me-1" /> }
+      @if (returnReviewAction() === 'validate') { Validar } @else { Rechazar }
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- Validar/rechazar depósito de vuelto de viáticos (de cualquier usuario) -->
+<c-modal [visible]="!!validatingDeposit()" (visibleChange)="!$event && validatingDeposit.set(null)" alignment="center" backdrop="static">
+  <c-modal-header>
+    <h5 class="modal-title">Revisar depósito de vuelto</h5>
+  </c-modal-header>
+  <c-modal-body>
+    @if (validatingDeposit(); as d) {
+      <div class="mb-3 p-3 bg-body-secondary rounded small">
+        <div><strong>{{ d.deposited_by_name }}</strong> — S/ {{ d.amount | number:'1.2-2' }}</div>
+        <div class="text-muted">{{ d.bank?.name }} / {{ d.payment_method?.name }} · Op. {{ d.operation_number }} · {{ d.deposit_date | date:'dd/MM/yyyy' }}</div>
+      </div>
+      @if (d.voucher_url) {
+        @if (isImage(d.voucher_url)) {
+          <div class="position-relative mb-3" style="background:#111; border-radius:.375rem; overflow:hidden;">
+            <div class="d-flex align-items-center justify-content-center" style="min-height:160px; max-height:38vh;">
+              <img [src]="d.voucher_url" alt="Voucher" style="max-width:100%; max-height:38vh; object-fit:contain; display:block; cursor:zoom-in;"
+                   (click)="filePreview.open(d.voucher_url!)" />
+            </div>
+          </div>
+        } @else {
+          <div class="d-flex flex-column align-items-center justify-content-center gap-2 py-4 mb-3 rounded"
+               style="background:var(--bs-tertiary-bg);">
+            <fa-icon icon="file-pdf" style="font-size:2.5rem; color:#dc3545; opacity:.85;" />
+            <a [href]="d.voucher_url" download class="btn btn-sm btn-outline-secondary fw-semibold">
+              <fa-icon icon="download" class="me-1" />Descargar comprobante
+            </a>
+          </div>
+        }
+      }
+    }
+    @if (!depositRejectMode()) {
+      <div class="d-flex gap-2">
+        <button class="btn btn-success flex-grow-1" [disabled]="depositReviewSaving()" (click)="confirmValidateDeposit()">
+          @if (depositReviewSaving()) { <fa-icon [icon]="faSpinner" class="me-1" /> }
+          Validar
+        </button>
+        <button class="btn btn-outline-danger flex-grow-1" [disabled]="depositReviewSaving()" (click)="depositRejectMode.set(true)">
+          Rechazar
+        </button>
+      </div>
+    } @else {
+      <label class="form-label small">Motivo del rechazo <span class="text-danger">*</span></label>
+      <textarea class="form-control mb-2" rows="2" [ngModel]="depositReviewNotes()" (ngModelChange)="depositReviewNotes.set($event)"
+        placeholder="Ej: Voucher ilegible, monto incorrecto…"></textarea>
+      <div class="d-flex gap-2">
+        <button class="btn btn-secondary btn-sm flex-grow-1" [disabled]="depositReviewSaving()"
+          (click)="depositRejectMode.set(false); depositReviewNotes.set('')">Cancelar</button>
+        <button class="btn btn-danger btn-sm flex-grow-1" [disabled]="depositReviewSaving() || !depositReviewNotes().trim()"
+          (click)="confirmRejectDeposit()">
+          @if (depositReviewSaving()) { <fa-icon [icon]="faSpinner" class="me-1" /> }
+          Confirmar rechazo
+        </button>
+      </div>
+    }
+  </c-modal-body>
+</c-modal>
+
+<app-confirm-modal
+  [visible]="!!deletingDeposit()"
+  title="Eliminar depósito"
+  [message]="'¿Eliminar el depósito ' + (deletingDeposit()?.code ?? '') + ' por S/ ' + (deletingDeposit()?.amount ?? '') + '? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  (confirm)="doDeleteDeposit()"
+  (cancel)="deletingDeposit.set(null)" />
+
+<app-register-deposit-modal
+  source="viatico"
+  [open]="showNewViaticoDeposit()"
+  [deposit]="editViaticoDeposit()"
+  (registered)="editViaticoDeposit() ? onViaticoDepositCorrected($event) : onViaticoDepositRegistered($event)"
+  (cancelled)="showNewViaticoDeposit.set(false); editViaticoDeposit.set(null)" />
+
+<app-return-submit-modal
+  [viaticoReturn]="registeringReturn()"
+  (submitted)="onReturnRegistered()"
+  (cancelled)="registeringReturn.set(null)" />
+
+<app-file-preview-modal #filePreview />

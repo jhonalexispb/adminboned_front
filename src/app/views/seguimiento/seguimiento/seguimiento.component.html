@@ -1,0 +1,55 @@
+<app-page-header title="Seguimiento" subtitle="Ruta y actividad del día de un usuario" />
+
+<div class="row g-2 mb-3">
+  <div class="col-6 col-md-4">
+    <label class="form-label small">Usuario</label>
+    <p-select [options]="users()" optionLabel="name" optionValue="id"
+      [(ngModel)]="selectedUserId" (onChange)="search()"
+      placeholder="Seleccionar usuario" styleClass="w-100 p-inputtext-sm" />
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label small">Fecha</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="selectedDate" (change)="search()" />
+  </div>
+</div>
+
+@if (users().length === 0) {
+  <div class="text-center text-muted py-5">
+    <fa-icon icon="location-dot" class="fs-1 d-block mb-2" />
+    <div>Ningún usuario tiene el seguimiento habilitado todavía.</div>
+    <div class="small mt-1">Actívalo desde el módulo Usuarios.</div>
+  </div>
+} @else {
+  <c-card>
+    <c-card-header class="d-flex justify-content-between align-items-center py-2">
+      <span class="small">
+        @if (assignedDistricts().length > 0) {
+          <fa-icon icon="map-pin" class="text-info me-1" />
+          Distritos asignados ese día:
+          @for (d of assignedDistricts(); track d.id) {
+            <strong class="ms-1">{{ d.name }}</strong> <span class="text-muted">({{ d.province_name }})</span>@if (!$last) {,}
+          }
+        } @else {
+          <span class="text-muted">Sin comisión asignada para esa fecha.</span>
+        }
+      </span>
+      @if ((map?.outsideCount() ?? 0) > 0) {
+        <span class="badge bg-danger">{{ map!.outsideCount() }} acciones fuera de las provincias asignadas</span>
+      }
+    </c-card-header>
+    <c-card-body class="p-2 position-relative">
+      @if (loading()) {
+        <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center
+                    justify-content-center" style="background:rgba(0,0,0,.35);z-index:600">
+          <c-spinner color="primary" />
+        </div>
+      }
+      <app-tracking-map [points]="points()" [assignedProvinceNames]="provinceNames()" height="520px" />
+      @if (!loading() && points().length === 0) {
+        <div class="text-center text-muted py-4">
+          Sin acciones registradas para {{ selectedDate | date:'dd/MM/yyyy' }}.
+        </div>
+      }
+    </c-card-body>
+  </c-card>
+}

@@ -64,6 +64,19 @@
           </div>
         }
 
+        <!-- Seguimiento GPS -->
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="trackingSwitch"
+                   [ngModel]="form().tracking_enabled"
+                   (ngModelChange)="form.update(f => ({...f, tracking_enabled: $event}))" />
+            <label class="form-check-label small" for="trackingSwitch">
+              Habilitar seguimiento GPS
+              <span class="text-body-secondary ms-1">— se captura su ubicación en cada acción que registre</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Roles -->
         <div class="col-12">
           <label class="form-label small mb-2">Roles <span class="text-danger">*</span></label>

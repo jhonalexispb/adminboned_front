@@ -17,7 +17,7 @@ export interface CatalogRequest {
   id: number;
   code: string;
   client: { id: number; name: string; business_name: string; ruc: string | null; phone: string | null } | null;
-  status: 'pending_review' | 'needs_client_action' | 'ready_to_convert' | 'converted' | 'cancelled';
+  status: 'draft' | 'pending_review' | 'needs_client_action' | 'ready_to_convert' | 'converted' | 'cancelled';
   subtotal: string;
   total: string;
   client_notes: string | null;
@@ -29,6 +29,7 @@ export interface CatalogRequest {
 }
 
 export const CATALOG_REQUEST_STATUS_LABELS: Record<string, string> = {
+  draft:               'Carrito sin enviar',
   pending_review:      'Por revisar',
   needs_client_action: 'Requiere acción del cliente',
   ready_to_convert:    'Listo para convertir',
@@ -37,6 +38,7 @@ export const CATALOG_REQUEST_STATUS_LABELS: Record<string, string> = {
 };
 
 export const CATALOG_REQUEST_STATUS_COLORS: Record<string, string> = {
+  draft:               'light',
   pending_review:      'secondary',
   needs_client_action: 'warning',
   ready_to_convert:    'info',

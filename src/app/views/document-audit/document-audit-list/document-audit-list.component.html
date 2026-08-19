@@ -1,0 +1,101 @@
+<app-page-header title="Auditoría de Documentos" subtitle="Boletas, facturas y tickets declarados en gastos de viáticos" />
+
+@if (repeatedCount() > 0) {
+  <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+    <fa-icon [icon]="faTriangleExclamation" />
+    <div>
+      Hay <strong>{{ repeatedCount() }}</strong> registros con un número de documento repetido.
+      El sistema ya bloquea repetir el mismo documento en el mismo establecimiento — revisa estos casos
+      para confirmar que de verdad son de establecimientos distintos.
+    </div>
+  </div>
+}
+
+<div class="row g-2 mb-3 align-items-end">
+  <div class="col-6 col-md-3">
+    <label class="form-label small">Buscar N° de documento</label>
+    <input type="text" class="form-control form-control-sm"
+           [(ngModel)]="filters.document_number" (keyup.enter)="applyFilters()"
+           placeholder="Ej. B001-000123" />
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label small">Tipo</label>
+    <p-select [options]="typeOptions" optionLabel="label" optionValue="value"
+      [(ngModel)]="filters.document_type" (onChange)="applyFilters()"
+      placeholder="Todos" styleClass="w-100 p-inputtext-sm" />
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Desde</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_from" (change)="applyFilters()" />
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Hasta</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_to" (change)="applyFilters()" />
+  </div>
+  <div class="col-6 col-md-2 d-flex align-items-center">
+    <div class="form-check">
+      <input type="checkbox" class="form-check-input" id="onlyRep"
+             [(ngModel)]="filters.only_repeated" (change)="applyFilters()" />
+      <label class="form-check-label small" for="onlyRep">Solo repetidos</label>
+    </div>
+  </div>
+  <div class="col-12 col-md-auto">
+    <button cButton color="primary" size="sm" (click)="applyFilters()">Buscar</button>
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (items().length === 0) {
+  <div class="text-center text-muted py-5">
+    <div class="fs-1">🧾</div>
+    <div>No hay documentos registrados con estos filtros.</div>
+  </div>
+} @else {
+  <c-card>
+    <c-card-body class="p-0">
+      <table cTable hover responsive>
+        <thead>
+          <tr>
+            <th>Fecha emisión</th>
+            <th>Tipo</th>
+            <th>N° documento</th>
+            <th>Establecimiento</th>
+            <th>Categoría</th>
+            <th class="text-end">Monto</th>
+            <th>Usuario</th>
+            <th>Comisión</th>
+            <th>Comprobante</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of items(); track d.id) {
+            <tr [class.table-warning]="d.is_repeated_number">
+              <td class="text-nowrap">{{ d.document_date ? (d.document_date | date:'dd/MM/yyyy') : '—' }}</td>
+              <td><c-badge color="secondary">{{ typeLabel(d.document_type) }}</c-badge></td>
+              <td class="text-nowrap">
+                {{ d.document_number }}
+                @if (d.is_repeated_number) {
+                  <fa-icon [icon]="faTriangleExclamation" class="text-warning ms-1"
+                           title="Este número de documento aparece en más de un gasto" />
+                }
+              </td>
+              <td>{{ d.establishment_name ?? '—' }}</td>
+              <td>{{ d.category }}</td>
+              <td class="text-end fw-bold">S/ {{ d.amount | number:'1.2-2' }}</td>
+              <td>{{ d.user_name ?? '—' }}</td>
+              <td class="text-muted small">{{ d.comision_destination ?? '—' }}</td>
+              <td>
+                @if (d.photo_url) {
+                  <a [href]="d.photo_url" target="_blank">Ver</a>
+                } @else { — }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </c-card-body>
+  </c-card>
+
+  <app-pagination [currentPage]="filters.page ?? 1" [lastPage]="lastPage()" [total]="total()" (pageChange)="onPage($event)" />
+}

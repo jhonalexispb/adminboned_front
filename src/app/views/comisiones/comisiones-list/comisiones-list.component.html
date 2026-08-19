@@ -1,0 +1,1287 @@
+<app-page-header title="Comisiones" subtitle="Asignación de zonas y periodos de comisión por vendedor">
+  <button cButton color="primary" size="sm" (click)="openCreate()">
+    <fa-icon [icon]="faPlus" class="me-1" />Nueva comisión
+  </button>
+</app-page-header>
+
+<!-- Tabs -->
+<div class="btn-group mb-3" role="group">
+  <button type="button" class="btn btn-sm" [class.btn-primary]="activeTab() === 'list'"
+    [class.btn-outline-secondary]="activeTab() !== 'list'" (click)="selectTab('list')">
+    Comisiones
+  </button>
+  <button type="button" class="btn btn-sm" [class.btn-primary]="activeTab() === 'sin-comisionar'"
+    [class.btn-outline-secondary]="activeTab() !== 'sin-comisionar'" (click)="selectTab('sin-comisionar')">
+    Pedidos sin comisionar
+    @if (sinComisionar().length > 0) {
+      <c-badge color="secondary" shape="rounded-pill" class="ms-1">{{ sinComisionar().length }}</c-badge>
+    }
+  </button>
+</div>
+
+@if (activeTab() === 'list') {
+
+<!-- Filtros -->
+<div class="row g-2 mb-3">
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Desde</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_from" (change)="applyFilters()" />
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Hasta</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_to" (change)="applyFilters()" />
+  </div>
+  <div class="col-6 col-md-4">
+    <label class="form-label small">Vendedor</label>
+    <p-select [options]="sellerOptions()" optionLabel="label" optionValue="value"
+      [(ngModel)]="filters.user_id" (onChange)="applyFilters()"
+      placeholder="Todos" styleClass="w-100 p-inputtext-sm" />
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label small">Estado</label>
+    <p-select [options]="statusOptions" optionLabel="label" optionValue="value"
+      [(ngModel)]="filters.status" (onChange)="applyFilters()"
+      placeholder="Todos" styleClass="w-100 p-inputtext-sm" />
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (items().length === 0) {
+  <div class="text-center text-muted py-5">
+    <div class="fs-1">🗓️</div>
+    <div>No hay comisiones en el período seleccionado.</div>
+  </div>
+} @else {
+  <!-- ══ VISTA MOBILE: cards ═════════════════════════════════════════════════ -->
+  <div class="d-md-none d-flex flex-column gap-2">
+    @for (c of items(); track c.id) {
+      @let st = STATUS[c.status];
+      <c-card>
+        <c-card-header class="py-2 px-3">
+          <div class="d-flex align-items-center justify-content-between gap-2">
+            <div>
+              <div class="fw-bold" style="font-size:.9rem;">{{ c.user_name ?? '—' }}</div>
+              <div class="text-body-secondary" style="font-size:.72rem;">
+                {{ c.date_from | date:'dd/MM/yy' }}
+                @if (c.date_from !== c.date_to) { → {{ c.date_to | date:'dd/MM/yy' }} }
+              </div>
+            </div>
+            <c-badge [color]="st.color" style="font-size:.7rem;">{{ st.label }}</c-badge>
+          </div>
+        </c-card-header>
+        <c-card-body class="px-3 py-2">
+          @if (c.destination) {
+            <div class="small text-body-secondary mb-1">{{ c.destination }}</div>
+          }
+          <div class="mb-2 d-flex flex-wrap gap-1">
+            @if (c.zonas.length) {
+              @for (z of c.zonas; track z.id) {
+                <c-badge color="info" style="font-size:.7rem;">{{ zoneLabel(z) }}</c-badge>
+              }
+            } @else {
+              <span class="text-muted" style="font-size:.75rem;">Sin zonas</span>
+            }
+          </div>
+          @if (c.advance.status === 'delivered' || c.budget) {
+            <div class="d-flex justify-content-between align-items-start mb-2" style="font-size:.8rem;">
+              <div>
+                <div class="text-body-secondary" style="font-size:.68rem; text-transform:uppercase; letter-spacing:.04em;">Viáticos</div>
+                @if (c.advance.status === 'delivered') {
+                  <span class="text-success fw-semibold">S/ {{ c.advance.amount | number:'1.2-2' }}</span>
+                } @else {
+                  <span class="text-muted">Pendiente (S/ {{ c.budget | number:'1.2-2' }})</span>
+                }
+              </div>
+              <div class="text-end">
+                <div class="text-body-secondary" style="font-size:.68rem; text-transform:uppercase; letter-spacing:.04em;">Gastos</div>
+                <div>{{ c.gastos_count }} · <strong class="text-primary">S/ {{ c.gastos_total | number:'1.2-2' }}</strong></div>
+              </div>
+            </div>
+          }
+
+          <div class="d-flex gap-1 overflow-auto pb-1" style="scrollbar-width:none; -ms-overflow-style:none;">
+            @if (c.status === 'open') {
+              <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center flex-shrink-0" style="min-width:56px;" (click)="openEdit(c)">
+                <fa-icon [icon]="faPencil" /><small>Editar</small>
+              </button>
+              @if (c.gastos_count === 0) {
+                <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center flex-shrink-0" style="min-width:56px;" (click)="confirmDelete(c)">
+                  <fa-icon [icon]="faTrash" /><small>Eliminar</small>
+                </button>
+              }
+            } @else {
+              <button class="btn btn-sm btn-outline-warning d-flex flex-column align-items-center flex-shrink-0" style="min-width:56px;" [disabled]="reopeningId() === c.id" (click)="reopen(c)">
+                @if (reopeningId() === c.id) { <fa-icon [icon]="faSpinner" spin /> } @else { <fa-icon [icon]="faLockOpen" /> }
+                <small>Reabrir</small>
+              </button>
+            }
+            <button class="btn btn-sm btn-outline-primary d-flex flex-column align-items-center flex-shrink-0" style="min-width:56px;" (click)="openDetail(c)">
+              <fa-icon [icon]="faEye" /><small>Ver</small>
+            </button>
+          </div>
+        </c-card-body>
+      </c-card>
+    }
+  </div>
+
+  <!-- ══ VISTA DESKTOP: tabla ════════════════════════════════════════════════ -->
+  <c-card class="d-none d-md-block">
+    <c-card-body class="p-0">
+      <table cTable hover responsive class="mb-0">
+        <thead>
+          <tr>
+            <th>Vendedor</th>
+            <th>Fecha</th>
+            <th>Destino</th>
+            <th>Zonas</th>
+            <th>Estado</th>
+            <th>Viáticos</th>
+            <th class="text-end">Gastos</th>
+            <th class="text-end" style="white-space:nowrap;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of items(); track c.id) {
+            @let st = STATUS[c.status];
+            <tr>
+              <td>{{ c.user_name ?? '—' }}</td>
+              <td class="text-nowrap">
+                {{ c.date_from | date:'dd/MM/yy' }}
+                @if (c.date_from !== c.date_to) { → {{ c.date_to | date:'dd/MM/yy' }} }
+              </td>
+              <td>{{ c.destination ?? '—' }}</td>
+              <td>
+                @if (c.zonas.length) {
+                  <div class="d-flex flex-wrap gap-1">
+                    @for (z of c.zonas; track z.id) {
+                      <c-badge color="info" style="font-size:.7rem;">{{ zoneLabel(z) }}</c-badge>
+                    }
+                  </div>
+                } @else {
+                  <span class="text-muted small">Sin zonas</span>
+                }
+              </td>
+              <td><c-badge [color]="st.color">{{ st.label }}</c-badge></td>
+              <td class="small">
+                @if (c.advance.status === 'delivered') {
+                  <span class="text-success">S/ {{ c.advance.amount | number:'1.2-2' }}</span>
+                } @else if (c.budget) {
+                  <span class="text-muted">Pendiente (S/ {{ c.budget | number:'1.2-2' }})</span>
+                }
+              </td>
+              <td class="text-end">
+                @if (c.advance.status === 'delivered' || c.budget) {
+                  <div>{{ c.gastos_count }}</div>
+                  <div class="fw-semibold text-primary small">S/ {{ c.gastos_total | number:'1.2-2' }}</div>
+                }
+              </td>
+              <td>
+                <div class="d-inline-flex gap-1 flex-nowrap justify-content-end">
+                  @if (c.status === 'open') {
+                    <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center" (click)="openEdit(c)">
+                      <fa-icon [icon]="faPencil" /><small>Editar</small>
+                    </button>
+                    @if (c.gastos_count === 0) {
+                      <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center" (click)="confirmDelete(c)">
+                        <fa-icon [icon]="faTrash" /><small>Eliminar</small>
+                      </button>
+                    }
+                  } @else {
+                    <button class="btn btn-sm btn-outline-warning d-flex flex-column align-items-center" [disabled]="reopeningId() === c.id" (click)="reopen(c)">
+                      @if (reopeningId() === c.id) { <fa-icon [icon]="faSpinner" spin /> } @else { <fa-icon [icon]="faLockOpen" /> }
+                      <small>Reabrir</small>
+                    </button>
+                  }
+                  <button class="btn btn-sm btn-outline-primary d-flex flex-column align-items-center" (click)="openDetail(c)">
+                    <fa-icon [icon]="faEye" /><small>Ver</small>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </c-card-body>
+  </c-card>
+
+  <div class="mt-3">
+    <app-pagination [currentPage]="filters.page ?? 1" [lastPage]="lastPage()" [total]="total()"
+      (pageChange)="onPage($event)" />
+  </div>
+}
+
+} <!-- fin activeTab 'list' -->
+
+@if (activeTab() === 'sin-comisionar') {
+  <div class="alert alert-secondary py-2 px-3 mb-3" style="font-size:.83rem;">
+    <fa-icon icon="circle-info" class="me-1" />
+    Pedidos vendidos que hoy no caen dentro de la zona ni el rango de fechas de ninguna
+    comisión abierta — no se le van a comisionar a nadie mientras siga así. Es informativo,
+    revisa si hace falta abrir una comisión que los cubra.
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+      <label class="form-label small">Desde</label>
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="sinComisionarFilters.date_from" (change)="loadSinComisionar()" />
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small">Hasta</label>
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="sinComisionarFilters.date_to" (change)="loadSinComisionar()" />
+    </div>
+  </div>
+
+  @if (loadingSinComisionar()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (sinComisionar().length === 0) {
+    <div class="text-center text-muted py-5">
+      <div class="fs-1">✅</div>
+      <div>No hay pedidos sin comisionar en el período seleccionado.</div>
+    </div>
+  } @else {
+    <!-- Mobile: tarjetas -->
+    <div class="d-md-none d-flex flex-column gap-2">
+      @for (p of sinComisionar(); track p.id) {
+        <div class="card shadow-sm" style="border-radius:12px;">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <div class="fw-bold">{{ p.code }}</div>
+              <div class="fw-bold text-primary">S/ {{ p.total | number:'1.2-2' }}</div>
+            </div>
+            <div class="small">{{ p.client_business_name || p.client_name }}</div>
+            <div class="text-body-secondary" style="font-size:.75rem;">
+              {{ [p.client_district, p.client_province, p.client_department].filter(v => v).join(', ') }}
+            </div>
+            <div class="text-body-secondary" style="font-size:.75rem;">{{ p.date | date:'dd/MM/yyyy' }}</div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Desktop: tabla -->
+    <c-card class="d-none d-md-block">
+      <c-card-body class="p-0">
+        <div class="table-responsive">
+          <table cTable hover small class="mb-0">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Cliente</th>
+                <th>Zona</th>
+                <th>Fecha</th>
+                <th class="text-end">Total</th>
+                <th class="text-end">Cobrado neto</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of sinComisionar(); track p.id) {
+                <tr>
+                  <td class="font-monospace small">{{ p.code }}</td>
+                  <td class="small">{{ p.client_business_name || p.client_name }}</td>
+                  <td class="small text-muted">
+                    {{ [p.client_district, p.client_province, p.client_department].filter(v => v).join(', ') }}
+                  </td>
+                  <td class="small text-nowrap">{{ p.date | date:'dd/MM/yyyy' }}</td>
+                  <td class="text-end">S/ {{ p.total | number:'1.2-2' }}</td>
+                  <td class="text-end fw-semibold">S/ {{ p.net_collected | number:'1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+}
+
+<!-- ── Modal ver detalle ─────────────────────────────────────────────────── -->
+<c-modal [visible]="!!expandedId()" (visibleChange)="!$event && closeDetail()" size="lg" alignment="center">
+  <c-modal-header>
+    <h5 cModalTitle>
+      @if (expandedItem(); as d) {
+        Comisión de {{ d.user_name }} · {{ d.date_from | date:'dd/MM/yy' }}
+        @if (d.date_from !== d.date_to) { → {{ d.date_to | date:'dd/MM/yy' }} }
+      } @else {
+        Detalle de comisión
+      }
+    </h5>
+  </c-modal-header>
+  <c-modal-body>
+    @if (loadingExpanded()) {
+      <div class="text-center py-4"><c-spinner color="primary" /></div>
+    } @else if (expandedItem(); as d) {
+
+      <!-- Barra de estado y acción principal -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <c-badge [color]="STATUS[d.status].color">{{ STATUS[d.status].label }}</c-badge>
+        @if (d.status === 'open') {
+          <button cButton color="warning" size="sm" (click)="closeDetail(); openClose(d)">
+            <fa-icon [icon]="faLock" class="me-1" />Cerrar comisión
+          </button>
+        }
+      </div>
+
+      <!-- Zonas y tramos -->
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <c-card class="h-100">
+            <c-card-header class="py-2 small fw-semibold text-body-secondary text-uppercase">Zonas asignadas</c-card-header>
+            <c-card-body class="py-2">
+              @if (!d.zonas.length) {
+                <div class="text-muted small">Sin zonas.</div>
+              } @else {
+                <div class="d-flex flex-wrap gap-1">
+                  @for (z of d.zonas; track z.id) {
+                    <c-badge color="info">
+                      {{ z.zone_type === 'department' ? 'Dpto. ' + z.department_name
+                         : z.zone_type === 'province' ? 'Prov. ' + z.province_name
+                         : 'Dist. ' + z.district_name }}
+                    </c-badge>
+                  }
+                </div>
+              }
+              @if (d.purpose) {
+                <div class="small text-muted mt-2"><strong>Propósito:</strong> {{ d.purpose }}</div>
+              }
+              @if (d.notes) {
+                <div class="small text-muted mt-1"><strong>Notas:</strong> {{ d.notes }}</div>
+              }
+            </c-card-body>
+          </c-card>
+        </div>
+        <div class="col-md-6">
+          <c-card class="h-100">
+            <c-card-header class="py-2 small fw-semibold text-body-secondary text-uppercase">Tramos de comisión</c-card-header>
+            <c-card-body class="py-2">
+              @if (!d.tramos.length) {
+                <div class="text-muted small">Sin tramos definidos.</div>
+              } @else {
+                <div class="d-flex flex-wrap gap-1">
+                  @for (t of d.tramos; track t.id) {
+                    <c-badge color="primary">Desde S/ {{ t.min_amount | number:'1.2-2' }} → {{ t.percentage }}%</c-badge>
+                  }
+                </div>
+              }
+            </c-card-body>
+          </c-card>
+        </div>
+      </div>
+
+      <!-- Viáticos -->
+      <c-card class="mb-3">
+        <c-card-header class="py-2 d-flex justify-content-between align-items-center">
+          <span class="small fw-semibold text-body-secondary text-uppercase">Viáticos</span>
+          <div class="d-flex flex-wrap gap-2">
+            @if (d.status === 'open' && d.advance.status === 'none' && d.budget) {
+              <button cButton color="success" size="sm" (click)="closeDetail(); openAdvance(d)">
+                <fa-icon [icon]="faMoneyBillWave" class="me-1" />Entregar viáticos
+              </button>
+            }
+            @if (d.status === 'open' && d.advance.status === 'delivered') {
+              <button cButton color="secondary" size="sm" variant="outline" (click)="closeDetail(); openBudgetAdjust(d, 'increase')">
+                Abono
+              </button>
+              <button cButton color="secondary" size="sm" variant="outline" (click)="closeDetail(); openBudgetAdjust(d, 'decrease')">
+                Reducción
+              </button>
+            }
+          </div>
+        </c-card-header>
+        <c-card-body>
+          <!-- Resumen financiero (mismo patrón visual que Mis Viáticos) -->
+          @if (d.advance.status === 'delivered') {
+            @let rf = d.resumen_financiero;
+            @let pct = usagePercent(d);
+            <div class="d-flex justify-content-between align-items-center small mb-1">
+              <span>
+                Viáticos entregados: <strong>S/ {{ rf.adelanto | number:'1.2-2' }}</strong>
+                <span class="text-muted">({{ d.advance.form === 'cash' ? 'efectivo' : 'depósito' }} — {{ d.advance.delivered_at | date:'dd/MM/yyyy' }} por {{ d.advance.delivered_by_name }})</span>
+              </span>
+              <span class="fw-bold" [class.text-danger]="pct > 100" [class.text-warning]="pct > 80 && pct <= 100" [class.text-success]="pct <= 80">
+                {{ pct }}% usado
+              </span>
+            </div>
+            <div class="progress" style="height:8px;">
+              <div class="progress-bar"
+                [class.bg-success]="pct <= 80" [class.bg-warning]="pct > 80 && pct <= 100" [class.bg-danger]="pct > 100"
+                [style.width.%]="pct > 100 ? 100 : pct"></div>
+            </div>
+            <div class="d-flex flex-wrap gap-3 small mt-2">
+              <span class="text-success">✔ Aprobado: S/ {{ rf.aprobado | number:'1.2-2' }}</span>
+              @if (rf.pendiente_revision > 0) {
+                <span class="text-warning">⏳ Pendiente de revisión: S/ {{ rf.pendiente_revision | number:'1.2-2' }}</span>
+              }
+              @if (rf.rechazado > 0) {
+                <span class="text-danger">✘ Rechazado: S/ {{ rf.rechazado | number:'1.2-2' }}</span>
+              }
+              @if (rf.vuelto_o_faltante != null) {
+                @if (rf.vuelto_o_faltante >= 0) {
+                  <span class="text-primary">↩ Vuelto por devolver: S/ {{ rf.vuelto_o_faltante | number:'1.2-2' }}</span>
+                } @else {
+                  <span class="text-danger">⚠ Gastó S/ {{ (-rf.vuelto_o_faltante) | number:'1.2-2' }} de más — se le debe ese monto</span>
+                }
+              }
+            </div>
+            @if (d.return) {
+              <div class="small mt-2 border-top pt-2">
+                {{ d.return.direction === 'to_company' ? 'El vendedor debe devolver:' : 'Se le debe al vendedor:' }}
+                S/ {{ d.return.amount | number:'1.2-2' }}
+                <c-badge [color]="d.return.status === 'validated' ? 'success' : d.return.status === 'rejected' ? 'danger' : 'warning'">
+                  {{ d.return.status === 'validated' ? 'Regularizado' : d.return.status === 'rejected' ? 'Rechazado' : 'Pendiente' }}
+                </c-badge>
+              </div>
+            }
+          } @else if (!d.budget) {
+            <div class="text-muted small mb-0">Esta comisión no tiene viáticos (sin presupuesto asignado).</div>
+          } @else {
+            <div class="text-muted small mb-0">Presupuesto de viáticos: S/ {{ d.budget | number:'1.2-2' }} — aún no entregado.</div>
+          }
+        </c-card-body>
+      </c-card>
+
+      <!-- Comisión por ventas -->
+      @if (d.status === 'closed') {
+        <c-card class="mb-3">
+          <c-card-header class="py-2 small fw-semibold text-body-secondary text-uppercase">Comisión por ventas</c-card-header>
+          <c-card-body>
+            @if (d.total_ventas) {
+              <div class="d-flex justify-content-between align-items-center small">
+                <span>Ventas comisionadas</span>
+                <strong>S/ {{ d.total_ventas | number:'1.2-2' }}</strong>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="small">Comisión</span>
+                @if (d.total_comision != null) {
+                  <strong class="text-success">S/ {{ d.total_comision | number:'1.2-2' }}</strong>
+                } @else {
+                  <span class="text-muted small">No alcanzó ningún tramo</span>
+                }
+              </div>
+              @if (d.pedidos?.length) {
+                <!-- Mobile: cards -->
+                <div class="d-md-none d-flex flex-column gap-2 mt-2" style="max-height:320px; overflow-y:auto;">
+                  @for (p of d.pedidos!; track p.order_id) {
+                    <c-card>
+                      <c-card-body class="p-2">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                          <div>
+                            <div class="fw-semibold small">{{ p.code }}</div>
+                            @if (p.date) {
+                              <div class="text-muted" style="font-size:.7rem;">{{ p.date | date:'dd/MM/yyyy' }}</div>
+                            }
+                          </div>
+                          <div class="fw-semibold text-success text-end text-nowrap" style="font-size:.85rem;">S/ {{ (p.net_collected ?? p.total) | number:'1.2-2' }}</div>
+                        </div>
+                        <div class="mt-1">
+                          <div class="fw-semibold" style="font-size:.82rem;"><fa-icon [icon]="faBuilding" class="me-1 text-muted" style="font-size:.8em;" />{{ p.client_business_name || p.client_name }}</div>
+                          @if (clientTradeName(p)) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ clientTradeName(p) }}</div>
+                          }
+                          @if (clientDetail(p)) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ clientDetail(p) }}</div>
+                          }
+                          @if (clientLocation(p)) {
+                            <div class="text-muted" style="font-size:.72rem;">
+                              <fa-icon icon="location-dot" style="font-size:.85em;" class="me-1" />{{ clientLocation(p) }}
+                            </div>
+                          }
+                          @if (p.client_address) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ p.client_address }}</div>
+                          }
+                        </div>
+                      </c-card-body>
+                    </c-card>
+                  }
+                </div>
+
+                <!-- Desktop: tabla -->
+                <div class="d-none d-md-block table-responsive rounded border mt-2" style="max-height:280px; overflow-y:auto;">
+                  <table cTable hover small class="mb-0 align-middle">
+                    <thead>
+                      <tr>
+                        <th>Pedido</th>
+                        <th>Cliente</th>
+                        <th class="text-end">Cobrado neto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (p of d.pedidos!; track p.order_id) {
+                        <tr>
+                          <td>
+                            <div class="fw-semibold">{{ p.code }}</div>
+                            @if (p.date) {
+                              <div class="text-muted" style="font-size:.72rem;">{{ p.date | date:'dd/MM/yyyy' }}</div>
+                            }
+                          </td>
+                          <td>
+                            <div class="fw-semibold"><fa-icon [icon]="faBuilding" class="me-1 text-muted" style="font-size:.8em;" />{{ p.client_business_name || p.client_name }}</div>
+                            @if (clientTradeName(p)) {
+                              <div class="text-muted" style="font-size:.72rem;">{{ clientTradeName(p) }}</div>
+                            }
+                            @if (clientDetail(p)) {
+                              <div class="text-muted" style="font-size:.72rem;">{{ clientDetail(p) }}</div>
+                            }
+                            @if (clientLocation(p)) {
+                              <div class="text-muted" style="font-size:.72rem;">
+                                <fa-icon icon="location-dot" style="font-size:.85em;" class="me-1" />{{ clientLocation(p) }}
+                              </div>
+                            }
+                            @if (p.client_address) {
+                              <div class="text-muted" style="font-size:.72rem;">{{ p.client_address }}</div>
+                            }
+                          </td>
+                          <td class="text-end fw-semibold text-success">S/ {{ (p.net_collected ?? p.total) | number:'1.2-2' }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+              @if (d.total_comision) {
+                <div class="mt-2 pt-2 border-top">
+                  @if (d.payment.paid_at) {
+                    <div class="text-success small">
+                      <fa-icon [icon]="faCheck" class="me-1" />Pagada el {{ d.payment.paid_at | date:'dd/MM/yyyy' }}
+                      ({{ d.payment.form === 'cash' ? 'efectivo' : 'depósito' }})
+                      @if (d.payment.voucher_url) {
+                        <a style="cursor:pointer" class="ms-1" (click)="filePreview.open(d.payment.voucher_url!)">
+                          <fa-icon [icon]="faImage" />
+                        </a>
+                      }
+                    </div>
+                  } @else {
+                    <button cButton color="success" size="sm" (click)="closeDetail(); openPay(d)">
+                      <fa-icon [icon]="faMoneyBillWave" class="me-1" />Pagar comisión
+                    </button>
+                  }
+                </div>
+              }
+            } @else {
+              <div class="text-muted small mb-0">Sin pedidos comisionados en este cierre.</div>
+            }
+          </c-card-body>
+        </c-card>
+      }
+
+      <!-- Gastos (informativo — la aprobación se hace en Gestionar Viáticos) -->
+      @if (d.gastos?.length) {
+        <c-card>
+          <c-card-header class="py-2 small fw-semibold text-body-secondary text-uppercase">Gastos registrados ({{ d.gastos!.length }})</c-card-header>
+          <c-card-body class="p-0">
+            <!-- Mobile: cards -->
+            <div class="d-md-none d-flex flex-column gap-2 p-2">
+              @for (g of d.gastos!; track g.id) {
+                <div class="border rounded p-2">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                      <div class="fw-semibold small">{{ g.category }}</div>
+                      <div class="text-muted" style="font-size:.7rem;">{{ g.date | date:'dd/MM/yyyy' }}</div>
+                    </div>
+                    <div class="fw-semibold text-end text-nowrap" style="font-size:.85rem;">S/ {{ g.amount | number:'1.2-2' }}</div>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center mt-2">
+                    <c-badge [color]="g.status === 'approved' ? 'success' : g.status === 'rejected' ? 'danger' : 'warning'" style="font-size:.7rem;">
+                      {{ g.status === 'approved' ? 'Aprobado' : g.status === 'rejected' ? 'Rechazado' : 'Pendiente' }}
+                    </c-badge>
+                    @if (g.photo_url) {
+                      <a style="cursor:pointer" (click)="filePreview.open(g.photo_url!)"><fa-icon [icon]="faImage" class="text-muted" /></a>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Desktop: tabla -->
+            <div class="d-none d-md-block table-responsive">
+              <table cTable hover small class="mb-0">
+                <thead>
+                  <tr>
+                    <th>Fecha</th><th>Categoría</th><th class="text-end">Monto</th><th>Comprobante</th><th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (g of d.gastos!; track g.id) {
+                    <tr>
+                      <td class="text-nowrap">{{ g.date | date:'dd/MM/yyyy' }}</td>
+                      <td>{{ g.category }}</td>
+                      <td class="text-end">S/ {{ g.amount | number:'1.2-2' }}</td>
+                      <td>
+                        @if (g.photo_url) {
+                          <a style="cursor:pointer" (click)="filePreview.open(g.photo_url!)"><fa-icon [icon]="faImage" /></a>
+                        } @else { — }
+                      </td>
+                      <td>
+                        <c-badge [color]="g.status === 'approved' ? 'success' : g.status === 'rejected' ? 'danger' : 'warning'">
+                          {{ g.status === 'approved' ? 'Aprobado' : g.status === 'rejected' ? 'Rechazado' : 'Pendiente' }}
+                        </c-badge>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </c-card-body>
+        </c-card>
+      }
+    }
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="closeDetail()">Cerrar</button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- ── Modal crear/editar ────────────────────────────────────────────────── -->
+<c-modal [visible]="formModal()" (visibleChange)="formModal.set($event)" size="lg" alignment="center" backdrop="static">
+  <c-modal-header>
+    <h5 cModalTitle>{{ isEditMode ? 'Editar Comisión' : 'Nueva Comisión' }}</h5>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label">Vendedor <span class="text-danger">*</span></label>
+        <p-select [options]="sellerOptions().slice(1)" optionLabel="label" optionValue="value"
+          [(ngModel)]="form.user_id" [disabled]="isEditMode && advanceDelivered"
+          (onChange)="onSellerChange()"
+          placeholder="Seleccionar..." filter="true" styleClass="w-100" />
+        @if (isEditMode && advanceDelivered) {
+          <div class="form-text">Ya se entregaron los viáticos — no se puede reasignar el vendedor.</div>
+        }
+      </div>
+      @if (form.user_id && !checkingSaleZones() && !saleZonesActiveForSeller) {
+        <div class="col-12">
+          <div class="alert alert-warning py-2 px-3 small mb-0">
+            <div class="mb-2">
+              <fa-icon icon="triangle-exclamation" class="me-1" />
+              Zonas de Venta no está activo para este vendedor — sin esto, las ventas de sus zonas no generarán comisión.
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              @if (!saleZonesGlobalOn()) {
+                <button type="button" class="btn btn-sm btn-warning" [disabled]="fixingSaleZones()" (click)="activateSaleZonesGlobal()">
+                  @if (fixingSaleZones()) { <fa-icon [icon]="faSpinner" spin class="me-1" /> }
+                  Activar Zonas de Venta (general)
+                </button>
+              }
+              @if (saleZonesGlobalOn() && sellerSeesAllClients()) {
+                <button type="button" class="btn btn-sm btn-warning" [disabled]="fixingSaleZones()" (click)="activateSaleZonesForSeller()">
+                  @if (fixingSaleZones()) { <fa-icon [icon]="faSpinner" spin class="me-1" /> }
+                  Activar Zonas de Venta para este vendedor
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+      }
+      <div class="col-6">
+        <label class="form-label">Desde <span class="text-danger">*</span></label>
+        <input type="date" class="form-control" [(ngModel)]="form.date_from" />
+      </div>
+      <div class="col-6">
+        <label class="form-label">Hasta <span class="text-danger">*</span></label>
+        <input type="date" class="form-control" [(ngModel)]="form.date_to" />
+      </div>
+      <div class="col-12">
+        <label class="form-label">Destino</label>
+        <input type="text" class="form-control" [(ngModel)]="form.destination" placeholder="Ej. Andahuaylas y anexos" />
+      </div>
+      <div class="col-12">
+        <label class="form-label">Propósito</label>
+        <input type="text" class="form-control" [(ngModel)]="form.purpose" placeholder="Motivo de la comisión (opcional)" />
+      </div>
+      <div class="col-12">
+        <app-comision-zone-picker [zonas]="zonas()" [sellerId]="form.user_id" (zonasChange)="zonas.set($event)" />
+      </div>
+      <div class="col-12">
+        <c-card>
+          <c-card-header class="py-2 d-flex justify-content-between align-items-center">
+            <span class="small fw-semibold text-body-secondary text-uppercase">Tramos de comisión</span>
+            <button type="button" class="btn btn-sm btn-outline-primary" (click)="addTramo()">
+              <fa-icon [icon]="faPlus" class="me-1" />Agregar tramo
+            </button>
+          </c-card-header>
+          <c-card-body>
+          @if (!tramos().length) {
+            <div class="text-muted small">Sin tramos definidos — esta comisión no generará comisión por ventas.</div>
+          } @else {
+            <div class="d-flex flex-column gap-2 mb-2">
+              @for (t of tramos(); track $index; let i = $index) {
+                <div class="row g-2 align-items-center">
+                  <div class="col-5">
+                    <label class="form-label small mb-1">Desde (S/)</label>
+                    <input type="number" class="form-control form-control-sm" [(ngModel)]="t.min_amount"
+                      [ngModelOptions]="{ standalone: true }" step="0.01" min="0" />
+                  </div>
+                  <div class="col-5">
+                    <label class="form-label small mb-1">Porcentaje (%)</label>
+                    <input type="number" class="form-control form-control-sm" [(ngModel)]="t.percentage"
+                      [ngModelOptions]="{ standalone: true }" step="0.01" min="0" max="100" />
+                  </div>
+                  <div class="col-2 text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeTramo(i)">
+                      <fa-icon [icon]="faTrash" />
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+            @if (tramosDuplicados) {
+              <div class="text-danger small mb-2">No puede haber dos tramos con el mismo monto "desde".</div>
+            }
+
+            <div class="small text-muted mb-1">
+              Se aplica el tramo más alto alcanzado sobre el <strong>total vendido</strong> (no es acumulativo por tramo).
+            </div>
+            <div class="d-flex align-items-end gap-2 mt-2 p-2 bg-body rounded border">
+              <div class="flex-grow-1">
+                <label class="form-label small mb-1">Simular con un total de ventas (S/)</label>
+                <input type="number" class="form-control form-control-sm" [(ngModel)]="simulatedVentas"
+                  [ngModelOptions]="{ standalone: true }" step="0.01" min="0" placeholder="Ej. 7500" />
+              </div>
+              <div class="small">
+                @if (simulatedVentas != null && simulatedResult) {
+                  <span class="text-success">{{ simulatedResult.percentage }}% → S/ {{ simulatedResult.comision | number:'1.2-2' }}</span>
+                } @else if (simulatedVentas != null) {
+                  <span class="text-muted">No alcanza ningún tramo.</span>
+                }
+              </div>
+            </div>
+          }
+          </c-card-body>
+        </c-card>
+      </div>
+      <div class="col-6">
+        <label class="form-label">Presupuesto de viáticos (S/)</label>
+        <input type="number" class="form-control" [(ngModel)]="form.budget" step="0.01" min="0"
+          [disabled]="isEditMode && advanceDelivered" placeholder="Dejar vacío si no lleva viáticos" />
+        @if (isEditMode && advanceDelivered) {
+          <div class="form-text">Ya se entregaron los viáticos por el monto original — no editable.</div>
+        }
+      </div>
+      <div class="col-12">
+        <label class="form-label">Notas</label>
+        <textarea class="form-control" [(ngModel)]="form.notes" rows="2"></textarea>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="closeFormModal()" [disabled]="savingForm()">Cancelar</button>
+    <button cButton color="primary" (click)="saveForm()" [disabled]="savingForm() || !isFormValid">
+      @if (savingForm()) { <fa-icon [icon]="faSpinner" spin class="me-1" /> } Guardar
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- ── Modal cerrar ──────────────────────────────────────────────────────── -->
+<c-modal [visible]="closeModal()" (visibleChange)="closeModal.set($event)" size="lg" alignment="center">
+  <c-modal-header>
+    <h5 cModalTitle>Cerrar comisión</h5>
+  </c-modal-header>
+  <c-modal-body>
+    @if (closeTarget(); as c) {
+      @if (c.advance.status === 'delivered') {
+        @let rf = c.resumen_financiero;
+        <div class="mb-3 p-3 rounded border bg-body-secondary small">
+          <div class="d-flex justify-content-between">
+            <span>Viáticos entregados</span>
+            <strong>S/ {{ rf.adelanto | number:'1.2-2' }}</strong>
+          </div>
+          <div class="d-flex justify-content-between text-success">
+            <span>Aprobado</span>
+            <strong>S/ {{ rf.aprobado | number:'1.2-2' }}</strong>
+          </div>
+          @if (rf.pendiente_revision > 0) {
+            <div class="alert alert-danger py-1 px-2 mt-2 mb-0 small">
+              Hay S/ {{ rf.pendiente_revision | number:'1.2-2' }} pendientes de revisión — resuélvelos en Gestionar Viáticos antes de cerrar.
+            </div>
+          }
+          @if (rf.vuelto_o_faltante != null) {
+            <div class="mt-2 pt-2 border-top fw-bold">
+              @if (rf.vuelto_o_faltante >= 0) {
+                Al cerrar, el vendedor deberá devolver S/ {{ rf.vuelto_o_faltante | number:'1.2-2' }}.
+              } @else {
+                Al cerrar, se le deberá S/ {{ (-rf.vuelto_o_faltante) | number:'1.2-2' }} al vendedor.
+              }
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="alert alert-secondary py-2 px-3 small mb-3">Esta comisión no tiene viáticos entregados.</div>
+      }
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold mb-2">Pedidos a incluir en la comisión por ventas</label>
+
+        @if (loadingCandidatos()) {
+          <div class="text-center py-3"><fa-icon [icon]="faSpinner" spin class="text-muted" /></div>
+        } @else {
+          <ul class="nav nav-tabs mb-2">
+            <li class="nav-item">
+              <a class="nav-link" style="cursor:pointer" [class.active]="pedidosTab() === 'cobrados'" (click)="pedidosTab.set('cobrados')">
+                <fa-icon [icon]="faCircleCheck" class="me-1 text-success" />Cobrados
+                <span class="badge rounded-pill text-bg-success-subtle text-success-emphasis ms-1">{{ cobrados().length }}</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" style="cursor:pointer" [class.active]="pedidosTab() === 'no_cobrados'" (click)="pedidosTab.set('no_cobrados')">
+                <fa-icon [icon]="faCircleXmark" class="me-1 text-muted" />No cobrados
+                <span class="badge rounded-pill text-bg-secondary-subtle text-secondary-emphasis ms-1">{{ noCobrados().length }}</span>
+              </a>
+            </li>
+          </ul>
+
+          @if (pedidosTab() === 'cobrados') {
+            @if (!cobrados().length) {
+              <div class="text-muted small py-2">No hay pedidos cobrados dentro de las zonas y fechas de esta comisión.</div>
+            } @else {
+              <!-- Mobile: cards -->
+              <div class="d-md-none d-flex flex-column gap-2" style="max-height:320px; overflow-y:auto;">
+                @for (o of cobrados(); track o.id) {
+                  <c-card [class.opacity-50]="o.already_commissioned">
+                    <c-card-body class="p-2">
+                      <div class="d-flex align-items-start gap-2">
+                        <input type="checkbox" class="form-check-input mt-1" style="flex-shrink:0;"
+                          [checked]="selectedOrderIds().has(o.id)"
+                          [disabled]="o.already_commissioned"
+                          (change)="toggleOrder(o.id)" />
+                        <div class="flex-grow-1 min-width-0">
+                          <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                              <div class="fw-semibold small">{{ o.code }}</div>
+                              <div class="text-muted" style="font-size:.7rem;">{{ o.date | date:'dd/MM/yyyy' }}</div>
+                            </div>
+                            <div class="fw-semibold text-success text-end text-nowrap" style="font-size:.85rem;">S/ {{ o.net_collected | number:'1.2-2' }}</div>
+                          </div>
+                          @if (o.already_commissioned) {
+                            <span class="badge text-bg-danger mt-1">Ya comisionado a {{ o.commissioned_to }}</span>
+                          }
+                          <div class="mt-1">
+                            <div class="fw-semibold" style="font-size:.82rem;"><fa-icon [icon]="faBuilding" class="me-1 text-muted" style="font-size:.8em;" />{{ o.client_business_name || o.client_name }}</div>
+                            @if (clientTradeName(o)) {
+                              <div class="text-muted" style="font-size:.72rem;">{{ clientTradeName(o) }}</div>
+                            }
+                            @if (clientDetail(o)) {
+                              <div class="text-muted" style="font-size:.72rem;">{{ clientDetail(o) }}</div>
+                            }
+                            @if (clientLocation(o)) {
+                              <div class="text-muted" style="font-size:.72rem;">
+                                <fa-icon icon="location-dot" style="font-size:.85em;" class="me-1" />{{ clientLocation(o) }}
+                              </div>
+                            }
+                            @if (o.client_address) {
+                              <div class="text-muted" style="font-size:.72rem;">{{ o.client_address }}</div>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </c-card-body>
+                  </c-card>
+                }
+              </div>
+
+              <!-- Desktop: tabla -->
+              <div class="d-none d-md-block table-responsive rounded border" style="max-height:280px; overflow-y:auto;">
+                <table cTable hover small class="mb-0 align-middle">
+                  <thead class="sticky-top" style="background:var(--cui-table-bg, var(--bs-body-bg));">
+                    <tr>
+                      <th style="width:32px;"></th>
+                      <th>Pedido</th>
+                      <th>Cliente</th>
+                      <th class="text-end">Cobrado neto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (o of cobrados(); track o.id) {
+                      <tr [class.opacity-50]="o.already_commissioned">
+                        <td>
+                          <input type="checkbox" class="form-check-input"
+                            [checked]="selectedOrderIds().has(o.id)"
+                            [disabled]="o.already_commissioned"
+                            (change)="toggleOrder(o.id)" />
+                        </td>
+                        <td>
+                          <div class="fw-semibold">{{ o.code }}</div>
+                          <div class="text-muted" style="font-size:.72rem;">{{ o.date | date:'dd/MM/yyyy' }}</div>
+                          @if (o.already_commissioned) {
+                            <span class="badge text-bg-danger mt-1">Ya comisionado a {{ o.commissioned_to }}</span>
+                          }
+                        </td>
+                        <td>
+                          <div class="fw-semibold"><fa-icon [icon]="faBuilding" class="me-1 text-muted" style="font-size:.8em;" />{{ o.client_business_name || o.client_name }}</div>
+                          @if (clientTradeName(o)) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ clientTradeName(o) }}</div>
+                          }
+                          @if (clientDetail(o)) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ clientDetail(o) }}</div>
+                          }
+                          @if (clientLocation(o)) {
+                            <div class="text-muted" style="font-size:.72rem;">
+                              <fa-icon icon="location-dot" style="font-size:.85em;" class="me-1" />{{ clientLocation(o) }}
+                            </div>
+                          }
+                          @if (o.client_address) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ o.client_address }}</div>
+                          }
+                        </td>
+                        <td class="text-end fw-semibold text-success">S/ {{ o.net_collected | number:'1.2-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-center mt-2 p-2 rounded small"
+                [class.bg-success-subtle]="closePreview()" [class.bg-body-secondary]="!closePreview()">
+                <span>Total ventas seleccionado: <strong>S/ {{ selectedNetTotal() | number:'1.2-2' }}</strong></span>
+                @if (closePreview(); as pv) {
+                  <span class="text-success fw-semibold">{{ pv.percentage }}% → S/ {{ pv.comision | number:'1.2-2' }} de comisión</span>
+                } @else if (selectedNetTotal() > 0) {
+                  <span class="text-muted">No alcanza ningún tramo de comisión.</span>
+                }
+              </div>
+            }
+          } @else {
+            @if (!noCobrados().length) {
+              <div class="text-muted small py-2">No hay pedidos sin cobrar en esta comisión.</div>
+            } @else {
+              <!-- Mobile: cards -->
+              <div class="d-md-none d-flex flex-column gap-2" style="max-height:320px; overflow-y:auto;">
+                @for (o of noCobrados(); track o.id) {
+                  <c-card>
+                    <c-card-body class="p-2">
+                      <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                          <div class="fw-semibold small">{{ o.code }}</div>
+                          <div class="text-muted" style="font-size:.7rem;">{{ o.date | date:'dd/MM/yyyy' }}</div>
+                        </div>
+                        <div class="fw-semibold text-end text-nowrap" style="font-size:.85rem;">S/ {{ o.total | number:'1.2-2' }}</div>
+                      </div>
+                      <div class="mt-1">
+                        <div class="fw-semibold" style="font-size:.82rem;"><fa-icon [icon]="faBuilding" class="me-1 text-muted" style="font-size:.8em;" />{{ o.client_business_name || o.client_name }}</div>
+                        @if (clientTradeName(o)) {
+                          <div class="text-muted" style="font-size:.72rem;">{{ clientTradeName(o) }}</div>
+                        }
+                        @if (clientDetail(o)) {
+                          <div class="text-muted" style="font-size:.72rem;">{{ clientDetail(o) }}</div>
+                        }
+                        @if (clientLocation(o)) {
+                          <div class="text-muted" style="font-size:.72rem;">
+                            <fa-icon icon="location-dot" style="font-size:.85em;" class="me-1" />{{ clientLocation(o) }}
+                          </div>
+                        }
+                        @if (o.client_address) {
+                          <div class="text-muted" style="font-size:.72rem;">{{ o.client_address }}</div>
+                        }
+                      </div>
+                    </c-card-body>
+                  </c-card>
+                }
+              </div>
+
+              <!-- Desktop: tabla -->
+              <div class="d-none d-md-block table-responsive rounded border" style="max-height:280px; overflow-y:auto;">
+                <table cTable hover small class="mb-0 align-middle">
+                  <thead class="sticky-top" style="background:var(--cui-table-bg, var(--bs-body-bg));">
+                    <tr>
+                      <th>Pedido</th>
+                      <th>Cliente</th>
+                      <th class="text-end">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (o of noCobrados(); track o.id) {
+                      <tr>
+                        <td>
+                          <div class="fw-semibold">{{ o.code }}</div>
+                          <div class="text-muted" style="font-size:.72rem;">{{ o.date | date:'dd/MM/yyyy' }}</div>
+                        </td>
+                        <td>
+                          <div class="fw-semibold"><fa-icon [icon]="faBuilding" class="me-1 text-muted" style="font-size:.8em;" />{{ o.client_business_name || o.client_name }}</div>
+                          @if (clientTradeName(o)) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ clientTradeName(o) }}</div>
+                          }
+                          @if (clientDetail(o)) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ clientDetail(o) }}</div>
+                          }
+                          @if (clientLocation(o)) {
+                            <div class="text-muted" style="font-size:.72rem;">
+                              <fa-icon icon="location-dot" style="font-size:.85em;" class="me-1" />{{ clientLocation(o) }}
+                            </div>
+                          }
+                          @if (o.client_address) {
+                            <div class="text-muted" style="font-size:.72rem;">{{ o.client_address }}</div>
+                          }
+                        </td>
+                        <td class="text-end">S/ {{ o.total | number:'1.2-2' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div class="text-muted small mt-1">No elegibles — todavía no tienen cobro validado.</div>
+            }
+          }
+        }
+      </div>
+
+      <label class="form-label small">Motivo (opcional)</label>
+      <textarea class="form-control form-control-sm" [(ngModel)]="closeReason" rows="2"></textarea>
+    }
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="closeModal.set(false)" [disabled]="closing()">Cancelar</button>
+    <button cButton color="warning" (click)="confirmClose()" [disabled]="closing()">
+      @if (closing()) { <fa-icon [icon]="faSpinner" spin class="me-1" /> } Cerrar comisión
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- ── Modal entregar viáticos ───────────────────────────────────────────── -->
+<c-modal [visible]="advanceModal()" (visibleChange)="advanceModal.set($event)" alignment="center" backdrop="static">
+  <c-modal-header>
+    <h5 cModalTitle>Entregar viáticos</h5>
+  </c-modal-header>
+  <c-modal-body>
+    @if (advanceTarget(); as t) {
+      <div class="mb-2 small text-muted">Presupuesto a entregar: <strong>S/ {{ t.budget | number:'1.2-2' }}</strong></div>
+    }
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="btn-group w-100" role="group">
+          <input type="radio" class="btn-check" id="advCash" [value]="'cash'" [(ngModel)]="advanceForm.form">
+          <label class="btn btn-outline-primary btn-sm" for="advCash">💵 Efectivo</label>
+          <input type="radio" class="btn-check" id="advDeposit" [value]="'deposit'" [(ngModel)]="advanceForm.form">
+          <label class="btn btn-outline-primary btn-sm" for="advDeposit">💳 Depósito</label>
+        </div>
+      </div>
+      @if (advanceForm.form === 'deposit') {
+        <div class="col-12">
+          <label class="form-label small mb-1">Medio de pago <span class="text-danger">*</span></label>
+          <select class="form-select form-select-sm" [(ngModel)]="advanceForm.payment_method_id">
+            <option [ngValue]="null" disabled>Seleccionar...</option>
+            @for (m of methods(); track m.id) {
+              <option [ngValue]="m.id">{{ m.bank?.name }} — {{ m.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-8">
+          <label class="form-label small mb-1">N° de operación <span class="text-danger">*</span></label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="advanceForm.operation_number" />
+        </div>
+        <div class="col-4">
+          <label class="form-label small mb-1">Hora <span class="text-danger">*</span></label>
+          <input type="time" class="form-control form-control-sm" [(ngModel)]="advanceForm.operation_time" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small mb-1">Fecha de operación <span class="text-danger">*</span></label>
+          <input type="date" class="form-control form-control-sm" [(ngModel)]="advanceForm.operation_date" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small mb-1">Voucher <span class="text-danger">*</span></label>
+          <input type="file" class="form-control form-control-sm" accept="image/*,.pdf" (change)="onVoucherSelected($event)" />
+          @if (voucherPreview()) {
+            <img [src]="voucherPreview()!" alt="Voucher" class="img-thumbnail mt-2" style="max-height:120px" />
+          }
+        </div>
+      }
+      <div class="col-12">
+        <label class="form-label small mb-1">Notas</label>
+        <textarea class="form-control form-control-sm" [(ngModel)]="advanceForm.notes" rows="2"></textarea>
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="closeAdvanceModal()" [disabled]="advanceSaving()">Cancelar</button>
+    <button cButton color="success" (click)="submitAdvance()" [disabled]="advanceSaving() || !isAdvanceValid">
+      @if (advanceSaving()) { <fa-icon [icon]="faSpinner" spin class="me-1" /> } Entregar
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- ── Modal pagar comisión ──────────────────────────────────────────────── -->
+<c-modal [visible]="payModal()" (visibleChange)="payModal.set($event)" alignment="center" backdrop="static">
+  <c-modal-header>
+    <h5 cModalTitle>Pagar comisión</h5>
+  </c-modal-header>
+  <c-modal-body>
+    @if (payTarget(); as t) {
+      <div class="mb-2 small text-muted">Monto a pagar: <strong>S/ {{ t.total_comision | number:'1.2-2' }}</strong></div>
+    }
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="btn-group w-100" role="group">
+          <input type="radio" class="btn-check" id="payCash" [value]="'cash'" [(ngModel)]="payForm.form">
+          <label class="btn btn-outline-primary btn-sm" for="payCash">💵 Efectivo</label>
+          <input type="radio" class="btn-check" id="payDeposit" [value]="'deposit'" [(ngModel)]="payForm.form">
+          <label class="btn btn-outline-primary btn-sm" for="payDeposit">💳 Depósito</label>
+        </div>
+      </div>
+      @if (payForm.form === 'deposit') {
+        <div class="col-12">
+          <label class="form-label small mb-1">Medio de pago <span class="text-danger">*</span></label>
+          <select class="form-select form-select-sm" [(ngModel)]="payForm.payment_method_id">
+            <option [ngValue]="null" disabled>Seleccionar...</option>
+            @for (m of methods(); track m.id) {
+              <option [ngValue]="m.id">{{ m.bank?.name }} — {{ m.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="col-8">
+          <label class="form-label small mb-1">N° de operación <span class="text-danger">*</span></label>
+          <input type="text" class="form-control form-control-sm" [(ngModel)]="payForm.operation_number" />
+        </div>
+        <div class="col-4">
+          <label class="form-label small mb-1">Hora <span class="text-danger">*</span></label>
+          <input type="time" class="form-control form-control-sm" [(ngModel)]="payForm.operation_time" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small mb-1">Fecha de operación <span class="text-danger">*</span></label>
+          <input type="date" class="form-control form-control-sm" [(ngModel)]="payForm.operation_date" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small mb-1">Voucher <span class="text-danger">*</span></label>
+          <input type="file" class="form-control form-control-sm" accept="image/*,.pdf" (change)="onPayVoucherSelected($event)" />
+          @if (payVoucherPreview()) {
+            <img [src]="payVoucherPreview()!" alt="Voucher" class="img-thumbnail mt-2" style="max-height:120px" />
+          }
+        </div>
+      }
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="closePayModal()" [disabled]="paySaving()">Cancelar</button>
+    <button cButton color="success" (click)="submitPay()" [disabled]="paySaving() || !isPayValid">
+      @if (paySaving()) { <fa-icon [icon]="faSpinner" spin class="me-1" /> } Pagar
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<!-- ── Modal ajuste de presupuesto ───────────────────────────────────────── -->
+<c-modal [visible]="budgetModal()" (visibleChange)="budgetModal.set($event)" size="lg" alignment="center" backdrop="static">
+  <c-modal-header>
+    <h5 cModalTitle>{{ budgetMode() === 'increase' ? 'Registrar abono' : 'Registrar reducción' }}</h5>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="btn-group mb-3" role="group">
+      <button type="button" class="btn btn-sm" [class.btn-primary]="budgetMode() === 'increase'"
+        [class.btn-outline-secondary]="budgetMode() !== 'increase'" (click)="budgetMode.set('increase')">Abono</button>
+      <button type="button" class="btn btn-sm" [class.btn-primary]="budgetMode() === 'decrease'"
+        [class.btn-outline-secondary]="budgetMode() !== 'decrease'" (click)="budgetMode.set('decrease')">Reducción</button>
+    </div>
+
+    @if (budgetMode() === 'increase') {
+      <div class="row g-3">
+        <div class="col-6">
+          <label class="form-label small mb-1">Monto (S/) <span class="text-danger">*</span></label>
+          <input type="number" class="form-control form-control-sm" [(ngModel)]="budgetForm.amount" step="0.01" min="0.01" />
+        </div>
+        <div class="col-6">
+          <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" id="budCash" [value]="'cash'" [(ngModel)]="budgetForm.form">
+            <label class="btn btn-outline-primary btn-sm" for="budCash">💵 Efectivo</label>
+            <input type="radio" class="btn-check" id="budDeposit" [value]="'deposit'" [(ngModel)]="budgetForm.form">
+            <label class="btn btn-outline-primary btn-sm" for="budDeposit">💳 Depósito</label>
+          </div>
+        </div>
+        @if (budgetForm.form === 'deposit') {
+          <div class="col-12">
+            <label class="form-label small mb-1">Medio de pago <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" [(ngModel)]="budgetForm.payment_method_id">
+              <option [ngValue]="null" disabled>Seleccionar...</option>
+              @for (m of methods(); track m.id) {
+                <option [ngValue]="m.id">{{ m.bank?.name }} — {{ m.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="col-8">
+            <label class="form-label small mb-1">N° de operación <span class="text-danger">*</span></label>
+            <input type="text" class="form-control form-control-sm" [(ngModel)]="budgetForm.operation_number" />
+          </div>
+          <div class="col-4">
+            <label class="form-label small mb-1">Hora <span class="text-danger">*</span></label>
+            <input type="time" class="form-control form-control-sm" [(ngModel)]="budgetForm.operation_time" />
+          </div>
+          <div class="col-12">
+            <label class="form-label small mb-1">Fecha de operación <span class="text-danger">*</span></label>
+            <input type="date" class="form-control form-control-sm" [(ngModel)]="budgetForm.operation_date" />
+          </div>
+          <div class="col-12">
+            <label class="form-label small mb-1">Voucher <span class="text-danger">*</span></label>
+            <input type="file" class="form-control form-control-sm" accept="image/*,.pdf" (change)="onBudgetVoucherSelected($event)" />
+            @if (budgetVoucherPreview()) {
+              <img [src]="budgetVoucherPreview()!" alt="Voucher" class="img-thumbnail mt-2" style="max-height:120px" />
+            }
+          </div>
+        }
+        <div class="col-12">
+          <label class="form-label small mb-1">Notas</label>
+          <textarea class="form-control form-control-sm" [(ngModel)]="budgetForm.notes" rows="2"></textarea>
+        </div>
+      </div>
+    } @else {
+      <div class="row g-3">
+        <div class="col-6">
+          <label class="form-label small mb-1">Monto a reducir (S/) <span class="text-danger">*</span></label>
+          <input type="number" class="form-control form-control-sm" [(ngModel)]="budgetForm.decreaseAmount" step="0.01" min="0.01" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small mb-1">Notas</label>
+          <textarea class="form-control form-control-sm" [(ngModel)]="budgetForm.decreaseNotes" rows="2"
+            placeholder="Motivo de la reducción"></textarea>
+        </div>
+        <div class="col-12">
+          <div class="alert alert-secondary py-1 px-2 small mb-0">
+            Esto genera una devolución pendiente a cargo del vendedor por el monto indicado.
+          </div>
+        </div>
+      </div>
+    }
+
+    <hr />
+    <div class="small text-muted mb-1">Historial de ajustes</div>
+    @if (loadingBudgetHistory()) {
+      <div class="text-center py-2"><c-spinner size="sm" /></div>
+    } @else if (!budgetHistory().length) {
+      <div class="text-muted small">Sin ajustes registrados.</div>
+    } @else {
+      <div class="table-responsive">
+        <table cTable small class="mb-0">
+          <thead><tr><th>Fecha</th><th>Tipo</th><th class="text-end">Monto</th><th>Notas</th></tr></thead>
+          <tbody>
+            @for (a of budgetHistory(); track a.id) {
+              <tr>
+                <td class="text-nowrap">{{ a.created_at | date:'dd/MM/yy HH:mm' }}</td>
+                <td>
+                  <c-badge [color]="a.type === 'increase' ? 'success' : 'warning'">
+                    {{ a.type === 'increase' ? 'Abono' : 'Reducción' }}
+                  </c-badge>
+                </td>
+                <td class="text-end">S/ {{ a.amount | number:'1.2-2' }}</td>
+                <td class="small text-muted">{{ a.notes ?? '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="closeBudgetModal()" [disabled]="budgetSaving()">Cancelar</button>
+    @if (budgetMode() === 'increase') {
+      <button cButton color="primary" (click)="submitBudgetIncrease()" [disabled]="budgetSaving() || !isBudgetIncreaseValid">
+        @if (budgetSaving()) { <fa-icon [icon]="faSpinner" spin class="me-1" /> } Registrar abono
+      </button>
+    } @else {
+      <button cButton color="warning" (click)="submitBudgetDecrease()" [disabled]="budgetSaving() || !isBudgetDecreaseValid">
+        @if (budgetSaving()) { <fa-icon [icon]="faSpinner" spin class="me-1" /> } Registrar reducción
+      </button>
+    }
+  </c-modal-footer>
+</c-modal>
+
+<app-confirm-modal
+  [visible]="!!deletingItem()"
+  [message]="'¿Eliminar la comisión de ' + (deletingItem()?.user_name ?? '') + '?'"
+  (confirm)="doDelete()"
+  (cancel)="deletingItem.set(null)" />
+
+<app-file-preview-modal #filePreview />

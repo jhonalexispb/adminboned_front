@@ -3,21 +3,40 @@
     <c-modal-header>
       <h5 cModalTitle>
         <fa-icon icon="building-columns" class="me-2 text-primary" />
-        {{ isEditMode ? 'Corregir depósito' : 'Registrar depósito de efectivo' }}
+        {{ isEditMode ? 'Corregir depósito' : (source() === 'viatico' ? 'Registrar depósito de vuelto de viáticos' : 'Registrar depósito de cobranza') }}
       </h5>
     </c-modal-header>
 
     <c-modal-body>
-      @if (isEditMode && deposit(); as d) {
-        <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.85rem;">
-          <fa-icon icon="triangle-exclamation" class="me-1" />
-          <strong>Rechazado</strong> — corrígelo y reenvía.
-          @if (d.notes) { <div class="mt-1">Motivo: {{ d.notes }}</div> }
+      @if (!isEditMode) {
+        <div class="mb-3">
+          <c-badge [color]="source() === 'viatico' ? 'warning' : 'info'" class="px-2 py-1">
+            {{ source() === 'viatico' ? 'Vuelto de viáticos' : 'Cobranza a clientes' }}
+          </c-badge>
         </div>
+      }
+      @if (isEditMode && deposit(); as d) {
+        @if (d.status === 'rejected') {
+          <div class="alert alert-danger py-2 px-3 mb-3" style="font-size:.85rem;">
+            <fa-icon icon="triangle-exclamation" class="me-1" />
+            <strong>Rechazado</strong> — corrígelo y reenvía.
+            @if (d.notes) { <div class="mt-1">Motivo: {{ d.notes }}</div> }
+          </div>
+        } @else {
+          <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.85rem;">
+            <fa-icon icon="circle-info" class="me-1" />
+            Todavía no está validado — revisa bien los datos antes de validarlo, una vez
+            validado no se puede corregir.
+          </div>
+        }
       } @else {
         <div class="text-body-secondary mb-3" style="font-size:.83rem;">
           <fa-icon icon="circle-info" class="me-1" />
-          Registra el depósito bancario del efectivo que tienes acumulado. El administrador lo verificará.
+          @if (source() === 'viatico') {
+            Registra el depósito bancario del efectivo de vuelto de viáticos que tienes acumulado. El administrador lo verificará.
+          } @else {
+            Registra el depósito bancario del efectivo cobrado a clientes que tienes acumulado. El administrador lo verificará.
+          }
         </div>
       }
 
@@ -126,7 +145,7 @@
         </div>
 
         <div class="col-4">
-          <label class="form-label small mb-1">Hora <span class="text-body-secondary">(opc.)</span></label>
+          <label class="form-label small mb-1">Hora <span class="text-danger">*</span></label>
           <input type="time" class="form-control form-control-sm"
                  [(ngModel)]="form.deposit_time" />
         </div>

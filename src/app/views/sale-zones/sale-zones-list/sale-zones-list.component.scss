@@ -1,0 +1,68 @@
+// ── Three-panel selector ──────────────────────────────────────────────────────
+.panels-wrapper {
+  border-radius: var(--cui-border-radius);
+  overflow: hidden;
+  border: 1px solid var(--cui-border-color);
+}
+
+.panels-inner {
+  display: flex;
+  flex-direction: column; // mobile: stack vertically
+
+  @media (min-width: 992px) {
+    flex-direction: row;
+    height: 360px;
+    overflow: hidden;
+  }
+}
+
+.panel-col {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-bottom: 1px solid var(--cui-border-color);
+  max-height: 220px;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  @media (min-width: 992px) {
+    width: 33.33%;
+    max-height: none;
+    border-bottom: none;
+    border-right: 1px solid var(--cui-border-color);
+
+    &:last-child {
+      flex: 1;
+      width: auto;
+      border-right: none;
+    }
+  }
+}
+
+// ── Zone map ──────────────────────────────────────────────────────────────────
+.map-card-wrapper {
+  position: sticky;
+  top: 1rem;
+
+  @media (max-width: 991.98px) {
+    position: static;
+  }
+}
+
+// ── Client table: hide extra columns on very small screens ────────────────────
+@media (max-width: 575.98px) {
+  .clients-table th.col-hide-xs,
+  .clients-table td.col-hide-xs {
+    display: none;
+  }
+}
+
+// ── Toggle card description ───────────────────────────────────────────────────
+.toggle-description {
+  @media (max-width: 767.98px) {
+    display: none !important;
+  }
+}
+

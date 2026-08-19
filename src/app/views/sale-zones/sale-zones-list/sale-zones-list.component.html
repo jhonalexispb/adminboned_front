@@ -1,0 +1,830 @@
+<app-page-header title="Zonas de Venta" subtitle="Configura las zonas geográficas de cada vendedor" />
+
+<!-- ── Toggle global ──────────────────────────────────────────────────────── -->
+<c-card class="mb-3">
+  <c-card-body class="d-flex align-items-center gap-3 py-2">
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" id="szSwitch"
+             [checked]="zonesEnabled()" [disabled]="togglingGlobal()" (change)="toggleGlobal()">
+      <label class="form-check-label fw-semibold" for="szSwitch">
+        {{ zonesEnabled() ? 'Zonas de venta activadas' : 'Zonas de venta desactivadas' }}
+      </label>
+    </div>
+    @if (togglingGlobal()) { <c-spinner size="sm" /> }
+    <span class="text-body-secondary small ms-auto toggle-description">
+      Cuando está activo, cada vendedor solo ve los clientes de sus zonas asignadas —
+      además, es requisito para que Comisiones pueda atribuir ventas por zona.
+    </span>
+  </c-card-body>
+</c-card>
+
+<app-confirm-modal
+  [visible]="confirmDisableGlobal()"
+  [message]="'Hay ' + openComisionesCount() + ' comisión(es) abierta(s). Al desactivar Zonas de Venta, las ventas en las zonas de esos vendedores dejarán de generar comisión a partir de ahora. ¿Continuar?'"
+  (confirm)="confirmDisableGlobalProceed()"
+  (cancel)="confirmDisableGlobal.set(false)" />
+
+<!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <button class="nav-link" [class.active]="activeTab() === 'config'" (click)="setTab('config')">
+      Configurar
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link d-flex align-items-center gap-2"
+            [class.active]="activeTab() === 'overview'" (click)="setTab('overview')">
+      Cobertura
+      @if (hasAnyConflict) { <c-badge color="warning">!</c-badge> }
+    </button>
+  </li>
+</ul>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     TAB CONFIGURAR
+═══════════════════════════════════════════════════════════════════════════ -->
+@if (activeTab() === 'config') {
+
+  <!-- Cabecera: selector de vendedor + toggle acceso ──────────────────── -->
+  <c-card class="mb-3">
+    <c-card-body class="py-2">
+      <div class="row g-3 align-items-center">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold mb-1 small">Vendedor</label>
+          @if (loadingUsers()) {
+            <div class="d-flex align-items-center gap-2 text-body-secondary small">
+              <c-spinner size="sm" /><span>Cargando...</span>
+            </div>
+          } @else {
+            <p-select [options]="users()" optionLabel="name" optionValue="id"
+                      placeholder="Selecciona..." [filter]="true" filterPlaceholder="Buscar..."
+                      [showClear]="true" styleClass="w-100"
+                      [ngModel]="selectedUserId()" (ngModelChange)="onUserChange($event)" />
+          }
+        </div>
+        @if (selectedUserId() && config() && !loadingConfig()) {
+          <div class="col-md-auto d-flex align-items-center gap-2 pt-md-3">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" [id]="'aa' + selectedUserId()"
+                     [checked]="config()!.allow_all_clients" [disabled]="togglingAll() || isLocked"
+                     (change)="toggleAllowAll()">
+              <label class="form-check-label small" [for]="'aa' + selectedUserId()">
+                Ver todos los clientes
+              </label>
+            </div>
+            @if (togglingAll()) { <c-spinner size="sm" /> }
+          </div>
+        }
+      </div>
+    </c-card-body>
+  </c-card>
+
+  <div class="row g-3">
+
+    <!-- Panel del vendedor ──────────────────────────────────────────────── -->
+    <div class="col-lg-7 order-1">
+
+      @if (!selectedUserId()) {
+        <c-card>
+          <c-card-body class="text-center text-body-secondary py-5">
+            Selecciona un vendedor para configurar sus zonas.
+          </c-card-body>
+        </c-card>
+      }
+
+      @if (selectedUserId() && loadingConfig()) {
+        <c-card><c-card-body class="text-center py-4">
+          <c-spinner /><span class="ms-2">Cargando...</span>
+        </c-card-body></c-card>
+      }
+
+      @if (selectedUserId() && config() && !loadingConfig()) {
+
+        @if (isLocked) {
+          <div class="alert alert-warning small mb-3 d-flex align-items-center gap-2">
+            <span>🔒</span>
+            <span>
+              Este vendedor tiene una comisión abierta
+              @if (config()!.locked_until) { (hasta {{ config()!.locked_until }}) }
+              — sus zonas no se pueden modificar hasta que se cierre.
+            </span>
+          </div>
+        }
+
+        <!-- ── SELECTOR JERÁRQUICO ──────────────────────────────────────── -->
+        <c-card class="mb-3">
+          <c-card-body>
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <h6 class="fw-semibold mb-0">Asignar zonas</h6>
+              @if (pendingDistIds().size > 0) {
+                <c-badge color="primary">{{ pendingDistIds().size }} distritos seleccionados</c-badge>
+              }
+            </div>
+
+            <!-- Buscador rápido global ─────────────────────────────────── -->
+            <div class="position-relative mb-2">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text bg-transparent">
+                  @if (geoSearchLoading()) { <c-spinner size="sm" /> }
+                  @else { 🔍 }
+                </span>
+                <input type="text" class="form-control"
+                       placeholder="Buscar provincia o distrito directamente..."
+                       [value]="geoSearchQuery()"
+                       (input)="onGeoSearchChange($any($event.target).value)"
+                       (blur)="geoSearchResults().length > 0 ? null : geoSearchQuery.set('')"
+                       autocomplete="off">
+                @if (geoSearchQuery()) {
+                  <button class="btn btn-outline-secondary" type="button"
+                          (click)="geoSearchQuery.set(''); geoSearchResults.set([])">✕</button>
+                }
+              </div>
+              @if (geoSearchResults().length > 0) {
+                <div class="position-absolute start-0 end-0 border rounded bg-body shadow"
+                     style="top:calc(100% + 2px);z-index:1050;max-height:260px;overflow-y:auto">
+                  @for (r of geoSearchResults(); track r.type + r.id) {
+                    <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom"
+                         style="cursor:pointer"
+                         (mousedown)="navigateToGeoResult(r)">
+                      <span class="badge rounded-pill"
+                            [style.background]="r.type === 'province' ? '#3b82f6' : '#475569'">
+                        {{ r.type === 'province' ? 'Prov.' : 'Dist.' }}
+                      </span>
+                      <div class="flex-grow-1 min-w-0">
+                        <div class="small fw-semibold text-truncate">{{ r.name }}</div>
+                        <div class="text-body-secondary text-truncate" style="font-size:.72rem">
+                          {{ r.department_name }}
+                          @if (r.province_name) { › {{ r.province_name }} }
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <!-- 3 paneles ─────────────────────────────────────────────── -->
+            <div class="panels-wrapper">
+              <div class="panels-inner">
+
+              <!-- Panel 1: Departamentos ─────────────────────────────── -->
+              <div class="panel-col">
+                <div class="px-2 py-1 border-bottom bg-body-tertiary d-flex align-items-center gap-2 flex-shrink-0">
+                  <span class="small fw-semibold text-uppercase text-body-secondary" style="letter-spacing:.05em; font-size:.68rem">
+                    Departamentos
+                  </span>
+                  @if (loadingDepts()) { <c-spinner size="sm" class="ms-auto" /> }
+                </div>
+                <div class="px-2 pt-1 pb-0 flex-shrink-0 border-bottom">
+                  <input type="text" class="form-control form-control-sm border-0 bg-transparent px-0"
+                         placeholder="Buscar..."
+                         [value]="deptSearch()"
+                         (input)="deptSearch.set($any($event.target).value)">
+                </div>
+                <div class="overflow-y-auto flex-grow-1">
+                  @for (dept of filteredDepts(); track dept.id) {
+                    @let selfExact = isDeptExactlyAssigned(dept.id);
+                    @let selfPartial = isDeptPartiallyAssigned(dept.id);
+                    @let selfAssigned = isDeptAssignedToCurrentUser(dept.id);
+                    @let others = deptAssignments().get(dept.id) ?? [];
+                    @let active = navDeptId() === dept.id;
+                    <div class="px-3 py-2 border-bottom d-flex align-items-start justify-content-between gap-1"
+                         style="cursor:pointer"
+                         [class.bg-primary]="active"
+                         [class.text-white]="active"
+                         (click)="selectNavDept(dept.id)">
+                      <div class="flex-grow-1 min-w-0">
+                        <div class="small fw-semibold text-truncate">{{ dept.name }}</div>
+                        @if (selfExact) {
+                          <div style="font-size:.68rem"
+                               [class.text-success]="!active"
+                               [class.text-white]="active">✓ Ya asignado</div>
+                        } @else if (selfPartial) {
+                          <div style="font-size:.68rem"
+                               [class.text-info]="!active"
+                               [class.text-white-50]="active">◑ Cob. parcial</div>
+                        }
+                        @if (others.length) {
+                          <div class="text-truncate" style="font-size:.68rem"
+                               [class.text-warning]="!active"
+                               [class.text-white-50]="active">
+                            ⚠ {{ others.join(', ') }}
+                          </div>
+                        }
+                      </div>
+                      <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0 ms-1">
+                        @if (active && !selfExact) {
+                          <button class="btn btn-outline-light btn-sm py-0 px-1"
+                                  style="font-size:.65rem; white-space:nowrap"
+                                  [disabled]="savingZone() || isLocked"
+                                  (click)="$event.stopPropagation(); addDeptZone()">
+                            @if (savingZone()) { <c-spinner size="sm" /> }
+                            + Asignar
+                          </button>
+                        }
+                        @if (active && selfExact) {
+                          <button class="btn btn-outline-light btn-sm py-0 px-1"
+                                  style="font-size:.65rem; white-space:nowrap"
+                                  [disabled]="savingZone() || isLocked"
+                                  (click)="$event.stopPropagation(); removeDeptZone()">
+                            ✕ Quitar
+                          </button>
+                        }
+                        <span class="text-body-tertiary" style="font-size:.7rem">›</span>
+                      </div>
+                    </div>
+                  }
+                  @if (!loadingDepts() && filteredDepts().length === 0) {
+                    <div class="text-center text-body-secondary p-3 small">Sin resultados.</div>
+                  }
+                </div>
+              </div>
+
+              <!-- Panel 2: Provincias ────────────────────────────────── -->
+              <div class="panel-col">
+                <div class="px-2 py-1 border-bottom bg-body-tertiary d-flex align-items-center gap-2 flex-shrink-0">
+                  <span class="small fw-semibold text-uppercase text-body-secondary" style="letter-spacing:.05em; font-size:.68rem">
+                    Provincias
+                    @if (navDeptId() && provinces().length) {
+                      <span class="text-body-tertiary fw-normal">({{ provinces().length }})</span>
+                    }
+                  </span>
+                  @if (loadingProvs()) { <c-spinner size="sm" class="ms-auto" /> }
+                </div>
+                <div class="px-2 pt-1 pb-0 flex-shrink-0 border-bottom">
+                  <input type="text" class="form-control form-control-sm border-0 bg-transparent px-0"
+                         placeholder="Buscar..."
+                         [value]="provSearch()"
+                         (input)="provSearch.set($any($event.target).value)"
+                         [disabled]="!navDeptId()">
+                </div>
+                <div class="overflow-y-auto flex-grow-1">
+                  @if (!navDeptId()) {
+                    <div class="text-center text-body-secondary p-4 small">← Selecciona un departamento</div>
+                  } @else if (!loadingProvs() && filteredProvs().length === 0) {
+                    <div class="text-center text-body-secondary p-4 small">Sin resultados.</div>
+                  } @else {
+                    @for (prov of filteredProvs(); track prov.id) {
+                      @let selfExact    = isProvExactlyAssigned(prov.id);
+                      @let selfPartial  = isProvPartiallyAssigned(prov.id);
+                      @let selfAssigned = isProvAssignedToCurrentUser(prov.id);
+                      @let selfParent   = !selfExact && selfAssigned;
+                      @let others = provAssignments().get(prov.id) ?? [];
+                      @let active = navProvId() === prov.id;
+                      <div class="px-3 py-2 border-bottom d-flex align-items-start justify-content-between gap-1"
+                           style="cursor:pointer"
+                           [class.bg-primary]="active"
+                           [class.text-white]="active"
+                           (click)="selectNavProv(prov.id)">
+                        <div class="flex-grow-1 min-w-0">
+                          <div class="small fw-semibold text-truncate">{{ prov.name }}</div>
+                          @if (selfExact) {
+                            <div style="font-size:.68rem"
+                                 [class.text-success]="!active"
+                                 [class.text-white]="active">✓ Ya asignado</div>
+                          } @else if (selfPartial) {
+                            <div style="font-size:.68rem"
+                                 [class.text-info]="!active"
+                                 [class.text-white-50]="active">◑ Cob. parcial</div>
+                          }
+                          @if (others.length) {
+                            <div class="text-truncate" style="font-size:.68rem"
+                                 [class.text-warning]="!active"
+                                 [class.text-white-50]="active">
+                              ⚠ {{ others.join(', ') }}
+                            </div>
+                          }
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0 ms-1">
+                          @if (active && !selfExact && !selfParent) {
+                            <button class="btn btn-outline-light btn-sm py-0 px-1"
+                                    style="font-size:.65rem; white-space:nowrap"
+                                    [disabled]="savingZone() || isLocked"
+                                    (click)="$event.stopPropagation(); addProvZone()">
+                              @if (savingZone()) { <c-spinner size="sm" /> }
+                              + Asignar
+                            </button>
+                          }
+                          @if (active && selfExact) {
+                            <button class="btn btn-outline-light btn-sm py-0 px-1"
+                                    style="font-size:.65rem; white-space:nowrap"
+                                    [disabled]="savingZone() || isLocked"
+                                    (click)="$event.stopPropagation(); removeProvZone()">
+                              ✕ Quitar
+                            </button>
+                          }
+                          @if (active && selfParent) {
+                            <button class="btn btn-outline-warning btn-sm py-0 px-1"
+                                    style="font-size:.65rem; white-space:nowrap"
+                                    [disabled]="savingZone() || isLocked"
+                                    (click)="$event.stopPropagation(); removeDeptIntoProvinces(prov.id)">
+                              @if (savingZone()) { <c-spinner size="sm" /> }
+                              ✕ Excluir
+                            </button>
+                          }
+                          <span class="text-body-tertiary" style="font-size:.7rem">›</span>
+                        </div>
+                      </div>
+                    }
+                  }
+                </div>
+              </div>
+
+              <!-- Panel 3: Distritos ─────────────────────────────────── -->
+              <div class="panel-col">
+                <div class="px-2 py-1 border-bottom bg-body-tertiary d-flex align-items-center gap-2 flex-shrink-0">
+                  <span class="small fw-semibold text-uppercase text-body-secondary" style="letter-spacing:.05em; font-size:.68rem">
+                    Distritos
+                    @if (navProvId() && districts().length) {
+                      <span class="text-body-tertiary fw-normal">({{ districts().length }})</span>
+                    }
+                  </span>
+                  @if (loadingDists()) { <c-spinner size="sm" class="ms-auto" /> }
+                </div>
+                <div class="px-2 pt-1 pb-0 flex-shrink-0 border-bottom">
+                  <input type="text" class="form-control form-control-sm border-0 bg-transparent px-0"
+                         placeholder="Buscar..."
+                         [value]="distSearch()"
+                         (input)="distSearch.set($any($event.target).value)"
+                         [disabled]="!navProvId()">
+                </div>
+                <div class="overflow-y-auto flex-grow-1">
+                  @if (!navProvId()) {
+                    <div class="text-center text-body-secondary p-4 small">← Selecciona una provincia</div>
+                  } @else if (!loadingDists() && filteredDists().length === 0) {
+                    <div class="text-center text-body-secondary p-4 small">Sin resultados.</div>
+                  } @else {
+                    @for (dist of filteredDists(); track dist.id) {
+                      @let selfExact = isDistExactlyAssigned(dist.id);
+                      @let selfParent = !selfExact && isDistAssignedToCurrentUser(dist.id);
+                      @let selfAssigned = selfExact || selfParent;
+                      @let others = distAssignments().get(dist.id) ?? [];
+                      @let isPending = pendingDistIds().has(dist.id);
+                      <label class="d-flex align-items-start gap-2 px-3 py-2 border-bottom w-100"
+                             [id]="'dist-' + dist.id"
+                             style="margin:0; cursor: pointer"
+                             [class.bg-primary]="isPending && !selfAssigned"
+                             [class.text-white]="isPending && !selfAssigned">
+                        <input type="checkbox" class="mt-1 flex-shrink-0"
+                               [checked]="isPending || selfAssigned"
+                               [disabled]="savingZone() || isLocked"
+                               (change)="toggleDistZone(dist.id)">
+                        <div class="flex-grow-1 min-w-0">
+                          <div class="small fw-semibold text-truncate">{{ dist.name }}</div>
+                          @if (selfExact) {
+                            <div class="text-success" style="font-size:.68rem">✓ Ya asignado</div>
+                          }
+                          @if (selfParent) {
+                            <div class="text-warning" style="font-size:.68rem">● Cubierto por zona padre — desmarcar para excluir</div>
+                          }
+                          @if (others.length) {
+                            <div class="text-truncate" style="font-size:.68rem"
+                                 [class.text-warning]="!isPending"
+                                 [class.text-white-50]="isPending">
+                              ⚠ {{ others.join(', ') }}
+                            </div>
+                          }
+                        </div>
+                      </label>
+                    }
+                  }
+                </div>
+              </div>
+
+              </div>
+            </div>
+            <!-- fin 3 paneles -->
+
+            <!-- Barra inferior ─────────────────────────────────────────── -->
+            <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+              @if (checkingConflicts()) {
+                <small class="text-body-secondary d-flex align-items-center gap-1">
+                  <c-spinner size="sm" /> Verificando...
+                </small>
+              } @else if (preCheckConflicts().length > 0) {
+                <div class="alert alert-warning py-1 px-2 mb-0 small flex-grow-1">
+                  ⚠ Zona compartida con: <strong>{{ preCheckConflicts().join(', ') }}</strong>
+                </div>
+              }
+              @if (pendingDistIds().size > 0) {
+                <div class="ms-auto d-flex align-items-center gap-2">
+                  @if (pendingDistrictConflicts().length > 0) {
+                    <span class="small text-warning">
+                      ⚠ {{ pendingDistrictConflicts().join(', ') }}
+                    </span>
+                  }
+                  <button class="btn btn-primary btn-sm" [disabled]="addingBatch() || isLocked" (click)="addPendingDistricts()">
+                    @if (addingBatch()) { <c-spinner size="sm" class="me-1" /> }
+                    Agregar {{ pendingDistIds().size }} {{ pendingDistIds().size === 1 ? 'distrito' : 'distritos' }}
+                  </button>
+                </div>
+              }
+            </div>
+
+          </c-card-body>
+        </c-card>
+
+
+        <!-- Zonas asignadas ──────────────────────────────────────────────── -->
+        @if (config()!.zones.length > 0) {
+          <c-card class="mb-3">
+            <c-card-body>
+              <h6 class="fw-semibold mb-3">Zonas asignadas</h6>
+              <div class="d-flex flex-column gap-2">
+                @for (zone of config()!.zones; track zone.id) {
+                  <div class="border rounded p-2">
+                    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                      <div class="d-flex align-items-center gap-2">
+                        <c-badge [color]="zoneBadgeColor(zone.zone_type)">{{ zoneBadgeLabel(zone.zone_type) }}</c-badge>
+                        <span class="fw-semibold small">{{ zone.label }}</span>
+                      </div>
+                      <div class="d-flex gap-1">
+                        <button class="btn btn-outline-secondary btn-sm" (click)="toggleZoneClients(zone)">
+                          Clientes {{ expandedZoneId() === zone.id ? '▲' : '▼' }}
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" [disabled]="isLocked" (click)="removeZone(zone)">✕</button>
+                      </div>
+                    </div>
+
+                    @if (expandedZoneId() === zone.id) {
+                      <div class="mt-3 border-top pt-3">
+                        @if (loadingZoneClients()) {
+                          <div class="text-center py-3 small text-body-secondary">
+                            <c-spinner size="sm" /><span class="ms-2">Cargando clientes...</span>
+                          </div>
+                        } @else {
+                          <input type="text" class="form-control form-control-sm mb-2"
+                                 placeholder="Buscar por nombre, RUC, DNI, teléfono..."
+                                 [value]="zoneClientSearch()"
+                                 (input)="zoneClientSearch.set($any($event.target).value)">
+                          <ul class="nav nav-tabs nav-sm mb-2">
+                            <li class="nav-item">
+                              <button class="nav-link py-1 px-2 small"
+                                      [class.active]="activeZoneTab() === 'active'"
+                                      (click)="activeZoneTab.set('active')">
+                                Activos <c-badge color="success" class="ms-1">{{ activeCount(zone.id) }}</c-badge>
+                              </button>
+                            </li>
+                            <li class="nav-item">
+                              <button class="nav-link py-1 px-2 small"
+                                      [class.active]="activeZoneTab() === 'blocked'"
+                                      (click)="activeZoneTab.set('blocked')">
+                                Bloqueados
+                                @if (blockedCount(zone.id) > 0) {
+                                  <c-badge color="danger" class="ms-1">{{ blockedCount(zone.id) }}</c-badge>
+                                }
+                              </button>
+                            </li>
+                          </ul>
+                          @if (filteredClientsForZone(zone.id).length === 0) {
+                            <p class="text-body-secondary small text-center py-2 mb-0">
+                              Sin clientes {{ activeZoneTab() === 'blocked' ? 'bloqueados' : 'activos' }}.
+                            </p>
+                          } @else {
+                            <div class="table-responsive" style="max-height:300px;overflow-y:auto">
+                              <table class="table table-sm table-hover mb-0 align-middle clients-table">
+                                <thead class="sticky-top" style="background-color:var(--cui-body-bg)">
+                                  <tr>
+                                    <th>Nombre / Razón social</th>
+                                    <th class="col-hide-xs">RUC / DNI</th>
+                                    <th class="col-hide-xs">Teléfono</th>
+                                    <th class="col-hide-xs">Ubicación</th>
+                                    <th></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  @for (c of filteredClientsForZone(zone.id); track c.id) {
+                                    <tr>
+                                      <td>
+                                        <div class="fw-semibold small">{{ c.business_name || c.person_name || '—' }}</div>
+                                        @if (c.business_name && c.person_name) {
+                                          <div class="text-body-secondary" style="font-size:.75rem">{{ c.person_name }}</div>
+                                        }
+                                        @if (c.address) {
+                                          <div class="text-body-secondary" style="font-size:.7rem">{{ c.address }}</div>
+                                        }
+                                        <!-- Datos extras visibles solo en xs -->
+                                        <div class="d-sm-none text-body-secondary mt-1 lh-sm" style="font-size:.72rem">
+                                          @if (c.ruc) { <span class="me-2">RUC: {{ c.ruc }}</span> }
+                                          @if (c.dni) { <span class="me-2">DNI: {{ c.dni }}</span> }
+                                          @if (c.phone) { <span class="me-2">Tel: {{ c.phone }}</span> }
+                                          @if (c.district) { <span>{{ c.district }}, {{ c.province }}</span> }
+                                        </div>
+                                      </td>
+                                      <td class="small col-hide-xs">
+                                        @if (c.ruc) { <div>RUC: {{ c.ruc }}</div> }
+                                        @if (c.dni) { <div>DNI: {{ c.dni }}</div> }
+                                        @if (!c.ruc && !c.dni) { — }
+                                      </td>
+                                      <td class="small col-hide-xs">{{ c.phone || '—' }}</td>
+                                      <td class="small col-hide-xs">
+                                        @if (c.district) {
+                                          <div>{{ c.district }}</div>
+                                          <div class="text-body-secondary" style="font-size:.7rem">{{ c.province }}, {{ c.department }}</div>
+                                        } @else { — }
+                                      </td>
+                                      <td class="text-end">
+                                        <button class="btn btn-sm"
+                                                [class.btn-outline-danger]="!c.blocked"
+                                                [class.btn-outline-success]="c.blocked"
+                                                (click)="toggleBlockClient(zone.id, c)">
+                                          <span class="d-none d-sm-inline">{{ c.blocked ? '✓ Desbloquear' : '✕ Bloquear' }}</span>
+                                          <span class="d-sm-none">{{ c.blocked ? '✓' : '✕' }}</span>
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  }
+                                </tbody>
+                              </table>
+                            </div>
+                          }
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </c-card-body>
+          </c-card>
+        } @else {
+          <c-card class="mb-3">
+            <c-card-body class="text-center text-body-secondary py-3 small">
+              Sin zonas asignadas. Usa el selector de arriba para agregar.
+            </c-card-body>
+          </c-card>
+        }
+
+        <!-- Acceso especial ──────────────────────────────────────────────── -->
+        <c-card>
+          <c-card-body>
+            <h6 class="fw-semibold mb-1">Acceso especial</h6>
+            <p class="text-body-secondary small mb-3">
+              Clientes fuera de zona que este vendedor puede ver igualmente.
+            </p>
+            <div class="position-relative mb-2">
+              <input type="text" class="form-control form-control-sm pe-4"
+                     placeholder="Buscar cliente por nombre, RUC, DNI..."
+                     [value]="clientSearch()"
+                     (input)="onClientSearchChange($any($event.target).value)">
+              @if (clientSearchLoading()) {
+                <span class="position-absolute top-50 end-0 translate-middle-y me-2"
+                      style="pointer-events:none">
+                  <c-spinner size="sm" variant="border" color="secondary"/>
+                </span>
+              }
+            </div>
+            @if (clientResults().length > 0) {
+              <div class="border rounded mb-3" style="max-height:260px;overflow-y:auto">
+                @for (c of clientResults(); track c.id) {
+                  <div class="px-3 py-2 border-bottom d-flex align-items-start justify-content-between gap-2"
+                       style="cursor:pointer" (click)="addAllowException(c)">
+                    <div class="small lh-sm">
+                      <div class="fw-semibold">{{ c.business_name || c.name || '—' }}</div>
+                      <div class="text-body-secondary">
+                        @if (c.ruc) { <span class="me-2">RUC: {{ c.ruc }}</span> }
+                        @if (c.dni) { <span class="me-2">DNI: {{ c.dni }}</span> }
+                        @if (c.phone) { <span class="me-2">Tel: {{ c.phone }}</span> }
+                      </div>
+                      @if (c.district) {
+                        <div class="text-body-secondary" style="font-size:.75rem">
+                          {{ c.district.name }}
+                          @if (c.district.province) { — {{ c.district.province.name }} }
+                          @if (c.district.province?.department) { ({{ c.district.province!.department!.name }}) }
+                        </div>
+                      }
+                      @if (c.address) {
+                        <div class="text-body-secondary text-truncate" style="font-size:.72rem;max-width:240px">
+                          {{ c.address }}
+                        </div>
+                      }
+                    </div>
+                    <span class="text-success fw-bold flex-shrink-0">+</span>
+                  </div>
+                }
+              </div>
+            }
+            @if (allowExceptions.length > 0) {
+              <div class="d-flex flex-column gap-2">
+                @for (exc of allowExceptions; track exc.client_id) {
+                  <div class="border rounded px-3 py-2 small position-relative bg-body-secondary" style="padding-right:2rem!important">
+                    <div class="fw-semibold">{{ exc.client_name }}</div>
+                    <div class="text-body-secondary lh-sm">
+                      @if (exc.ruc) { <span class="me-2">RUC: {{ exc.ruc }}</span> }
+                      @if (exc.dni) { <span class="me-2">DNI: {{ exc.dni }}</span> }
+                      @if (exc.phone) { <span class="me-2">Tel: {{ exc.phone }}</span> }
+                    </div>
+                    @if (exc.district_name) {
+                      <div class="text-body-secondary" style="font-size:.75rem">
+                        {{ exc.district_name }}
+                        @if (exc.province_name) { — {{ exc.province_name }} }
+                        @if (exc.department_name) { ({{ exc.department_name }}) }
+                      </div>
+                    }
+                    @if (exc.address) {
+                      <div class="text-body-secondary text-truncate" style="font-size:.72rem;max-width:100%">{{ exc.address }}</div>
+                    }
+                    <button type="button" class="btn-close position-absolute top-50 end-0 translate-middle-y me-2"
+                            style="font-size:.6rem" (click)="removeAllowException(exc)"></button>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="text-body-secondary small mb-0">Sin accesos especiales.</p>
+            }
+          </c-card-body>
+        </c-card>
+
+      }
+    </div>
+
+    <!-- Mapa sticky ── columna derecha ──────────────────────────────────── -->
+    <div class="col-lg-5 order-2">
+      @if (selectedUserId() && config() && !loadingConfig()) {
+        <div class="map-card-wrapper">
+          <c-card>
+            <c-card-body class="p-2">
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="small fw-semibold">
+                  @if (navDeptId()) {
+                    {{ departments().find(d => d.id === navDeptId())?.name }}
+                  } @else {
+                    Cobertura — {{ selectedUser?.name }}
+                  }
+                </span>
+                <span class="text-body-secondary" style="font-size:.68rem">
+                  @if (navDeptId()) { clic en provincia } @else { clic en dpto }
+                </span>
+              </div>
+              <app-zone-map
+                [departments]="departments()"
+                [deptAssignments]="deptAssignments()"
+                [provinces]="provinces()"
+                [provAssignments]="provAssignments()"
+                [selfDeptIds]="selfDeptIds()"
+                [selfProvIds]="selfProvIds()"
+                [selfPartialDeptIds]="selfPartialDeptIds()"
+                [selfPartialProvIds]="selfPartialProvIds()"
+                [selfUserName]="selfUserName"
+                [focusDeptId]="navDeptId()"
+                [highlightProvId]="navProvId()"
+                [height]="mapHeight()"
+                (provinceClick)="selectNavProv($event)"
+                (deptClick)="selectNavDept($event)"
+                (mapBackClick)="clearNavDept()"
+              />
+            </c-card-body>
+          </c-card>
+        </div>
+      }
+    </div>
+
+  </div>
+}
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     TAB COBERTURA
+═══════════════════════════════════════════════════════════════════════════ -->
+@if (activeTab() === 'overview') {
+
+  @if (!loadingOverview()) {
+    <div class="row g-3 mb-3">
+      <div class="col-sm-4">
+        <c-card class="text-center">
+          <c-card-body class="py-3">
+            <div class="fs-3 fw-bold text-primary">{{ totalUsersWithZones }}</div>
+            <div class="text-body-secondary small">Vendedores con zonas</div>
+          </c-card-body>
+        </c-card>
+      </div>
+      <div class="col-sm-4">
+        <c-card class="text-center">
+          <c-card-body class="py-3">
+            <div class="fs-3 fw-bold text-success">{{ totalZonesAssigned }}</div>
+            <div class="text-body-secondary small">Zonas asignadas</div>
+          </c-card-body>
+        </c-card>
+      </div>
+      <div class="col-sm-4">
+        <c-card class="text-center">
+          <c-card-body class="py-3">
+            <div class="fs-3 fw-bold"
+                 [class.text-warning]="totalWithConflicts > 0"
+                 [class.text-success]="totalWithConflicts === 0">
+              {{ totalWithConflicts }}
+            </div>
+            <div class="text-body-secondary small">Con solapamiento</div>
+          </c-card-body>
+        </c-card>
+      </div>
+    </div>
+  }
+
+  <div class="row g-3">
+
+    <!-- Mapa ────────────────────────────────────────────────────────────── -->
+    <div class="col-lg-7 order-2 order-lg-1">
+      <c-card>
+        <c-card-body class="overview-map-card">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="fw-semibold mb-0">Mapa de cobertura</h6>
+            <button class="btn btn-outline-secondary btn-sm" (click)="loadOverview()">↻ Actualizar</button>
+          </div>
+          <app-zone-map
+            [departments]="departments()"
+            [deptAssignments]="deptAssignments()"
+            [provinces]="overviewProvinces()"
+            [provAssignments]="provAssignments()"
+            [selfDeptIds]="selfDeptIds()"
+            [selfProvIds]="selfProvIds()"
+            [selfPartialDeptIds]="selfPartialDeptIds()"
+            [selfPartialProvIds]="selfPartialProvIds()"
+            [selfUserName]="selfUserName"
+            [focusDeptId]="overviewNavDeptId()"
+            [height]="mapHeight()"
+            (deptClick)="selectOverviewDept($event)"
+            (mapBackClick)="clearOverviewDept()"
+          />
+        </c-card-body>
+      </c-card>
+    </div>
+
+    <!-- Lista de vendedores ──────────────────────────────────────────────── -->
+    <div class="col-lg-5 order-1 order-lg-2">
+
+      @if (loadingOverview()) {
+        <c-card>
+          <c-card-body class="text-center py-5">
+            <c-spinner /><span class="ms-2">Cargando...</span>
+          </c-card-body>
+        </c-card>
+      } @else if (overview().length === 0) {
+        <c-card>
+          <c-card-body class="text-center text-body-secondary py-5">
+            No hay zonas asignadas.
+          </c-card-body>
+        </c-card>
+      } @else {
+
+        @if (hasAnyConflict) {
+          <div class="alert alert-warning d-flex align-items-start gap-2 mb-3">
+            <span class="fw-bold flex-shrink-0">⚠</span>
+            <div class="small">
+              Las zonas marcadas con <strong>Compartida</strong> se superponen con otro vendedor.
+            </div>
+          </div>
+        }
+
+        <div class="d-flex flex-column gap-2">
+          @for (usr of overview(); track usr.user_id) {
+            <c-card [class.border-warning]="userHasZoneConflict(usr)">
+              <c-card-body class="p-0">
+                <button class="btn w-100 text-start p-3 d-flex align-items-center justify-content-between border-0 bg-transparent"
+                        (click)="toggleOverviewUser(usr.user_id)">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-semibold">{{ usr.user_name }}</span>
+                    <c-badge color="secondary">
+                      {{ usr.zones.length }} {{ usr.zones.length === 1 ? 'zona' : 'zonas' }}
+                    </c-badge>
+                    @if (userHasZoneConflict(usr)) {
+                      <c-badge color="warning">Con solapamiento</c-badge>
+                    }
+                  </div>
+                  <span class="text-body-secondary">{{ expandedOverviewUserId() === usr.user_id ? '▲' : '▼' }}</span>
+                </button>
+
+                @if (expandedOverviewUserId() === usr.user_id) {
+                  <div class="px-3 pb-3 border-top pt-2">
+                    @if (usr.zones.length === 0) {
+                      <p class="text-body-secondary small mb-0">Sin zonas.</p>
+                    } @else {
+                      <div class="d-flex flex-wrap gap-2 mt-1">
+                        @for (zone of usr.zones; track zone.id) {
+                          <div class="border rounded px-3 py-2"
+                               [class.border-warning]="zone.shared_with.length > 0"
+                               [class.bg-warning-subtle]="zone.shared_with.length > 0">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                              <c-badge [color]="zoneBadgeColor(zone.zone_type)">{{ zoneBadgeLabel(zone.zone_type) }}</c-badge>
+                              <span class="fw-semibold small">{{ zone.label }}</span>
+                              @if (zone.shared_with.length > 0) {
+                                <c-badge color="warning">Compartida</c-badge>
+                              }
+                            </div>
+                            @if (zone.shared_with.length > 0) {
+                              <div class="text-body-secondary" style="font-size:.75rem">
+                                Con: {{ zone.shared_with.join(', ') }}
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </c-card-body>
+            </c-card>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}

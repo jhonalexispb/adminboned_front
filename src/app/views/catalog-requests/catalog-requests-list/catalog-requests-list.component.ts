@@ -14,6 +14,7 @@ import {
 } from '../catalog-request.model';
 import { ClientService } from '../../clients/client.service';
 import { Client } from '../../clients/client.model';
+import { UserService } from '../../users/user.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { CatalogRequestDetailModalComponent } from '../catalog-request-detail-modal/catalog-request-detail-modal.component';
@@ -39,12 +40,17 @@ type ClientOption = Client & { displayLabel: string };
 export class CatalogRequestsListComponent implements OnInit {
   requests = signal<CatalogRequest[]>([]);
   clients  = signal<ClientOption[]>([]);
+  sellers  = signal<{ id: number; name: string }[]>([]);
   loading  = signal(false);
   total    = signal(0);
   lastPage = signal(1);
 
   detailRequest = signal<CatalogRequest | null>(null);
   actingId       = signal<number | null>(null);
+
+  activeTab = signal<'pedidos' | 'sin-enviar'>('pedidos');
+  draftRequests  = signal<CatalogRequest[]>([]);
+  loadingDrafts  = signal(false);
 
   detailQuotation = signal<Quotation | null>(null);
   previewOrderId  = signal<number | null>(null);
@@ -72,6 +78,7 @@ export class CatalogRequestsListComponent implements OnInit {
   constructor(
     private catalogRequestService: CatalogRequestService,
     private clientService: ClientService,
+    private userService: UserService,
     private sales: SalesService,
     private toast: ToastService,
     private router: Router,
@@ -84,7 +91,16 @@ export class CatalogRequestsListComponent implements OnInit {
         displayLabel: [c.business_name, c.name, c.ruc].filter(Boolean).join(' · '),
       })));
     });
+    this.userService.listUsers({ permission: 'quotations', per_page: 100 }).subscribe(res => {
+      this.sellers.set(res.data.filter(u => !u.deleted_at && u.active));
+    });
     this.load();
+    // Se carga de una (no solo al entrar al tab) para que el número junto al tab avise sin tener que hacer clic.
+    this.loadDrafts();
+  }
+
+  selectTab(tab: 'pedidos' | 'sin-enviar'): void {
+    this.activeTab.set(tab);
   }
 
   load(): void {
@@ -97,6 +113,14 @@ export class CatalogRequestsListComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  loadDrafts(): void {
+    this.loadingDrafts.set(true);
+    this.catalogRequestService.list({ status: 'draft', per_page: 100 }).subscribe({
+      next: res => { this.draftRequests.set(res.data); this.loadingDrafts.set(false); },
+      error: () => this.loadingDrafts.set(false),
     });
   }
 
@@ -178,10 +202,17 @@ export class CatalogRequestsListComponent implements OnInit {
   // ── Convertir a cotización ───────────────────────────────────────────────────
 
   async convert(r: CatalogRequest): Promise<void> {
+    const sellerOptions: Record<string, string> = { '': 'Automático (por zona de venta)' };
+    for (const s of this.sellers()) sellerOptions[String(s.id)] = s.name;
+
     const result = await Swal.fire({
       title: '¿Convertir a cotización?',
-      text: `Se creará una cotización en borrador a partir de ${r.code} y se reservará el stock.`,
+      html: `Se creará una cotización en borrador a partir de ${r.code} y se reservará el stock.`,
       icon: 'question',
+      input: 'select',
+      inputOptions: sellerOptions,
+      inputValue: '',
+      inputLabel: 'Vendedor asignado (si la zona es compartida, elige manualmente)',
       showCancelButton: true,
       confirmButtonColor: '#198754',
       cancelButtonColor: '#6c757d',
@@ -189,9 +220,10 @@ export class CatalogRequestsListComponent implements OnInit {
       cancelButtonText: 'Cancelar',
     });
     if (!result.isConfirmed) return;
+    const sellerId = result.value ? Number(result.value) : undefined;
 
     this.actingId.set(r.id);
-    this.catalogRequestService.convert(r.id).subscribe({
+    this.catalogRequestService.convert(r.id, sellerId).subscribe({
       next: async res => {
         this.actingId.set(null);
         this.requests.update(list => list.map(x => x.id === r.id ? { ...x, status: 'converted' as const, quotation_id: res.quotation.id } : x));

@@ -39,20 +39,48 @@
                   <div class="px-3 py-2 border-bottom">
                     <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Cliente</div>
                     <div class="fw-semibold">{{ clientName(data) }}</div>
+                    @if (clientTradeName(data)) {
+                      <div class="text-body-secondary small">{{ clientTradeName(data) }}</div>
+                    }
                     @if (data.client?.phone) {
                       <div class="text-body-secondary small">
                         <fa-icon icon="phone" class="me-1" style="font-size:.75rem;" />{{ data.client!.phone }}
                       </div>
                     }
+                    @if (data.client?.email) {
+                      <div class="text-body-secondary small">
+                        <fa-icon icon="envelope" class="me-1" style="font-size:.75rem;" />{{ data.client!.email }}
+                      </div>
+                    }
                     @if (data.client?.ruc) {
                       <div class="text-body-secondary small font-monospace">RUC {{ data.client!.ruc }}</div>
+                    } @else if (data.client?.dni) {
+                      <div class="text-body-secondary small font-monospace">DNI {{ data.client!.dni }}</div>
+                    }
+                    @if (data.client?.address) {
+                      <div class="text-body-secondary small">
+                        <fa-icon icon="location-dot" class="me-1" style="font-size:.75rem;" />{{ data.client!.address }}
+                      </div>
+                    }
+                    @if (data.client?.district) {
+                      <div class="text-body-secondary small">
+                        {{ data.client!.district!.name }}
+                        @if (data.client!.district!.province) { , {{ data.client!.district!.province!.name }} }
+                        @if (data.client!.district!.province?.department) { , {{ data.client!.district!.province!.department!.name }} }
+                      </div>
                     }
                   </div>
                   <div class="px-3 py-2 border-bottom">
-                    <div class="row g-0">
+                    <div class="row g-2">
                       <div class="col-6">
-                        <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Vendedor</div>
-                        <div class="small fw-medium">{{ data.seller?.name ?? '—' }}</div>
+                        <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Comisión</div>
+                        @if (data.seller) {
+                          <span class="badge text-bg-info">{{ data.seller.name }}</span>
+                        }
+                      </div>
+                      <div class="col-6">
+                        <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Creado por</div>
+                        <div class="small fw-medium">{{ data.created_by?.name ?? '—' }}</div>
                       </div>
                       <div class="col-6">
                         <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Fecha</div>

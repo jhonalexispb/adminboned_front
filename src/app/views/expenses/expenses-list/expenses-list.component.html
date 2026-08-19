@@ -67,13 +67,30 @@
               <div class="d-flex align-items-start justify-content-between mb-2">
                 <div>
                   <span class="badge text-bg-secondary mb-1">{{ e.category }}</span>
+                  @if (e.comision_id) {
+                    <span class="badge text-bg-info mb-1 ms-1" title="Generado automáticamente desde un adelanto de viáticos">
+                      <fa-icon icon="route" class="me-1" />Viático
+                    </span>
+                  }
                   <div class="text-body-secondary" style="font-size:.75rem;">{{ e.date }}</div>
                 </div>
-                <div class="fw-bold text-end" style="font-size:1.05rem;">S/ {{ e.amount | number:'1.2-2' }}</div>
+                <div class="text-end">
+                  <div class="fw-bold" style="font-size:1.05rem;">S/ {{ e.amount | number:'1.2-2' }}</div>
+                  @if (e.original_amount != null && e.original_amount !== e.amount) {
+                    <div class="text-body-secondary text-decoration-line-through" style="font-size:.72rem;">
+                      S/ {{ e.original_amount | number:'1.2-2' }}
+                    </div>
+                  }
+                </div>
               </div>
 
               @if (e.description) {
                 <div class="text-body-secondary mb-2" style="font-size:.85rem;">{{ e.description }}</div>
+              }
+              @if (e.comision_destination) {
+                <div class="text-body-secondary mb-2" style="font-size:.8rem;">
+                  <fa-icon icon="location-dot" class="me-1" />{{ e.comision_destination }}
+                </div>
               }
 
               @if (e.document_number || e.document_image_url) {
@@ -90,14 +107,20 @@
                 </div>
               }
 
-              <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-primary flex-grow-1" (click)="openEdit(e)">
-                  <fa-icon icon="pencil" class="me-1" />Editar
-                </button>
-                <button class="btn btn-sm btn-danger flex-grow-1" (click)="confirmDelete(e)">
-                  <fa-icon icon="trash" class="me-1" />Eliminar
-                </button>
-              </div>
+              @if (!e.comision_id) {
+                <div class="d-flex gap-2">
+                  <button class="btn btn-sm btn-primary flex-grow-1" (click)="openEdit(e)">
+                    <fa-icon icon="pencil" class="me-1" />Editar
+                  </button>
+                  <button class="btn btn-sm btn-danger flex-grow-1" (click)="confirmDelete(e)">
+                    <fa-icon icon="trash" class="me-1" />Eliminar
+                  </button>
+                </div>
+              } @else {
+                <div class="text-body-secondary" style="font-size:.72rem;">
+                  <fa-icon icon="lock" class="me-1" />Se ajusta solo al liquidarse el vuelto
+                </div>
+              }
             </div>
           </div>
         }
@@ -121,9 +144,19 @@
                 <td class="text-nowrap">{{ e.date }}</td>
                 <td>
                   <span class="badge text-bg-secondary">{{ e.category }}</span>
+                  @if (e.comision_id) {
+                    <span class="badge text-bg-info ms-1" title="Generado automáticamente desde un adelanto de viáticos">
+                      <fa-icon icon="route" class="me-1" />Viático
+                    </span>
+                  }
                 </td>
                 <td class="text-body-secondary">
                   {{ e.description || '—' }}
+                  @if (e.comision_destination) {
+                    <div class="small text-body-secondary">
+                      <fa-icon icon="location-dot" class="me-1" />{{ e.comision_destination }}
+                    </div>
+                  }
                   @if (e.document_number || e.document_image_url) {
                     <div class="small mt-1">
                       @if (e.document_number) {
@@ -138,16 +171,29 @@
                     </div>
                   }
                 </td>
-                <td class="text-end fw-semibold">{{ e.amount | number:'1.2-2' }}</td>
+                <td class="text-end fw-semibold">
+                  {{ e.amount | number:'1.2-2' }}
+                  @if (e.original_amount != null && e.original_amount !== e.amount) {
+                    <div class="text-body-secondary text-decoration-line-through fw-normal" style="font-size:.72rem;">
+                      {{ e.original_amount | number:'1.2-2' }}
+                    </div>
+                  }
+                </td>
                 <td class="text-end">
-                  <div class="d-inline-flex gap-2">
-                    <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEdit(e)">
-                      <fa-icon icon="pencil" /><small>Editar</small>
-                    </button>
-                    <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDelete(e)">
-                      <fa-icon icon="trash" /><small>Eliminar</small>
-                    </button>
-                  </div>
+                  @if (!e.comision_id) {
+                    <div class="d-inline-flex gap-2">
+                      <button class="btn btn-sm btn-primary d-flex flex-column align-items-center" (click)="openEdit(e)">
+                        <fa-icon icon="pencil" /><small>Editar</small>
+                      </button>
+                      <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="confirmDelete(e)">
+                        <fa-icon icon="trash" /><small>Eliminar</small>
+                      </button>
+                    </div>
+                  } @else {
+                    <span class="text-body-secondary" style="font-size:.72rem;" title="Se ajusta solo al liquidarse el vuelto">
+                      <fa-icon icon="lock" class="me-1" />Automático
+                    </span>
+                  }
                 </td>
               </tr>
             }

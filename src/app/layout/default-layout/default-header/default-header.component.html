@@ -26,6 +26,25 @@
       </div>
     }
 
+    <!-- Efectivo de viáticos recibido de vendedores, pendiente de rendir -->
+    @if (viaticoCashDebt() > 0) {
+      <div class="d-flex align-items-center gap-1 gap-sm-2 ms-1 ms-sm-2 flex-shrink-0">
+        <a routerLink="/viaticos/gestionar" class="text-decoration-none"
+           title="Recibiste efectivo de vuelto de viáticos que aún no has rendido">
+          <c-badge color="warning" shape="rounded-pill" class="d-flex align-items-center gap-1 px-2 py-1 text-nowrap">
+            <svg cIcon name="cilWallet" size="sm"></svg>
+            <span class="fw-semibold"><span class="d-none d-sm-inline">Por rendir </span>S/ {{ viaticoCashDebt() | number:'1.2-2' }}</span>
+          </c-badge>
+        </a>
+        <button cButton color="success" variant="outline" size="sm"
+                class="d-flex align-items-center py-1 px-2"
+                title="Registrar depósito"
+                (click)="openNewViaticoDeposit()">
+          <svg cIcon name="cilInstitution" size="sm"></svg>
+        </button>
+      </div>
+    }
+
     <!-- Acciones lado derecho -->
     <c-header-nav class="ms-auto">
 

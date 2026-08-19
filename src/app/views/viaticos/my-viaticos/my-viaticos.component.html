@@ -1,0 +1,781 @@
+<app-page-header title="Mis Viáticos" subtitle="Registra los gastos de tus viáticos asignados" />
+
+@if (pendingReturns().length > 0) {
+  <div class="card bg-body-secondary border-start border-warning border-4 mb-3">
+    <div class="card-body py-2 px-3">
+      <div class="text-warning mb-2">
+        <fa-icon icon="triangle-exclamation" class="me-1" /><strong>Tienes movimientos de viáticos por regularizar</strong>
+      </div>
+      <div class="d-flex flex-column gap-2">
+        @for (r of pendingReturns(); track r.id) {
+          <div class="bg-body rounded p-2 small">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div>
+                <c-badge [color]="r.direction === 'to_company' ? 'warning' : 'info'" class="me-1">
+                  {{ r.direction === 'to_company' ? 'Debes' : 'Te deben' }}
+                </c-badge>
+                S/ {{ r.amount | number:'1.2-2' }} — {{ r.comision_destination }} ({{ r.comision_date_from | date:'dd/MM/yyyy' }})
+              </div>
+              @if (r.status === 'rejected') {
+                <button type="button" class="btn btn-sm btn-danger" (click)="openResubmitReturn(r)">
+                  <fa-icon icon="rotate-left" class="me-1" />Corregir y reenviar
+                </button>
+              }
+            </div>
+            @if (r.status === 'rejected') {
+              <div class="text-danger mt-1">Rechazado: {{ r.notes }}</div>
+            }
+          </div>
+        }
+      </div>
+      <div class="text-body-secondary mt-2" style="font-size:.78rem;">
+        Las devoluciones aún no registradas ("Debes"/"Te deben" sin rechazo) las gestiona administración desde su panel.
+        Las rechazadas puedes corregirlas y reenviarlas tú mismo arriba.
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Tabs -->
+<div class="btn-group mb-3" role="group">
+  <button type="button" class="btn btn-sm" [class.btn-primary]="activeTab() === 'actual'"
+    [class.btn-outline-secondary]="activeTab() !== 'actual'" (click)="selectTab('actual')">
+    Comisión actual
+  </button>
+  <button type="button" class="btn btn-sm" [class.btn-primary]="activeTab() === 'historial'"
+    [class.btn-outline-secondary]="activeTab() !== 'historial'" (click)="selectTab('historial')">
+    Comisiones anteriores
+  </button>
+  <button type="button" class="btn btn-sm" [class.btn-primary]="activeTab() === 'vueltos'"
+    [class.btn-outline-secondary]="activeTab() !== 'vueltos'" (click)="selectTab('vueltos')">
+    Mis vueltos
+  </button>
+</div>
+
+<!-- ── Tab: Comisión actual ──────────────────────────────────────────────── -->
+@if (activeTab() === 'actual') {
+  @if (loadingCurrent()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (currentComisiones().length === 0) {
+    <div class="text-center text-muted py-5">
+      <div class="fs-1">🗓️</div>
+      <div>No tienes una comisión en curso ahora mismo.</div>
+      <div class="small mt-1">Consulta con tu supervisor para que te asigne uno.</div>
+    </div>
+  } @else {
+    <div class="d-flex flex-column gap-3">
+      @for (comision of currentComisiones(); track comision.id) {
+        @let st = COMISION_STATUS_MAP[comision.status];
+        <c-card [class.border-success]="comision.status === 'open'">
+          <c-card-header class="d-flex justify-content-between align-items-center py-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <c-badge [color]="st.color">{{ st.label }}</c-badge>
+              <strong>
+                {{ comision.date_from | date:'dd/MM/yy' }}
+                @if (comision.date_from !== comision.date_to) { → {{ comision.date_to | date:'dd/MM/yy' }} }
+              </strong>
+              <span class="text-muted">→</span>
+              <span>{{ comision.destination }}</span>
+              @if (comision.purpose) {
+                <span class="text-muted small d-none d-md-inline">· {{ comision.purpose }}</span>
+              }
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <div class="text-end d-none d-md-block">
+                <div class="small text-muted">{{ comision.gastos_count }} gastos</div>
+                <div class="fw-bold text-primary">S/ {{ comision.gastos_total | number:'1.2-2' }}</div>
+              </div>
+              <button cButton color="success" size="sm" (click)="openAddGasto(comision)">
+                <fa-icon [icon]="faPlus" class="me-1" /> Gasto
+              </button>
+            </div>
+          </c-card-header>
+
+          <c-card-body>
+            <div class="d-md-none mb-3 d-flex gap-3 text-center">
+              <div>
+                <div class="small text-muted">Gastos</div>
+                <div class="fw-bold">{{ comision.gastos_count }}</div>
+              </div>
+              <div>
+                <div class="small text-muted">Total</div>
+                <div class="fw-bold text-primary">S/ {{ comision.gastos_total | number:'1.2-2' }}</div>
+              </div>
+              @if (comision.budget) {
+                <div>
+                  <div class="small text-muted">Presupuesto</div>
+                  <div class="fw-bold">S/ {{ comision.budget | number:'1.2-2' }}</div>
+                </div>
+              }
+            </div>
+
+            @if (comision.notes) {
+              <div class="border-start border-info border-3 bg-body-secondary rounded-2 py-1 px-2 small mb-3"><strong class="text-info">Notas:</strong> {{ comision.notes }}</div>
+            }
+
+            <ng-container [ngTemplateOutlet]="resumenFinanciero" [ngTemplateOutletContext]="{ comision: comision }" />
+
+            @if (!comision.gastos?.length) {
+              <div class="text-center text-muted py-3">
+                <fa-icon [icon]="faReceipt" class="me-1" />
+                Sin gastos registrados.
+                <button type="button" class="btn btn-link btn-sm p-0 ms-1" (click)="openAddGasto(comision)">Agregar primero</button>
+              </div>
+            } @else {
+              <ng-container [ngTemplateOutlet]="gastosList" [ngTemplateOutletContext]="{ gastos: comision.gastos, comision: comision }" />
+            }
+          </c-card-body>
+        </c-card>
+      }
+    </div>
+  }
+}
+
+<!-- ── Tab: Historial (comisiones cerradas) ───────────────────────────────── -->
+@if (activeTab() === 'historial') {
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+      <label class="form-label small">Desde</label>
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_from" (change)="applyFilters()" />
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small">Hasta</label>
+      <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_to" (change)="applyFilters()" />
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (comisiones().length === 0) {
+    <div class="text-center text-muted py-5">
+      <div class="fs-1">🗓️</div>
+      <div>No tienes comisiones cerradas en este período.</div>
+    </div>
+  } @else {
+    <c-card>
+      <c-card-body class="p-0">
+        <!-- Mobile: tarjetas -->
+        <div class="d-md-none d-flex flex-column gap-2 p-2">
+          @for (comision of comisiones(); track comision.id) {
+            @let st = COMISION_STATUS_MAP[comision.status];
+            <div class="card shadow-sm" style="border-radius:12px;">
+              <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <c-badge [color]="st.color" class="mb-1">{{ st.label }}</c-badge>
+                    <div class="fw-bold">
+                      {{ comision.date_from | date:'dd/MM/yy' }}
+                      @if (comision.date_from !== comision.date_to) { → {{ comision.date_to | date:'dd/MM/yy' }} }
+                    </div>
+                    <div class="text-body-secondary" style="font-size:.85rem;">{{ comision.destination }}</div>
+                  </div>
+                  <div class="text-end">
+                    <div class="small text-muted">{{ comision.gastos_count }} gastos</div>
+                    <div class="fw-bold text-primary">S/ {{ comision.gastos_total | number:'1.2-2' }}</div>
+                  </div>
+                </div>
+                <button class="btn btn-sm btn-outline-primary w-100 d-flex flex-column align-items-center" (click)="openView(comision)">
+                  <fa-icon [icon]="faEye" /><small>Ver detalle</small>
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Desktop: tabla -->
+        <div class="table-responsive d-none d-md-block">
+          <table cTable hover class="mb-0">
+            <thead>
+              <tr>
+                <th>Estado</th>
+                <th>Fecha</th>
+                <th>Destino</th>
+                <th class="text-end">Gastos</th>
+                <th class="text-end" style="width:110px">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (comision of comisiones(); track comision.id) {
+                @let st = COMISION_STATUS_MAP[comision.status];
+                <tr>
+                  <td><c-badge [color]="st.color">{{ st.label }}</c-badge></td>
+                  <td class="text-nowrap">
+                    {{ comision.date_from | date:'dd/MM/yy' }}
+                    @if (comision.date_from !== comision.date_to) { → {{ comision.date_to | date:'dd/MM/yy' }} }
+                  </td>
+                  <td>{{ comision.destination }}</td>
+                  <td class="text-end">
+                    <div>{{ comision.gastos_count }}</div>
+                    <div class="fw-semibold text-primary">S/ {{ comision.gastos_total | number:'1.2-2' }}</div>
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-outline-primary d-flex flex-column align-items-center" (click)="openView(comision)">
+                      <fa-icon [icon]="faEye" /><small>Ver</small>
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+
+    <div class="mt-4">
+      <app-pagination [currentPage]="filters.page ?? 1" [lastPage]="lastPage()" [total]="total()"
+        (pageChange)="onPage($event)" />
+    </div>
+  }
+}
+
+<!-- ── Tab: Mis vueltos ─────────────────────────────────────────────────── -->
+@if (activeTab() === 'vueltos') {
+  @if (loadingReturnsHistory()) {
+    <div class="text-center py-5"><c-spinner color="primary" /></div>
+  } @else if (!returnsHistory().length) {
+    <div class="text-center text-muted py-5">
+      <div class="fs-1">↩️</div>
+      <div>Aún no tienes vueltos registrados.</div>
+    </div>
+  } @else {
+    <!-- Mobile: tarjetas -->
+    <div class="d-md-none d-flex flex-column gap-2">
+      @for (r of returnsHistory(); track r.id) {
+        <div class="card shadow-sm" style="border-radius:12px;">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <c-badge [color]="r.direction === 'to_company' ? 'warning' : 'info'">
+                {{ r.direction === 'to_company' ? 'Devolviste' : 'Te dieron' }}
+              </c-badge>
+              <c-badge [color]="r.status === 'validated' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'">
+                {{ r.status === 'validated' ? 'Validado' : r.status === 'rejected' ? 'Rechazado' : 'Pendiente' }}
+              </c-badge>
+            </div>
+            <div class="fw-bold fs-6">S/ {{ r.amount | number:'1.2-2' }}</div>
+            <div class="text-body-secondary small">{{ r.comision_destination }} · {{ r.comision_date_from | date:'dd/MM/yyyy' }}</div>
+            <div class="small mt-1">
+              @if (r.form === 'cash') {
+                <fa-icon icon="money-bill-wave" class="me-1 text-muted" />Efectivo — recibido por {{ r.received_by_name }}
+              } @else if (r.form === 'deposit') {
+                <fa-icon icon="building-columns" class="me-1 text-muted" />
+                {{ r.bank_name }} / {{ r.payment_method_name }} · Op. {{ r.operation_number }}
+                @if (r.operation_date) { · {{ r.operation_date | date:'dd/MM/yyyy' }} }
+              } @else {
+                <span class="text-muted">Aún sin registrar</span>
+              }
+            </div>
+            @if (r.voucher_url) {
+              <div class="mt-2">
+                @if (isImage(r.voucher_url)) {
+                  <img [src]="r.voucher_url" alt="Voucher" class="rounded border" style="max-height:140px; max-width:100%; object-fit:contain; cursor:zoom-in;"
+                       (click)="filePreview.open(r.voucher_url!)" />
+                } @else {
+                  <a style="cursor:pointer" (click)="filePreview.open(r.voucher_url!)"><fa-icon icon="file-pdf" class="me-1" />Ver comprobante</a>
+                }
+              </div>
+            }
+            @if (r.status === 'rejected' && r.notes) {
+              <div class="text-danger small mt-1">Motivo: {{ r.notes }}</div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Desktop: tabla -->
+    <c-card class="d-none d-md-block">
+      <c-card-body class="p-0">
+        <div class="table-responsive">
+          <table cTable hover small class="mb-0">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Comisión</th>
+                <th>Forma</th>
+                <th class="text-end">Monto</th>
+                <th class="text-center">Voucher</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of returnsHistory(); track r.id) {
+                <tr>
+                  <td>
+                    <c-badge [color]="r.direction === 'to_company' ? 'warning' : 'info'">
+                      {{ r.direction === 'to_company' ? 'Devolviste' : 'Te dieron' }}
+                    </c-badge>
+                  </td>
+                  <td class="small">
+                    {{ r.comision_destination }}
+                    <div class="text-muted">{{ r.comision_date_from | date:'dd/MM/yyyy' }}</div>
+                  </td>
+                  <td class="small text-muted">
+                    @if (r.form === 'cash') {
+                      Efectivo — recibido por {{ r.received_by_name }}
+                    } @else if (r.form === 'deposit') {
+                      {{ r.bank_name }} / {{ r.payment_method_name }}
+                      <div class="font-monospace">{{ r.operation_number }}</div>
+                    } @else {
+                      <span class="text-muted">Aún sin registrar</span>
+                    }
+                  </td>
+                  <td class="text-end fw-bold">S/ {{ r.amount | number:'1.2-2' }}</td>
+                  <td class="text-center">
+                    @if (r.voucher_url) {
+                      <a style="cursor:pointer" (click)="filePreview.open(r.voucher_url!)"><fa-icon icon="image" /></a>
+                    }
+                  </td>
+                  <td>
+                    <c-badge [color]="r.status === 'validated' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'">
+                      {{ r.status === 'validated' ? 'Validado' : r.status === 'rejected' ? 'Rechazado' : 'Pendiente' }}
+                    </c-badge>
+                    @if (r.status === 'rejected' && r.notes) { <div class="text-danger small mt-1">{{ r.notes }}</div> }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </c-card-body>
+    </c-card>
+  }
+}
+
+<!-- ── Plantilla reutilizable: resumen financiero de una comisión ─────────── -->
+<ng-template #resumenFinanciero let-comision="comision">
+  @if (comision.advance.status !== 'delivered') {
+    <div class="alert alert-secondary py-1 px-2 small mb-3">
+      Aún no se te han entregado los viáticos de esta comisión.
+    </div>
+  } @else {
+    @let rf = comision.resumen_financiero;
+    @let pct = usagePercent(comision);
+    <div class="mb-3 p-2 bg-body-secondary rounded">
+      <div class="d-flex justify-content-between align-items-center small mb-1">
+        <span>
+          Viáticos entregados: <strong>S/ {{ rf.adelanto | number:'1.2-2' }}</strong>
+          <span class="text-muted">({{ comision.advance.form === 'cash' ? 'efectivo' : 'depósito' }} — {{ comision.advance.delivered_at | date:'dd/MM/yyyy' }})</span>
+        </span>
+        <span class="fw-bold" [class.text-danger]="pct > 100" [class.text-warning]="pct > 80 && pct <= 100" [class.text-success]="pct <= 80">
+          {{ pct }}% usado
+        </span>
+      </div>
+      <div class="progress" style="height:8px;">
+        <div class="progress-bar"
+          [class.bg-success]="pct <= 80" [class.bg-warning]="pct > 80 && pct <= 100" [class.bg-danger]="pct > 100"
+          [style.width.%]="pct > 100 ? 100 : pct"></div>
+      </div>
+      <div class="d-flex flex-wrap gap-3 small mt-2">
+        <span class="text-success">✔ Aprobado: S/ {{ rf.aprobado | number:'1.2-2' }}</span>
+        @if (rf.pendiente_revision > 0) {
+          <span class="text-warning">⏳ Pendiente de revisión: S/ {{ rf.pendiente_revision | number:'1.2-2' }}</span>
+        }
+        @if (rf.rechazado > 0) {
+          <span class="text-danger">✘ Rechazado: S/ {{ rf.rechazado | number:'1.2-2' }}</span>
+        }
+        @if (rf.vuelto_o_faltante != null) {
+          @if (rf.vuelto_o_faltante >= 0) {
+            <span class="text-primary">↩ Vuelto por devolver: S/ {{ rf.vuelto_o_faltante | number:'1.2-2' }}</span>
+          } @else {
+            <span class="text-danger">⚠ Gastaste S/ {{ (-rf.vuelto_o_faltante) | number:'1.2-2' }} de más — te deben ese monto</span>
+          }
+        }
+      </div>
+      @if (comision.return) {
+        <div class="small mt-2 border-top pt-2">
+          {{ comision.return.direction === 'to_company' ? 'Debes devolver:' : 'Te deben:' }}
+          S/ {{ comision.return.amount | number:'1.2-2' }}
+          <c-badge [color]="comision.return.status === 'validated' ? 'success' : comision.return.status === 'rejected' ? 'danger' : 'warning'">
+            {{ comision.return.status === 'validated' ? 'Regularizado' : comision.return.status === 'rejected' ? 'Rechazado' : 'Pendiente — coordina con administración' }}
+          </c-badge>
+        </div>
+      }
+    </div>
+  }
+</ng-template>
+
+<!-- ── Plantilla reutilizable: gastos de una comisión (cards en mobile, tabla en desktop) ── -->
+<ng-template #gastosList let-gastos="gastos" let-comision="comision">
+  <!-- Mobile: cards -->
+  <div class="row g-2 d-md-none">
+    @for (g of gastos; track g.id) {
+      <div class="col-12">
+        <ng-container [ngTemplateOutlet]="gastoCard" [ngTemplateOutletContext]="{ g: g, comision: comision }" />
+      </div>
+    }
+  </div>
+
+  <!-- Desktop: tabla -->
+  <div class="d-none d-md-block">
+    <table cTable hover small>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Categoría</th>
+          <th>Forma de pago</th>
+          <th class="text-end">Monto</th>
+          <th>Comprobante</th>
+          <th>Estado</th>
+          <th class="text-end">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (g of gastos; track g.id) {
+          @let gst = gastoStatus(g.status);
+          <tr>
+            <td class="text-nowrap">{{ g.date | date:'dd/MM/yyyy' }}</td>
+            <td>
+              {{ g.category }}
+              @if (g.description) { <div class="small text-muted">{{ g.description }}</div> }
+            </td>
+            <td>
+              {{ g.payment_form === 'transfer' ? '💳 Transferencia' : '💵 Efectivo' }}
+              @if (g.payment_form === 'transfer') {
+                <div class="small text-muted">{{ g.bank_name }} — {{ g.payment_method_name }} — N° {{ g.operation_number }}</div>
+              }
+              @if (g.document_type) {
+                <div class="small text-muted">{{ docTypeLabel(g.document_type) }} {{ g.document_number }} — {{ g.establishment_name }}</div>
+              }
+            </td>
+            <td class="text-end fw-bold">S/ {{ g.amount | number:'1.2-2' }}</td>
+            <td>
+              <div class="d-flex gap-2">
+                @if (g.photo_url) {
+                  <a style="cursor:pointer" title="Foto / Factura" (click)="filePreview.open(g.photo_url!)">
+                    @if (isImage(g.photo_url)) {
+                      <img [src]="g.photo_url" alt="Foto / Factura" class="img-thumbnail" style="max-height:40px" />
+                    } @else {
+                      <fa-icon icon="file-pdf" class="text-danger" style="font-size:1.6rem;" />
+                    }
+                  </a>
+                }
+                @if (g.voucher_url) {
+                  <a style="cursor:pointer" title="Voucher de transferencia" (click)="filePreview.open(g.voucher_url!)">
+                    @if (isImage(g.voucher_url)) {
+                      <img [src]="g.voucher_url" alt="Voucher" class="img-thumbnail" style="max-height:40px" />
+                    } @else {
+                      <fa-icon icon="file-pdf" class="text-danger" style="font-size:1.6rem;" />
+                    }
+                  </a>
+                }
+                @if (!g.photo_url && !g.voucher_url) { — }
+              </div>
+            </td>
+            <td>
+              <c-badge [color]="gst.color">{{ gst.label }}</c-badge>
+              @if (g.status === 'rejected' && g.review_notes) {
+                <div class="alert alert-danger alert-sm py-1 px-2 mt-1 small mb-0" style="max-width:220px;">{{ g.review_notes }}</div>
+              }
+            </td>
+            <td class="text-end">
+              @if (comision.status === 'closed') {
+                —
+              } @else if (g.status === 'rejected') {
+                <div class="d-inline-flex flex-wrap gap-2 justify-content-end">
+                  <button class="btn btn-sm btn-danger d-flex flex-column align-items-center" (click)="openEditGasto(g, comision)">
+                    <fa-icon [icon]="faPencil" /><small>Corregir</small>
+                  </button>
+                </div>
+              } @else if (g.status === 'pending') {
+                <div class="d-inline-flex flex-wrap gap-2 justify-content-end">
+                  <button class="btn btn-sm btn-outline-secondary d-flex flex-column align-items-center" (click)="openEditGasto(g, comision)">
+                    <fa-icon [icon]="faPencil" /><small>Editar</small>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger d-flex flex-column align-items-center" (click)="confirmDeleteGasto(g, comision)">
+                    <fa-icon [icon]="faTrash" /><small>Eliminar</small>
+                  </button>
+                </div>
+              } @else { — }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</ng-template>
+
+<!-- ── Plantilla reutilizable: tarjeta de un gasto (mobile) ────────────────── -->
+<ng-template #gastoCard let-g="g" let-comision="comision">
+  @let gst = gastoStatus(g.status);
+  <div class="border rounded p-2 h-100"
+    [class.border-success]="g.status === 'approved'"
+    [class.border-danger]="g.status === 'rejected'">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div class="small">
+        <strong>{{ g.category }}</strong>
+        <span class="text-muted ms-1">{{ g.payment_form === 'transfer' ? '💳 Transferencia' : '💵 Efectivo' }}</span>
+      </div>
+      <c-badge [color]="gst.color" class="ms-1">{{ gst.label }}</c-badge>
+    </div>
+    <div class="fw-bold text-primary">S/ {{ g.amount | number:'1.2-2' }}</div>
+    <div class="small text-muted">{{ g.date | date:'dd/MM/yyyy' }}</div>
+    @if (g.description) { <div class="small text-muted">{{ g.description }}</div> }
+    @if (g.payment_form === 'transfer') {
+      <div class="small text-muted">{{ g.bank_name }} — {{ g.payment_method_name }} — N° {{ g.operation_number }}</div>
+    }
+    @if (g.document_type) {
+      <div class="small text-muted">{{ docTypeLabel(g.document_type) }} {{ g.document_number }} — {{ g.establishment_name }}</div>
+    }
+    <div class="d-flex gap-2 mt-1">
+      @if (g.photo_url) {
+        <a style="cursor:pointer" title="Foto / Factura" (click)="filePreview.open(g.photo_url!)">
+          @if (isImage(g.photo_url)) {
+            <img [src]="g.photo_url" alt="Foto / Factura" class="img-thumbnail" style="max-height:60px" />
+          } @else {
+            <fa-icon icon="file-pdf" class="text-danger" style="font-size:2rem;" />
+          }
+        </a>
+      }
+      @if (g.voucher_url) {
+        <a style="cursor:pointer" title="Voucher de transferencia" (click)="filePreview.open(g.voucher_url!)">
+          @if (isImage(g.voucher_url)) {
+            <img [src]="g.voucher_url" alt="Voucher" class="img-thumbnail" style="max-height:60px" />
+          } @else {
+            <fa-icon icon="file-pdf" class="text-danger" style="font-size:2rem;" />
+          }
+        </a>
+      }
+    </div>
+    @if (g.status === 'rejected' && g.review_notes) {
+      <div class="alert alert-danger alert-sm py-1 px-2 mt-1 small mb-0">{{ g.review_notes }}</div>
+    }
+    @if (comision.status !== 'closed') {
+      @if (g.status === 'rejected') {
+        <button cButton color="danger" size="sm" class="w-100 mt-2" (click)="openEditGasto(g, comision)">
+          <fa-icon [icon]="faPencil" class="me-1" />Corregir y reenviar
+        </button>
+      } @else if (g.status === 'pending') {
+        <div class="d-flex gap-1 mt-2">
+          <button cButton color="secondary" size="sm" variant="outline" class="flex-fill d-flex flex-column align-items-center"
+            (click)="openEditGasto(g, comision)">
+            <fa-icon [icon]="faPencil" /><small>Editar</small>
+          </button>
+          <button cButton color="danger" size="sm" variant="outline" class="flex-fill d-flex flex-column align-items-center"
+            (click)="confirmDeleteGasto(g, comision)">
+            <fa-icon [icon]="faTrash" /><small>Eliminar</small>
+          </button>
+        </div>
+      }
+    }
+  </div>
+</ng-template>
+
+<!-- Modal registrar gasto -->
+<c-modal [visible]="gastoModal()" (visibleChange)="gastoModal.set($event)" size="lg" alignment="center" backdrop="static">
+  <c-modal-header>
+    <h5 class="modal-title">
+      {{ editingGasto() ? 'Editar Gasto' : 'Registrar Gasto' }}
+      @if (activeComision()) {
+        <span class="text-muted fw-normal fs-6 ms-2">— {{ activeComision()!.destination }}</span>
+      }
+    </h5>
+  </c-modal-header>
+  <c-modal-body>
+    <div class="row g-3">
+      <div class="col-6">
+        <label class="form-label">Fecha <span class="text-danger">*</span></label>
+        <input type="date" class="form-control" [(ngModel)]="gastoForm.date" />
+      </div>
+      <div class="col-6">
+        <label class="form-label">Monto (S/) <span class="text-danger">*</span></label>
+        <input type="number" class="form-control" [(ngModel)]="gastoForm.amount" step="0.01" min="0.01" placeholder="0.00" />
+      </div>
+      <div class="col-12">
+        <label class="form-label">Categoría <span class="text-danger">*</span></label>
+        <div class="d-flex gap-2 align-items-start">
+          <p-select [options]="categoryOptions()" optionLabel="label" optionValue="value"
+            [filter]="true" filterPlaceholder="Buscar categoría..."
+            [(ngModel)]="gastoForm.category" placeholder="Selecciona una categoría"
+            styleClass="flex-grow-1" />
+          <button type="button" class="btn btn-outline-primary flex-shrink-0" (click)="showNewCategory.set(!showNewCategory())">
+            <fa-icon [icon]="faPlus" />
+          </button>
+        </div>
+        @if (showNewCategory()) {
+          <div class="d-flex gap-2 align-items-start mt-2 p-2 bg-body-secondary rounded">
+            <input type="text" class="form-control form-control-sm flex-grow-1"
+              [(ngModel)]="newCategoryName" placeholder="Nombre de la nueva categoría" maxlength="50" />
+            <button type="button" class="btn btn-success btn-sm flex-shrink-0" [disabled]="!newCategoryName.trim() || creatingCategory()"
+              (click)="createCategory()">
+              @if (creatingCategory()) { <fa-icon [icon]="faSpinner" /> } @else { Crear }
+            </button>
+          </div>
+        }
+      </div>
+      <div class="col-12">
+        <label class="form-label">Descripción</label>
+        <textarea class="form-control" [(ngModel)]="gastoForm.description" rows="2"
+          placeholder="Detalle del gasto (opcional)"></textarea>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Forma de pago <span class="text-danger">*</span></label>
+        <div class="btn-group w-100" role="group">
+          <input type="radio" class="btn-check" name="gastoPaymentForm" id="gpf-cash" [value]="'cash'" [(ngModel)]="gastoForm.payment_form">
+          <label class="btn btn-outline-primary btn-sm" for="gpf-cash">💵 Efectivo</label>
+
+          <input type="radio" class="btn-check" name="gastoPaymentForm" id="gpf-transfer" [value]="'transfer'" [(ngModel)]="gastoForm.payment_form">
+          <label class="btn btn-outline-primary btn-sm" for="gpf-transfer">💳 Transferencia</label>
+        </div>
+      </div>
+
+      @if (gastoForm.payment_form === 'transfer') {
+        <div class="col-12">
+          <label class="form-label small mb-1">Medio de pago <span class="text-danger">*</span></label>
+          <select class="form-select form-select-sm"
+                  [(ngModel)]="gastoForm.payment_method_id"
+                  (ngModelChange)="gastoForm.operation_number = ''">
+            <option [ngValue]="null" disabled>Seleccionar...</option>
+            @for (m of methods(); track m.id) {
+              <option [ngValue]="m.id">{{ m.bank?.name }} — {{ m.name }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="col-8">
+          <label class="form-label small mb-1">N° de operación <span class="text-danger">*</span></label>
+          @if (selectedMethod; as m) {
+            <input type="text" class="form-control form-control-sm"
+                   [class.is-invalid]="!!opNumberError && !!gastoForm.operation_number"
+                   [placeholder]="m.op_format === 'numeric' ? 'Solo números' : m.op_format === 'alpha' ? 'Solo letras' : 'Letras y/o números'"
+                   [(ngModel)]="gastoForm.operation_number" />
+            @if (opNumberError) {
+              <div class="invalid-feedback d-block" style="font-size:.72rem;">
+                <fa-icon icon="triangle-exclamation" class="me-1" />{{ opNumberError }}
+              </div>
+            }
+          } @else {
+            <input type="text" class="form-control form-control-sm" placeholder="Selecciona primero el medio de pago" disabled />
+          }
+        </div>
+        <div class="col-4">
+          <label class="form-label small mb-1">Hora <span class="text-danger">*</span></label>
+          <input type="time" class="form-control form-control-sm" [(ngModel)]="gastoForm.operation_time" />
+        </div>
+        <div class="col-8">
+          <label class="form-label small mb-1">Fecha de operación <span class="text-danger">*</span></label>
+          <input type="date" class="form-control form-control-sm" [(ngModel)]="gastoForm.operation_date" />
+        </div>
+        <div class="col-12">
+          <label class="form-label small mb-1">Voucher de transferencia <span class="text-danger">*</span></label>
+          <input type="file" class="form-control form-control-sm" accept="image/*,.pdf" (change)="onVoucher($event)" />
+          @if (voucherPreview() && !voucherIsPdf()) {
+            <img [src]="voucherPreview()!" alt="Voucher" class="img-thumbnail mt-2" style="max-height:120px" />
+          } @else if (voucherIsPdf()) {
+            <div class="text-body-secondary small mt-2 d-flex align-items-center gap-2">
+              <fa-icon icon="file-pdf" class="text-danger" />
+              <span>Archivo PDF</span>
+              @if (voucherPreview()) {
+                <a [href]="voucherPreview()!" target="_blank" rel="noopener">Ver</a>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <div class="col-12">
+        <label class="form-label">
+          <fa-icon [icon]="faImage" class="me-1" /> Foto / Factura <span class="text-body-secondary">(opcional)</span>
+        </label>
+        <input type="file" class="form-control" accept="image/*,.pdf" (change)="onPhoto($event)" />
+        @if (photoPreview() && !photoIsPdf()) {
+          <img [src]="photoPreview()!" alt="Preview" class="img-thumbnail mt-2" style="max-height:120px" />
+        } @else if (photoIsPdf()) {
+          <div class="text-body-secondary small mt-2 d-flex align-items-center gap-2">
+            <fa-icon icon="file-pdf" class="text-danger" />
+            <span>Archivo PDF</span>
+            @if (photoPreview()) {
+              <a [href]="photoPreview()!" target="_blank" rel="noopener">Ver</a>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="col-12">
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" id="hasDocData"
+            [ngModel]="showDocumentFields()" (ngModelChange)="showDocumentFields.set($event)" />
+          <label class="form-check-label small" for="hasDocData">
+            Tengo los datos del comprobante (boleta/factura) — evita que se repita
+          </label>
+        </div>
+        @if (showDocumentFields()) {
+          <div class="row g-2 mt-1 p-2 bg-body-secondary rounded">
+            <div class="col-6">
+              <label class="form-label small mb-1">Tipo de documento <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" [(ngModel)]="gastoForm.document_type">
+                <option [ngValue]="''" disabled>Seleccionar...</option>
+                @for (t of documentTypeOptions; track t.value) {
+                  <option [ngValue]="t.value">{{ t.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">N° de documento <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="gastoForm.document_number" placeholder="B001-000123" />
+            </div>
+            <div class="col-8">
+              <label class="form-label small mb-1">Establecimiento <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" [(ngModel)]="gastoForm.establishment_name" placeholder="Nombre del negocio" />
+            </div>
+            <div class="col-4">
+              <label class="form-label small mb-1">Fecha de emisión <span class="text-danger">*</span></label>
+              <input type="date" class="form-control form-control-sm" [(ngModel)]="gastoForm.document_date" />
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="gastoModal.set(false)" [disabled]="savingGasto()">
+      Cancelar
+    </button>
+    <button cButton color="primary" (click)="saveGasto()"
+      [disabled]="savingGasto() || !isGastoValid">
+      @if (savingGasto()) { <fa-icon [icon]="faSpinner" class="me-1" /> } Guardar
+    </button>
+  </c-modal-footer>
+</c-modal>
+
+<app-confirm-modal
+  [visible]="showConfirm()"
+  [message]="'¿Eliminar ' + deletingLabel() + '?'"
+  (confirm)="doDeleteGasto()"
+  (cancel)="showConfirm.set(false)" />
+
+
+<!-- Modal ver detalle de comisión (historial) -->
+<c-modal [visible]="viewModalOpen()" (visibleChange)="viewModalOpen.set($event)" size="lg" alignment="center">
+  <c-modal-header>
+    <h5 class="modal-title">
+      @if (viewingComision(); as vi) {
+        Comisión · {{ vi.date_from | date:'dd/MM/yy' }}
+        @if (vi.date_from !== vi.date_to) { → {{ vi.date_to | date:'dd/MM/yy' }} }
+        — {{ vi.destination }}
+      }
+    </h5>
+  </c-modal-header>
+  <c-modal-body>
+    @if (loadingDetail()) {
+      <div class="text-center py-3"><c-spinner color="primary" /></div>
+    } @else if (viewingDetail(); as comision) {
+      <ng-container [ngTemplateOutlet]="resumenFinanciero" [ngTemplateOutletContext]="{ comision: comision }" />
+      @if (!comision.gastos?.length) {
+        <div class="text-center text-muted py-3">Sin gastos registrados.</div>
+      } @else {
+        <ng-container [ngTemplateOutlet]="gastosList" [ngTemplateOutletContext]="{ gastos: comision.gastos, comision: comision }" />
+      }
+    }
+  </c-modal-body>
+  <c-modal-footer>
+    <button cButton color="secondary" variant="outline" (click)="viewModalOpen.set(false)">Cerrar</button>
+  </c-modal-footer>
+</c-modal>
+
+<app-return-submit-modal
+  [viaticoReturn]="resubmittingReturn()"
+  (submitted)="onReturnResubmitted()"
+  (cancelled)="resubmittingReturn.set(null)" />
+
+<app-file-preview-modal #filePreview />

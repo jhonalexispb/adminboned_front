@@ -23,6 +23,7 @@ import { EmpresaService } from '../../core/services/empresa.service';
 import { CollectionService } from '../../views/payments/collection.service';
 import { UserDeposit } from '../../views/payments/collection.model';
 import { RegisterDepositModalComponent } from '../../views/payments/register-deposit-modal/register-deposit-modal.component';
+import { ViaticoReturnService } from '../../views/viaticos/viatico-return.service';
 import { NotificationsModalComponent } from './notifications-modal/notifications-modal.component';
 
 const LOGO_CACHE_KEY = 'empresa_logo_url';
@@ -45,6 +46,7 @@ export class DefaultLayoutComponent implements OnInit {
   private auth = inject(AuthService);
   private empresaService = inject(EmpresaService);
   collectionService = inject(CollectionService);
+  viaticoReturnService = inject(ViaticoReturnService);
 
   logoUrl   = signal<string | null>(localStorage.getItem(LOGO_CACHE_KEY));
   brandName = signal<string | null>(localStorage.getItem(BRAND_NAME_CACHE_KEY));
@@ -81,6 +83,11 @@ export class DefaultLayoutComponent implements OnInit {
   onDepositRegistered(_event: { deposit: UserDeposit }): void {
     this.collectionService.showNewDeposit.set(false);
     this.collectionService.myDebt().subscribe({ error: () => {} });
+  }
+
+  onViaticoDepositRegistered(_event: { deposit: UserDeposit }): void {
+    this.viaticoReturnService.showNewDeposit.set(false);
+    this.viaticoReturnService.myDebt().subscribe({ error: () => {} });
   }
 }
 

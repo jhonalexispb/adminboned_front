@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { permissionGuard } from '../../core/guards/permission.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'list', pathMatch: 'full' },
@@ -6,6 +7,13 @@ export const routes: Routes = [
     path: 'list',
     loadComponent: () =>
       import('./quotations-list/quotations-list.component').then(m => m.QuotationsListComponent),
+  },
+  {
+    path: 'supervisar',
+    loadComponent: () =>
+      import('./quotations-list/quotations-list.component').then(m => m.QuotationsListComponent),
+    canActivate: [permissionGuard('quotations_manage')],
+    data: { supervise: true, title: 'Supervisar Cotizaciones' },
   },
   {
     path: 'new',

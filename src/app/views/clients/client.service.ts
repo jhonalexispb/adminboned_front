@@ -9,6 +9,8 @@ export interface ClientFilters {
   search?: string;
   active?: boolean | '';
   catalog_enabled?: boolean | '';
+  /** Salta el filtro de zonas de venta — solo lo respeta el backend si además tienes un permiso que lo justifique (ej. quotations_manage). */
+  ignore_zone?: boolean;
   per_page?: number;
   page?: number;
 }
@@ -24,6 +26,7 @@ export class ClientService {
     if (filters.search)                                        params = params.set('search', filters.search);
     if (filters.active !== '' && filters.active !== undefined) params = params.set('active', String(filters.active));
     if (filters.catalog_enabled !== '' && filters.catalog_enabled !== undefined) params = params.set('catalog_enabled', String(filters.catalog_enabled));
+    if (filters.ignore_zone)                                   params = params.set('ignore_zone', '1');
     if (filters.per_page)                                      params = params.set('per_page', String(filters.per_page));
     if (filters.page)                                          params = params.set('page', String(filters.page));
     return this.http.get<PaginatedResponse<Client>>(this.url, { params });
@@ -31,6 +34,11 @@ export class ClientService {
 
   get(id: number): Observable<{ client: Client }> {
     return this.http.get<{ client: Client }>(`${this.url}/${id}`);
+  }
+
+  /** Búsqueda exacta por RUC/DNI — a diferencia de list({search}) que es parcial. */
+  lookup(document: string): Observable<{ client: Client | null }> {
+    return this.http.get<{ client: Client | null }>(`${this.url}/lookup`, { params: { document } });
   }
 
   create(payload: ClientPayload): Observable<{ message: string; client: Client }> {

@@ -30,7 +30,7 @@ export class UserModalComponent {
 
   form = signal({
     name: '', email: '', password: '', phone: '',
-    active: true, roles: [] as string[],
+    active: true, tracking_enabled: false, roles: [] as string[],
   });
 
   readonly roleLabel = roleLabel;
@@ -49,6 +49,7 @@ export class UserModalComponent {
           password: '',
           phone:    u?.phone    ?? '',
           active:   u?.active   ?? true,
+          tracking_enabled: u?.tracking_enabled ?? false,
           roles:    u ? [...u.roles] : [],
         });
       }
@@ -79,7 +80,7 @@ export class UserModalComponent {
 
     const data: any = {
       name: f.name, email: f.email, phone: f.phone || null,
-      active: f.active, roles: f.roles,
+      active: f.active, tracking_enabled: f.tracking_enabled, roles: f.roles,
     };
     if (f.password) data.password = f.password;
 

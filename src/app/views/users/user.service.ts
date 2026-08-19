@@ -30,12 +30,13 @@ export class UserService {
   private http = inject(HttpClient);
   private base = environment.apiUrl;
 
-  listUsers(params: { search?: string; role?: string; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<UserItem>> {
+  listUsers(params: { search?: string; role?: string; permission?: string; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<UserItem>> {
     let p = new HttpParams();
-    if (params.search)   p = p.set('search', params.search);
-    if (params.role)     p = p.set('role', params.role);
-    if (params.per_page) p = p.set('per_page', params.per_page);
-    if (params.page)     p = p.set('page', params.page);
+    if (params.search)     p = p.set('search', params.search);
+    if (params.role)       p = p.set('role', params.role);
+    if (params.permission) p = p.set('permission', params.permission);
+    if (params.per_page)   p = p.set('per_page', params.per_page);
+    if (params.page)       p = p.set('page', params.page);
     return this.http.get<PaginatedResponse<UserItem>>(`${this.base}/users`, { params: p });
   }
 

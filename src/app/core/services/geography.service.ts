@@ -6,6 +6,16 @@ import { environment } from '../../../environments/environment';
 export interface Department { id: number; name: string; }
 export interface Province   { id: number; name: string; department_id: number; }
 export interface District   { id: number; name: string; code: string; province_id: number; }
+export interface GeoSearchResult {
+  type:            'province' | 'district';
+  id:              number;
+  name:            string;
+  department_id:   number;
+  department_name: string;
+  province_id?:    number;
+  province_name?:  string;
+}
+
 export interface GeoLocation {
   district_id: number;   district_name: string;  ubigeo: string;
   province_id: number;   province_name: string;
@@ -30,6 +40,11 @@ export class GeographyService {
   districts(provinceId: number): Observable<District[]> {
     const params = new HttpParams().set('province_id', provinceId);
     return this.http.get<District[]>(`${this.base}/districts`, { params });
+  }
+
+  search(q: string): Observable<GeoSearchResult[]> {
+    const params = new HttpParams().set('q', q);
+    return this.http.get<GeoSearchResult[]>(`${this.base}/search`, { params });
   }
 
   /** Devuelve la jerarquía completa de un distrito (para pre-cargar selectores al editar) */

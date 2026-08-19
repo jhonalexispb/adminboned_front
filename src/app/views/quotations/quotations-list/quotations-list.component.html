@@ -1,13 +1,110 @@
-<app-page-header title="Cotizaciones" subtitle="Propuestas de venta a clientes">
+<app-page-header
+  [title]="supervising() ? 'Supervisar Cotizaciones' : 'Cotizaciones'"
+  [subtitle]="supervising() ? 'Todas las cotizaciones del equipo' : 'Propuestas de venta a clientes'">
   <div class="d-flex gap-2">
     <button class="btn btn-outline-secondary btn-sm" [disabled]="loading()" (click)="load()">
       <fa-icon icon="rotate" class="me-1" />Actualizar
     </button>
-    <a class="btn btn-primary" routerLink="/quotations/new">
-      <fa-icon icon="plus" class="me-1" />Nueva cotización
-    </a>
+    @if (!supervising()) {
+      <button class="btn btn-outline-success" (click)="openVentaCatalogo()">
+        <fa-icon icon="tablet-screen-button" class="me-1" />Venta Catálogo
+      </button>
+      <a class="btn btn-primary" routerLink="/quotations/new">
+        <fa-icon icon="plus" class="me-1" />Nueva cotización
+      </a>
+    }
   </div>
 </app-page-header>
+
+<!-- ── Modal: Venta Catálogo (buscar/verificar cliente por RUC/DNI) ────────── -->
+@if (ventaCatalogoModal()) {
+  <c-modal [visible]="true" alignment="center" (visibleChange)="!$event && (ventaCatalogoModal.set(false))">
+    <c-modal-header>
+      <h5 cModalTitle><fa-icon icon="tablet-screen-button" class="me-2 text-success" />Venta Catálogo</h5>
+    </c-modal-header>
+    <c-modal-body>
+      <div class="text-body-secondary mb-3" style="font-size:.83rem;">
+        <fa-icon icon="circle-info" class="me-1" />
+        Escribe el RUC o DNI del cliente. Se abrirá el catálogo para que arme su pedido en la tablet.
+      </div>
+      <label class="form-label small mb-1">RUC o DNI</label>
+      <input type="text" inputmode="numeric" maxlength="11" class="form-control" [(ngModel)]="ventaCatalogoDoc"
+             placeholder="RUC (11) o DNI (8)" [disabled]="ventaCatalogoLoading()"
+             (keyup.enter)="isVentaCatalogoDocValid && confirmVentaCatalogo()" />
+      @if (ventaCatalogoDoc.trim() && !isVentaCatalogoDocValid) {
+        <div class="text-danger mt-1" style="font-size:.78rem;">Debe tener 8 dígitos (DNI) u 11 (RUC).</div>
+      }
+    </c-modal-body>
+    <c-modal-footer>
+      <button cButton color="secondary" variant="outline" [disabled]="ventaCatalogoLoading()" (click)="ventaCatalogoModal.set(false)">Cancelar</button>
+      <button cButton color="success" [disabled]="ventaCatalogoLoading() || !isVentaCatalogoDocValid" (click)="confirmVentaCatalogo()">
+        @if (ventaCatalogoLoading()) { <c-spinner size="sm" class="me-1" /> }
+        Continuar
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}
+
+<!-- ── Barras de comisión (solo vendedor con comisión abierta) ────────────── -->
+@if (myOpenComision(); as c) {
+  @if (c.ventas_resumen; as vr) {
+    <c-card class="mb-3">
+      <c-card-body class="py-2 px-3">
+        <div class="d-flex justify-content-between align-items-center small mb-1">
+          <span>
+            <fa-icon icon="sack-dollar" class="me-1 text-success" />
+            Comisión ya ganada: <strong class="text-success">S/ {{ vr.comision_ganada | number:'1.2-2' }}</strong>
+            <span class="text-muted">(sobre S/ {{ vr.ganado | number:'1.2-2' }} cobrado{{ vr.porcentaje_ganado ? ' · ' + vr.porcentaje_ganado + '%' : '' }})</span>
+          </span>
+        </div>
+        <div class="progress mb-2" style="height:8px;">
+          <div class="progress-bar bg-success"
+            [style.width.%]="vr.potencial > 0 ? (vr.ganado / vr.potencial * 100) : 0"></div>
+        </div>
+        @if (vr.potencial > vr.ganado) {
+          <div class="d-flex justify-content-between align-items-center small mb-1">
+            <span>
+              <fa-icon icon="triangle-exclamation" class="me-1 text-warning" />
+              En riesgo de perderse si no se resuelve antes del cierre:
+              <strong class="text-warning">S/ {{ (vr.comision_potencial - vr.comision_ganada) | number:'1.2-2' }}</strong>
+              <span class="text-muted">(S/ {{ (vr.potencial - vr.ganado) | number:'1.2-2' }} en pedidos sin documentar, cotizaciones sin convertir o pedidos de catálogo sin gestionar)</span>
+            </span>
+          </div>
+          <div class="progress" style="height:8px;">
+            <div class="progress-bar bg-warning"
+              [style.width.%]="vr.potencial > 0 ? ((vr.potencial - vr.ganado) / vr.potencial * 100) : 0"></div>
+          </div>
+        }
+      </c-card-body>
+    </c-card>
+  }
+}
+
+<!-- ── Clientes de mi zona con carrito de catálogo sin enviar ──────────────── -->
+@if (pendingCarts().length > 0) {
+  <c-card class="mb-3 border-info">
+    <c-card-header class="py-2 small fw-bold">
+      <fa-icon icon="cart-shopping" class="me-1 text-info" />
+      Carritos sin enviar en tu zona
+    </c-card-header>
+    <c-card-body class="p-2">
+      @for (p of pendingCarts(); track p.id) {
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom py-2 small">
+          <div>
+            <strong>{{ p.client_business_name || p.client_name }}</strong>
+            — S/ {{ p.total | number:'1.2-2' }} armado, sin enviar
+            @if (p.client_phone) { <span class="text-muted"> · {{ p.client_phone }}</span> }
+          </div>
+          @if (p.client_phone) {
+            <a class="btn btn-outline-success btn-sm" [href]="'tel:' + p.client_phone">
+              <fa-icon icon="phone" class="me-1" />Llamar
+            </a>
+          }
+        </div>
+      }
+    </c-card-body>
+  </c-card>
+}
 
 <!-- ── Filtros ─────────────────────────────────────────────────────────────── -->
 <c-card class="mb-3">
@@ -100,8 +197,15 @@
           <c-card-header class="py-2 px-3">
             <div class="d-flex align-items-center justify-content-between gap-2">
               <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="font-monospace fw-bold" style="font-size:.88rem;">{{ q.code }}</span>
-                <span class="text-body-secondary" style="font-size:.72rem;">{{ q.created_at | date:'dd/MM/yy' }}</span>
+                <div>
+                  <div>
+                    <span class="font-monospace fw-bold" style="font-size:.88rem;">{{ q.code }}</span>
+                    <span class="text-body-secondary" style="font-size:.72rem;">{{ q.created_at | date:'dd/MM/yy' }}</span>
+                  </div>
+                  @if (q.created_by) {
+                    <div class="text-body-secondary" style="font-size:.7rem;">{{ q.created_by.name }}</div>
+                  }
+                </div>
                 @if (q.document_type) {
                   <span class="badge rounded-pill"
                         style="font-size:.65rem;"
@@ -145,7 +249,27 @@
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div>
                 <div class="fw-semibold" style="font-size:.95rem; line-height:1.2;">{{ clientName(q) }}</div>
-                <div class="text-body-secondary" style="font-size:.78rem;">{{ q.seller?.name ?? '—' }}</div>
+                @if (clientTradeName(q)) {
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ clientTradeName(q) }}</div>
+                }
+                @if (clientDoc(q)) {
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ clientDoc(q) }}</div>
+                }
+                @if (q.client?.phone) {
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ q.client!.phone }}</div>
+                }
+                @if (clientLocation(q)) {
+                  <div class="text-body-secondary" style="font-size:.72rem;">{{ clientLocation(q) }}</div>
+                }
+                @if (q.seller) {
+                  <span class="badge text-bg-info mt-1">{{ q.seller.name }}</span>
+                } @else if (q.pending_commission) {
+                  <span class="badge text-bg-warning mt-1" style="font-size:.7rem;">
+                    <fa-icon icon="triangle-exclamation" class="me-1" />
+                    Sin asignar
+                    @if (q.shared_zone) { — zona compartida }
+                  </span>
+                }
                 @if (q.shipping_type) {
                   <div class="text-body-secondary mt-1" style="font-size:.75rem;">
                     <fa-icon [icon]="q.shipping_type === 'local' ? 'store' : 'truck'" class="me-1" />
@@ -325,7 +449,7 @@
             <tr>
               <th class="ps-3" style="width:120px">Código</th>
               <th>Cliente</th>
-              <th style="width:90px">Vendedor</th>
+              <th style="width:110px">Comisión</th>
               <th style="width:110px">Envío</th>
               <th style="width:175px">Documentos</th>
               <th class="text-end" style="width:85px">Total</th>
@@ -339,14 +463,36 @@
                 <td class="ps-3">
                   <div class="font-monospace fw-semibold" style="font-size:.82rem;">{{ q.code }}</div>
                   <div class="text-body-secondary" style="font-size:.72rem;">{{ q.created_at | date:'dd/MM/yy' }}</div>
+                  @if (q.created_by) {
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ q.created_by.name }}</div>
+                  }
                 </td>
                 <td>
                   <div class="fw-medium lh-sm">{{ clientName(q) }}</div>
+                  @if (clientTradeName(q)) {
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ clientTradeName(q) }}</div>
+                  }
+                  @if (clientDoc(q)) {
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ clientDoc(q) }}</div>
+                  }
                   @if (q.client?.phone) {
                     <div class="text-body-secondary" style="font-size:.72rem;">{{ q.client!.phone }}</div>
                   }
+                  @if (clientLocation(q)) {
+                    <div class="text-body-secondary" style="font-size:.72rem;">{{ clientLocation(q) }}</div>
+                  }
                 </td>
-                <td class="text-body-secondary small">{{ q.seller?.name ?? '—' }}</td>
+                <td>
+                  @if (q.seller) {
+                    <span class="badge text-bg-info">{{ q.seller.name }}</span>
+                  } @else if (q.pending_commission) {
+                    <span class="badge text-bg-warning" style="font-size:.7rem;">
+                      <fa-icon icon="triangle-exclamation" class="me-1" />
+                      Sin asignar
+                      @if (q.shared_zone) { <span title="Zona compartida con otra comisión abierta">*</span> }
+                    </span>
+                  }
+                </td>
                 <td style="font-size:.78rem;">
                   @if (q.shipping_type) {
                     <div class="d-flex align-items-center gap-1">

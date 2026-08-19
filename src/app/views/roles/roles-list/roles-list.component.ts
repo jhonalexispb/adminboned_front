@@ -40,6 +40,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   purchase_documents: 'Documentos de ingreso',
   catalog_requests:   'Pedidos de catálogo',
   quotations:         'Cotizaciones',
+  quotations_manage:  'Supervisar cotizaciones',
   orders:             'Pedidos',
   orders_warehouse:   'Almacén',
   orders_dispatch:    'Despacho',
@@ -53,7 +54,14 @@ const PERMISSION_LABELS: Record<string, string> = {
   users:              'Usuarios',
   roles:              'Roles y permisos',
   geography:          'Geografía',
+  sale_zones:         'Zonas de venta',
   settings:           'Mi empresa',
+  viaticos:           'Mis viáticos',
+  viaticos_manage:    'Gestionar viáticos',
+  comisiones:         'Comisiones',
+  seguimiento:        'Seguimiento',
+  bank_operations:    'Operaciones bancarias',
+  document_audit:     'Auditoría de documentos',
 };
 
 const SECTION_GROUPS: { label: string; permissions: string[] }[] = [
@@ -61,11 +69,13 @@ const SECTION_GROUPS: { label: string; permissions: string[] }[] = [
   { label: 'Maestros',      permissions: ['products', 'categories', 'laboratories', 'catalog_order', 'catalog_appearance', 'suppliers', 'clients', 'carriers', 'banks'] },
   { label: 'Inventario',    permissions: ['stock', 'lots', 'reservations', 'kardex'] },
   { label: 'Compras',       permissions: ['purchase_analytics', 'purchase_orders', 'purchase_receipts', 'purchase_documents'] },
-  { label: 'Ventas',        permissions: ['catalog_requests', 'quotations', 'orders', 'orders_warehouse', 'orders_dispatch'] },
+  { label: 'Ventas',        permissions: ['catalog_requests', 'quotations', 'quotations_manage', 'orders', 'orders_warehouse', 'orders_dispatch'] },
   { label: 'Pagos',         permissions: ['collections', 'my_collections', 'payments_manage'] },
   { label: 'Post-venta',    permissions: ['returns', 'returns_manage', 'documents'] },
   { label: 'Finanzas',      permissions: ['expenses'] },
-  { label: 'Configuración', permissions: ['users', 'roles', 'geography', 'settings'] },
+  { label: 'Campo',         permissions: ['viaticos', 'viaticos_manage', 'comisiones', 'seguimiento'] },
+  { label: 'Auditoría',     permissions: ['bank_operations', 'document_audit'] },
+  { label: 'Configuración', permissions: ['users', 'roles', 'geography', 'sale_zones', 'settings'] },
 ];
 
 @Component({

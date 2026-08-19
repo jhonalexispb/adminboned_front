@@ -17,8 +17,17 @@ export interface QuotationItem {
 export interface Quotation {
   id: number;
   code: string;
-  client: { id: number; name: string; business_name: string; phone: string | null; ruc: string | null } | null;
+  client: {
+    id: number; name: string; business_name: string; phone: string | null; email: string | null;
+    ruc: string | null; dni: string | null; address: string | null;
+    district: { id: number; name: string; province?: { id: number; name: string; department?: { id: number; name: string } | null } | null } | null;
+  } | null;
   seller: { id: number; name: string } | null;
+  /** true si seller es null porque todavía es solo un candidato en vivo (zona/fecha de tu comisión abierta) — no se te asignó de verdad hasta cerrarla. */
+  pending_commission: boolean;
+  /** true si, además, la zona también la cubre otra comisión abierta — puede terminar comisionándose a otro vendedor. */
+  shared_zone: boolean;
+  created_by: { id: number; name: string } | null;
   status: 'draft' | 'sent' | 'approved' | 'rejected' | 'cancelled' | 'expired';
   subtotal: string;
   discount: string;

@@ -11,6 +11,7 @@ export interface AuthUser {
   phone: string | null;
   avatar: string | null;
   active: boolean;
+  tracking_enabled: boolean;
   roles: string[];
   permissions: string[];
 }

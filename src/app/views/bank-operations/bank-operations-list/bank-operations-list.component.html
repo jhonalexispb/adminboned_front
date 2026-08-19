@@ -1,0 +1,99 @@
+<app-page-header title="Operaciones Bancarias" subtitle="Registro unificado de números de operación de todos los módulos" />
+
+@if (duplicatesCount() > 0) {
+  <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+    <fa-icon [icon]="faTriangleExclamation" />
+    <div>
+      Se detectaron <strong>{{ duplicatesCount() }}</strong> registros con un número de operación repetido en el sistema
+      (aunque el medio de pago sea distinto). Revísalos por si acaso, ya que el sistema solo bloquea automáticamente
+      cuando además coincide el medio de pago, la fecha y la hora.
+    </div>
+  </div>
+}
+
+<div class="row g-2 mb-3 align-items-end">
+  <div class="col-6 col-md-3">
+    <label class="form-label small">Buscar N° de operación</label>
+    <input type="text" class="form-control form-control-sm"
+           [(ngModel)]="filters.operation_number" (keyup.enter)="applyFilters()"
+           placeholder="Ej. 123456" />
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label small">Origen</label>
+    <p-select [options]="sourceOptions" optionLabel="label" optionValue="value"
+      [(ngModel)]="filters.source" (onChange)="applyFilters()"
+      placeholder="Todos" styleClass="w-100 p-inputtext-sm" />
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Desde</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_from" (change)="applyFilters()" />
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small">Hasta</label>
+    <input type="date" class="form-control form-control-sm" [(ngModel)]="filters.date_to" (change)="applyFilters()" />
+  </div>
+  <div class="col-6 col-md-2 d-flex align-items-center">
+    <div class="form-check">
+      <input type="checkbox" class="form-check-input" id="onlyDup"
+             [(ngModel)]="filters.only_duplicates" (change)="applyFilters()" />
+      <label class="form-check-label small" for="onlyDup">Solo duplicados</label>
+    </div>
+  </div>
+  <div class="col-12 col-md-auto">
+    <button cButton color="primary" size="sm" (click)="applyFilters()">Buscar</button>
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="text-center py-5"><c-spinner color="primary" /></div>
+} @else if (items().length === 0) {
+  <div class="text-center text-muted py-5">
+    <div class="fs-1">🏦</div>
+    <div>No hay operaciones registradas con estos filtros.</div>
+  </div>
+} @else {
+  <c-card>
+    <c-card-body class="p-0">
+      <table cTable hover responsive>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>N° operación</th>
+            <th>Banco</th>
+            <th>Medio de pago</th>
+            <th>Origen</th>
+            <th>Referencia</th>
+            <th class="text-end">Monto</th>
+            <th>Usuario</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (op of items(); track op.source + '-' + op.id) {
+            <tr [class.table-warning]="op.is_duplicate">
+              <td class="text-nowrap">{{ op.date ? (op.date | date:'dd/MM/yyyy') : '—' }}</td>
+              <td class="text-nowrap">{{ op.time ?? '—' }}</td>
+              <td class="text-nowrap">
+                {{ op.operation_number }}
+                @if (op.is_duplicate) {
+                  <fa-icon [icon]="faTriangleExclamation" class="text-warning ms-1"
+                           title="Número de operación repetido en otro registro" />
+                }
+              </td>
+              <td>{{ op.bank_name ?? '—' }}</td>
+              <td>{{ op.payment_method_name ?? '—' }}</td>
+              <td><c-badge [color]="SOURCES[op.source].color">{{ op.source_label }}</c-badge></td>
+              <td class="text-muted small">{{ op.reference ?? '—' }}</td>
+              <td class="text-end fw-bold">{{ op.amount != null ? ('S/ ' + (op.amount | number:'1.2-2')) : '—' }}</td>
+              <td>{{ op.user_name ?? '—' }}</td>
+              <td>{{ op.status ?? '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </c-card-body>
+  </c-card>
+
+  <app-pagination [currentPage]="filters.page ?? 1" [lastPage]="lastPage()" [total]="total()" (pageChange)="onPage($event)" />
+}

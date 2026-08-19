@@ -1,0 +1,62 @@
+<c-card>
+  <c-card-header class="py-2">
+    <span class="small fw-semibold text-body-secondary text-uppercase">Zonas de venta de este vendedor</span>
+    <div class="text-muted" style="font-size:.72rem;">
+      Estas zonas son las mismas que aparecen en Zonas de Venta — mientras la comisión esté abierta, se editan desde aquí
+      (esa pantalla queda bloqueada para este vendedor hasta que se cierre).
+    </div>
+  </c-card-header>
+  <c-card-body>
+    <div class="row g-2 mb-2">
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1">Departamento</label>
+        <p-select [options]="departments()" optionLabel="name" optionValue="id"
+          [ngModel]="selectedDeptId" (ngModelChange)="onDeptChange($event)"
+          placeholder="Seleccionar..." filter="true" styleClass="w-100 p-inputtext-sm" />
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1">Provincia</label>
+        <p-select [options]="provinces()" optionLabel="name" optionValue="id"
+          [ngModel]="selectedProvId" (ngModelChange)="onProvChange($event)"
+          [disabled]="!selectedDeptId || loadingProvs()"
+          placeholder="Seleccionar..." filter="true" styleClass="w-100 p-inputtext-sm" />
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label small mb-1">Distrito</label>
+        <p-select [options]="districts()" optionLabel="name" optionValue="id"
+          [(ngModel)]="selectedDistId"
+          [disabled]="!selectedProvId || loadingDists()"
+          placeholder="Seleccionar..." filter="true" styleClass="w-100 p-inputtext-sm" />
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 mb-2">
+      <button type="button" class="btn btn-sm btn-outline-primary" [disabled]="!selectedDeptId" (click)="addDept()">
+        <fa-icon [icon]="faPlus" class="me-1" />Todo el departamento
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-primary" [disabled]="!selectedProvId" (click)="addProv()">
+        <fa-icon [icon]="faPlus" class="me-1" />Toda la provincia
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-primary" [disabled]="!selectedDistId" (click)="addDist()">
+        <fa-icon [icon]="faPlus" class="me-1" />Solo el distrito
+      </button>
+    </div>
+
+    @if (loadingSellerZones()) {
+      <div class="text-muted small"><fa-icon [icon]="faSpinner" spin class="me-1" />Cargando zonas actuales...</div>
+    } @else if (!current.length) {
+      <div class="text-muted small">Sin zonas asignadas todavía.</div>
+    } @else {
+      <div class="d-flex flex-wrap gap-1">
+        @for (z of current; track z.zone_type + '-' + z.department_id + '-' + z.province_id + '-' + z.district_id; let i = $index) {
+          <c-badge color="info" class="d-inline-flex align-items-center gap-1">
+            {{ z.label ?? (z.zone_type + ' #' + (z.district_id ?? z.province_id ?? z.department_id)) }}
+            <a style="cursor:pointer" (click)="removeZone(i)">
+              <fa-icon [icon]="faXmark" />
+            </a>
+          </c-badge>
+        }
+      </div>
+    }
+  </c-card-body>
+</c-card>

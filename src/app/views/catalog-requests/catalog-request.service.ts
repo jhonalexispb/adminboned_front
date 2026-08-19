@@ -51,4 +51,19 @@ export class CatalogRequestService {
   acceptAvailable(id: number): Observable<{ message: string; request: CatalogRequest }> {
     return this.http.post<{ message: string; request: CatalogRequest }>(`${this.base}/catalog-requests/${id}/accept-available`, {});
   }
+
+  /** Clientes de mi zona (mi comisión abierta) con un carrito armado sin enviar — para llamarlos. */
+  pendingInZone(): Observable<{ data: PendingCatalogCart[] }> {
+    return this.http.get<{ data: PendingCatalogCart[] }>(`${this.base}/catalog-requests/pending-in-zone`);
+  }
+}
+
+export interface PendingCatalogCart {
+  id: number;
+  client_id: number;
+  client_business_name: string | null;
+  client_name: string | null;
+  client_phone: string | null;
+  total: number;
+  updated_at: string;
 }

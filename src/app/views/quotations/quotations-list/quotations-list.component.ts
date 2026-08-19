@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
@@ -29,6 +29,10 @@ import { ToastService } from '../../../core/services/toast.service';
 import { OrderDetailModalComponent } from '../../orders/order-detail-modal/order-detail-modal.component';
 import { QuotationDetailModalComponent } from '../quotation-detail-modal/quotation-detail-modal.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
+import { ComisionService } from '../../comisiones/comision.service';
+import { Comision } from '../../comisiones/comision.model';
+import { CatalogRequestService, PendingCatalogCart } from '../../catalog-requests/catalog-request.service';
+import { environment } from '../../../../environments/environment';
 
 type ClientOption = Client & { displayLabel: string };
 
@@ -82,6 +86,20 @@ export class QuotationsListComponent implements OnInit {
 
   staleThresholdDays = signal(3);
 
+  /** true en la ruta /quotations/supervisar — ve todas las cotizaciones del equipo, sin barras ni Venta Catálogo (eso es "lo mío"). */
+  supervising = signal(false);
+
+  /** Comisión abierta del vendedor logueado, con la proyección de ventas — null si no aplica (admin) o no tiene una abierta. */
+  myOpenComision = signal<Comision | null>(null);
+
+  /** Clientes de mi zona con un carrito de catálogo armado sin enviar — para llamarlos. */
+  pendingCarts = signal<PendingCatalogCart[]>([]);
+
+  // ── Venta Catálogo ──────────────────────────────────────────────────────
+  ventaCatalogoModal   = signal(false);
+  ventaCatalogoDoc     = '';
+  ventaCatalogoLoading = signal(false);
+
   selectedClient: ClientOption | null = null;
 
   private static firstDayOfMonth(): string {
@@ -118,23 +136,95 @@ export class QuotationsListComponent implements OnInit {
     private clientService: ClientService,
     private collectionSvc: CollectionService,
     private toast: ToastService,
+    private comisionSvc: ComisionService,
+    private catalogRequestSvc: CatalogRequestService,
+    private route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
-    this.clientService.list({ active: true, per_page: 500 }).subscribe(res => {
+    this.supervising.set(!!this.route.snapshot.data['supervise']);
+
+    // En "Cotizaciones" (personal) el backend ya acota por zona de venta del usuario;
+    // en "Supervisar Cotizaciones" se pide sin acotar, para poder filtrar por cualquier cliente.
+    this.clientService.list({ active: true, per_page: 500, ignore_zone: this.supervising() }).subscribe(res => {
       this.clients.set(res.data.map(c => ({
         ...c,
         displayLabel: [c.business_name, c.name, c.ruc].filter(Boolean).join(' · '),
       })));
     });
     this.load();
+    // Barras de comisión y Venta Catálogo son cosas de "lo mío" — no aplican en supervisión.
+    if (!this.supervising()) {
+      this.loadMyOpenComision();
+      this.loadPendingCarts();
+    }
+  }
+
+  private loadMyOpenComision(): void {
+    this.comisionSvc.myList({ open_only: true, per_page: 1 }).subscribe({
+      next: r => this.myOpenComision.set(r.data[0] ?? null),
+    });
+  }
+
+  private loadPendingCarts(): void {
+    this.catalogRequestSvc.pendingInZone().subscribe({
+      next: r => this.pendingCarts.set(r.data),
+    });
+  }
+
+  // ── Venta Catálogo ──────────────────────────────────────────────────────
+
+  openVentaCatalogo(): void {
+    this.ventaCatalogoDoc = '';
+    this.ventaCatalogoModal.set(true);
+  }
+
+  get isVentaCatalogoDocValid(): boolean {
+    return /^\d{8}$|^\d{11}$/.test(this.ventaCatalogoDoc.trim());
+  }
+
+  confirmVentaCatalogo(): void {
+    const doc = this.ventaCatalogoDoc.trim();
+    if (!this.isVentaCatalogoDocValid || this.ventaCatalogoLoading()) return;
+    this.ventaCatalogoLoading.set(true);
+
+    this.clientService.lookup(doc).subscribe({
+      next: res => {
+        const exists = !!res.client;
+        const proceed = () => {
+          this.ventaCatalogoLoading.set(false);
+          this.ventaCatalogoModal.set(false);
+          window.open(`${environment.catalogVendedorUrl}?doc=${encodeURIComponent(doc)}&exists=${exists ? 1 : 0}`, '_blank');
+        };
+
+        if (!exists) {
+          Swal.fire({ icon: 'info', title: 'Cliente no encontrado', text: 'Se abrirá el catálogo para registrarlo ahí mismo.' }).then(proceed);
+          return;
+        }
+
+        // El cliente que llegue al catálogo necesita catalog_enabled para poder
+        // identificarse y enviar su pedido — se activa aquí para que ya esté listo.
+        if (!res.client!.catalog_enabled) {
+          this.clientService.updateCatalogAccess(res.client!.id, { catalog_enabled: true }).subscribe({
+            next: () => Swal.fire({ icon: 'success', title: 'Cliente encontrado', text: 'Se activó su acceso al catálogo.' }).then(proceed),
+            error: () => proceed(),
+          });
+        } else {
+          Swal.fire({ icon: 'success', title: 'Cliente encontrado' }).then(proceed);
+        }
+      },
+      error: () => {
+        this.ventaCatalogoLoading.set(false);
+        this.toast.error('No se pudo verificar el cliente.');
+      },
+    });
   }
 
   // ── Lista ──────────────────────────────────────────────────────────────────
 
   load(): void {
     this.loading.set(true);
-    this.sales.listQuotations(this.filters).subscribe({
+    this.sales.listQuotations({ ...this.filters, supervise: this.supervising() }).subscribe({
       next: res => {
         this.quotations.set(res.data);
         this.total.set(res.meta.total);
@@ -163,6 +253,29 @@ export class QuotationsListComponent implements OnInit {
   clientName(q: Quotation): string {
     const c = q.client;
     return c ? (c.business_name || c.name) : '—';
+  }
+
+  /** Nombre comercial, si existe y es distinto de la razón social — se muestra debajo. */
+  clientTradeName(q: Quotation): string | null {
+    const c = q.client;
+    return c && c.name && c.name !== c.business_name ? c.name : null;
+  }
+
+  /** Documento del cliente: RUC o DNI, lo que tenga. */
+  clientDoc(q: Quotation): string | null {
+    const c = q.client;
+    if (!c) return null;
+    if (c.ruc) return 'RUC ' + c.ruc;
+    if (c.dni) return 'DNI ' + c.dni;
+    return null;
+  }
+
+  /** Distrito · Provincia · Departamento — ubicación del cliente. */
+  clientLocation(q: Quotation): string | null {
+    const d = q.client?.district;
+    if (!d) return null;
+    const loc = [d.name, d.province?.name, d.province?.department?.name].filter(Boolean);
+    return loc.length ? loc.join(' · ') : null;
   }
 
   /** Días transcurridos desde que la cotización fue enviada al cliente (updated_at en status='sent'). */

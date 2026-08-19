@@ -46,6 +46,7 @@ export interface OrderCollection {
 export interface UserDeposit {
   id: number;
   code: string;
+  source?: 'collection' | 'viatico';
   deposited_by: number;
   deposited_by_name?: string;
   amount: string;
@@ -99,6 +100,8 @@ export interface UserDebtCollection {
   id: number;
   code: string;
   amount: number;
+  covered_amount: number;
+  uncovered_amount: number;
   date: string;
   days_ago: number;
   order_code: string | null;
@@ -108,6 +111,9 @@ export interface UserDebtCollection {
 export interface UserDebtSummary {
   id: number;
   name: string;
+  cash_total: number;
+  deposited: number;
+  pending_deposits: number;
   total_debt: number;
   collections: UserDebtCollection[];
 }

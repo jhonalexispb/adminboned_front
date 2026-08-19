@@ -23,6 +23,7 @@ import { IconDirective } from '@coreui/icons-angular';
 import { AuthService } from '../../../core/services/auth.service';
 import { AlertsService } from '../../../core/services/alerts.service';
 import { CollectionService } from '../../../views/payments/collection.service';
+import { ViaticoReturnService } from '../../../views/viaticos/viatico-return.service';
 
 @Component({
   selector: 'app-default-header',
@@ -53,10 +54,14 @@ export class DefaultHeaderComponent extends HeaderComponent implements OnInit {
 
   readonly debt = computed(() => this.collectionService.debt()?.debt ?? 0);
 
+  /** Efectivo de viáticos recibido de vendedores (vuelto) que este usuario aún no rindió a la empresa. */
+  readonly viaticoCashDebt = computed(() => this.returnService.debt()?.debt ?? 0);
+
   constructor(
     public auth: AuthService,
     public alertsService: AlertsService,
     private collectionService: CollectionService,
+    private returnService: ViaticoReturnService,
     private router: Router
   ) {
     super();
@@ -65,10 +70,17 @@ export class DefaultHeaderComponent extends HeaderComponent implements OnInit {
   ngOnInit(): void {
     this.alertsService.load();
     this.collectionService.myDebt().subscribe({ error: () => {} });
+    if (this.auth.hasPermission('viaticos_manage')) {
+      this.returnService.myDebt().subscribe({ error: () => {} });
+    }
   }
 
   openNewDeposit(): void {
     this.collectionService.showNewDeposit.set(true);
+  }
+
+  openNewViaticoDeposit(): void {
+    this.returnService.showNewDeposit.set(true);
   }
 
   logout(): void {

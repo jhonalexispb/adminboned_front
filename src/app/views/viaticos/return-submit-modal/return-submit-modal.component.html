@@ -1,0 +1,147 @@
+@if (isOpen) {
+  <c-modal [visible]="true" alignment="center" (visibleChange)="!$event && cancel()">
+    <c-modal-header>
+      <h5 cModalTitle>
+        <fa-icon icon="rotate-left" class="me-2 text-primary" />
+        @if (isResend) { Reenviar devolución }
+        @else if (isToSeller) { Registrar reembolso al vendedor }
+        @else { Registrar devolución del vendedor }
+      </h5>
+    </c-modal-header>
+
+    <c-modal-body>
+      @if (viaticoReturn(); as r) {
+        @if (isResend) {
+          <div class="border-start border-danger border-3 bg-body-secondary rounded-2 py-2 px-3 mb-3" style="font-size:.85rem;">
+            <fa-icon icon="triangle-exclamation" class="text-danger me-1" />
+            <strong>Rechazado</strong> — corrige el comprobante y reenvía.
+            @if (r.notes) { <div class="mt-1">Motivo: {{ r.notes }}</div> }
+          </div>
+        } @else {
+          <div class="text-body-secondary mb-3" style="font-size:.83rem;">
+            <fa-icon icon="circle-info" class="me-1" />
+            @if (isToSeller) {
+              Hay que reembolsarle <strong>S/ {{ r.amount | number:'1.2-2' }}</strong> a {{ r.user_name }}
+              por la comisión a {{ r.comision_destination }}.
+            } @else {
+              {{ r.user_name }} debe devolver <strong>S/ {{ r.amount | number:'1.2-2' }}</strong>
+              de la comisión a {{ r.comision_destination }}.
+            }
+          </div>
+        }
+      }
+
+      @if (!isResend) {
+        <div class="mb-3">
+          <label class="form-label small mb-1">Forma {{ isToSeller ? 'de entrega' : 'de devolución' }} <span class="text-danger">*</span></label>
+          <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" name="returnForm" id="retForm-cash" [value]="'cash'" [(ngModel)]="form.form">
+            <label class="btn btn-outline-primary btn-sm" for="retForm-cash">
+              {{ isToSeller ? 'Entregado en efectivo' : 'Recibido en efectivo' }}
+            </label>
+
+            <input type="radio" class="btn-check" name="returnForm" id="retForm-deposit" [value]="'deposit'" [(ngModel)]="form.form">
+            <label class="btn btn-outline-primary btn-sm" for="retForm-deposit">Depósito</label>
+          </div>
+        </div>
+      }
+
+      @if (form.form === 'cash' && !isResend) {
+        <div class="col-12 text-body-secondary" style="font-size:.82rem;">
+          <fa-icon icon="circle-info" class="me-1" />
+          Se registrará a tu nombre ({{ currentUserName() }}) como quien
+          {{ isToSeller ? 'entregó' : 'recibió' }} el efectivo.
+        </div>
+      } @else {
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label small mb-1">Medio de pago <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm"
+                    [(ngModel)]="form.payment_method_id"
+                    (ngModelChange)="form.operation_number = ''">
+              <option [ngValue]="null" disabled>Seleccionar...</option>
+              @for (m of methods(); track m.id) {
+                <option [ngValue]="m.id">{{ m.bank?.name }} — {{ m.name }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="col-8">
+            <label class="form-label small mb-1">N° de operación <span class="text-danger">*</span></label>
+            @if (selectedMethod; as m) {
+              <input type="text" class="form-control form-control-sm"
+                     [class.is-invalid]="!!opNumberError && !!form.operation_number"
+                     [placeholder]="m.op_format === 'numeric' ? 'Solo números' : m.op_format === 'alpha' ? 'Solo letras' : 'Letras y/o números'"
+                     [(ngModel)]="form.operation_number" />
+              @if (opNumberError) {
+                <div class="invalid-feedback d-block" style="font-size:.72rem;">
+                  <fa-icon icon="triangle-exclamation" class="me-1" />{{ opNumberError }}
+                </div>
+              }
+              @if (m.op_min_length || m.op_max_length) {
+                <div class="text-body-secondary mt-1" style="font-size:.72rem;">
+                  @if (m.op_min_length && m.op_max_length) { {{ m.op_min_length }}–{{ m.op_max_length }} caracteres }
+                  @else if (m.op_min_length) { Mínimo {{ m.op_min_length }} caracteres }
+                  @else { Máximo {{ m.op_max_length }} caracteres }
+                </div>
+              }
+            } @else {
+              <input type="text" class="form-control form-control-sm"
+                     placeholder="Selecciona primero el medio de pago" disabled />
+            }
+          </div>
+
+          <div class="col-4">
+            <label class="form-label small mb-1">Hora <span class="text-danger">*</span></label>
+            <input type="time" class="form-control form-control-sm"
+                   [(ngModel)]="form.operation_time" />
+          </div>
+
+          <div class="col-8">
+            <label class="form-label small mb-1">Fecha de operación <span class="text-danger">*</span></label>
+            <input type="date" class="form-control form-control-sm"
+                   [(ngModel)]="form.operation_date" />
+          </div>
+
+          <div class="col-12">
+            <label class="form-label small mb-1">
+              Voucher / Comprobante
+              @if (!isResend) { <span class="text-danger">*</span> }
+              @else { <span class="text-body-secondary">(opcional, reemplaza el anterior)</span> }
+            </label>
+            @if (isResend && viaticoReturn()?.voucher_url; as prevVoucher) {
+              <div class="mb-2">
+                <div class="text-body-secondary mb-1" style="font-size:.78rem;">
+                  <fa-icon icon="circle-info" class="me-1" />Comprobante rechazado:
+                </div>
+                @if (isImage(prevVoucher)) {
+                  <img [src]="prevVoucher" alt="Comprobante rechazado" class="rounded border"
+                       style="max-height:160px; max-width:100%; object-fit:contain; display:block;" />
+                } @else {
+                  <a [href]="prevVoucher" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
+                    <fa-icon icon="file-pdf" class="me-1" />Ver PDF
+                  </a>
+                }
+              </div>
+            }
+            <input type="file" class="form-control form-control-sm" accept="image/*,.pdf" (change)="onFileSelected($event)" />
+            @if (previewUrl) {
+              <div class="mt-2">
+                <img [src]="previewUrl" alt="Voucher" class="rounded border"
+                     style="max-height:180px; max-width:100%; object-fit:contain;" />
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </c-modal-body>
+
+    <c-modal-footer>
+      <button cButton color="secondary" [disabled]="saving()" (click)="cancel()">Cancelar</button>
+      <button cButton color="primary" [disabled]="saving() || !isValid" (click)="submit()">
+        @if (saving()) { <c-spinner size="sm" class="me-1" /> }
+        @if (isResend) { Reenviar } @else if (isToSeller) { Registrar reembolso } @else { Registrar devolución }
+      </button>
+    </c-modal-footer>
+  </c-modal>
+}

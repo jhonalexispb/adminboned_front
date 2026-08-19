@@ -3,18 +3,19 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FaIconComponent } from '@fortawesome/angular-fontawesome';
 import {
-  ButtonDirective, ModalBodyComponent, ModalComponent, ModalFooterComponent,
+  BadgeComponent, ButtonDirective, ModalBodyComponent, ModalComponent, ModalFooterComponent,
   ModalHeaderComponent, ModalTitleDirective, SpinnerComponent,
 } from '@coreui/angular';
 import { CollectionService } from '../collection.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { BankPaymentMethod, UserDeposit } from '../collection.model';
+import { ViaticoReturnService } from '../../viaticos/viatico-return.service';
 
 @Component({
   selector: 'app-register-deposit-modal',
   standalone: true,
   imports: [
-    FormsModule, FaIconComponent, ButtonDirective, SpinnerComponent, DecimalPipe,
+    FormsModule, FaIconComponent, ButtonDirective, SpinnerComponent, DecimalPipe, BadgeComponent,
     ModalComponent, ModalHeaderComponent, ModalTitleDirective, ModalBodyComponent, ModalFooterComponent,
   ],
   templateUrl: './register-deposit-modal.component.html',
@@ -22,6 +23,8 @@ import { BankPaymentMethod, UserDeposit } from '../collection.model';
 export class RegisterDepositModalComponent {
   open    = input<boolean>(false);
   deposit = input<UserDeposit | null>(null);
+  /** 'collection' = efectivo cobrado a clientes; 'viatico' = vuelto recibido de un vendedor. Son deudas separadas. */
+  source  = input<'collection' | 'viatico'>('collection');
 
   registered = output<{ deposit: UserDeposit }>();
   cancelled  = output<void>();
@@ -42,8 +45,9 @@ export class RegisterDepositModalComponent {
     deposit_time:      '',
   };
 
-  private svc   = inject(CollectionService);
-  private toast = inject(ToastService);
+  private svc         = inject(CollectionService);
+  private viaticoSvc  = inject(ViaticoReturnService);
+  private toast       = inject(ToastService);
 
   constructor() {
     this.svc.paymentMethods().subscribe({ next: m => this.methods.set(m) });
@@ -82,8 +86,10 @@ export class RegisterDepositModalComponent {
     return null;
   }
 
-  /** Deuda actual del repartidor — no se puede depositar más de lo que debe. */
-  readonly debt = computed(() => this.svc.debt()?.debt ?? 0);
+  /** Deuda actual — no se puede depositar más de lo que debe. Cada 'source' es una cuenta separada. */
+  readonly debt = computed(() =>
+    this.source() === 'viatico' ? (this.viaticoSvc.debt()?.debt ?? 0) : (this.svc.debt()?.debt ?? 0)
+  );
 
   get exceedsDebt(): boolean {
     return this.debt() > 0 && +this.form.amount > this.debt() + 0.005;
@@ -97,6 +103,7 @@ export class RegisterDepositModalComponent {
       this.form.operation_number &&
       !this.opNumberError &&
       this.form.deposit_date &&
+      this.form.deposit_time &&
       (this.isEditMode || this.file)
     );
   }
@@ -127,6 +134,7 @@ export class RegisterDepositModalComponent {
     if (this.file) fd.append('voucher', this.file);
 
     const d = this.deposit();
+    if (!d) fd.append('source', this.source());
     const req = d ? this.svc.updateDeposit(d.id, fd) : this.svc.registerDeposit(fd);
 
     req.subscribe({
@@ -134,6 +142,8 @@ export class RegisterDepositModalComponent {
         this.saving.set(false);
         this.toast.success(d ? 'Depósito corregido y reenviado.' : 'Depósito registrado. Pendiente de validación.');
         this.resetForm();
+        if (this.source() === 'viatico') this.viaticoSvc.myDebt().subscribe({ error: () => {} });
+        else this.svc.myDebt().subscribe({ error: () => {} });
         this.registered.emit({ deposit: res.deposit });
       },
       error: (err: any) => {

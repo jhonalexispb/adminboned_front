@@ -5,69 +5,71 @@
 </app-page-header>
 
 <!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
-<div class="mb-3" style="overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;">
-  <ul class="nav nav-tabs flex-nowrap">
-    <li class="nav-item">
-      <button class="nav-link d-inline-flex align-items-center gap-2 py-2 px-3"
-              style="white-space:nowrap;"
-              [class.active]="activeTab() === 'deposits'"
-              (click)="selectTab('deposits')">
-        <span class="position-relative d-inline-flex">
-          <fa-icon icon="building-columns" />
-          @if (pendingDeposits().length) {
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                  style="font-size:.65rem; min-width:1.4em; padding:.2em .3em; line-height:1;">
-              {{ pendingDeposits().length }}
-            </span>
-          }
+<div class="d-flex border-bottom mb-3">
+  <button class="btn border-0 rounded-0 fw-semibold py-2 px-1 d-flex flex-column align-items-center justify-content-center gap-1"
+          style="flex:1 1 0; border-bottom:3px solid transparent !important;"
+          [style.borderBottomColor]="activeTab() === 'deposits' ? 'var(--cui-primary)' : 'transparent'"
+          [class.text-primary]="activeTab() === 'deposits'"
+          [class.text-body-secondary]="activeTab() !== 'deposits'"
+          (click)="selectTab('deposits')">
+    <span class="position-relative d-inline-flex">
+      <fa-icon icon="building-columns" style="font-size:1rem;" />
+      @if (pendingDeposits().length) {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              style="font-size:.6rem; min-width:1.3em; padding:.2em .3em; line-height:1;">
+          {{ pendingDeposits().length }}
         </span>
-        <span style="font-size:.8rem;">Depósitos</span>
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link d-inline-flex align-items-center gap-2 py-2 px-3"
-              style="white-space:nowrap;"
-              [class.active]="activeTab() === 'transfers'"
-              (click)="selectTab('transfers')">
-        <span class="position-relative d-inline-flex">
-          <fa-icon icon="right-left" />
-          @if (pendingTransfers().length) {
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                  style="font-size:.65rem; min-width:1.4em; padding:.2em .3em; line-height:1;">
-              {{ pendingTransfers().length }}
-            </span>
-          }
+      }
+    </span>
+    <span style="font-size:.75rem; white-space:nowrap; line-height:1.1;">Depósitos</span>
+  </button>
+
+  <button class="btn border-0 rounded-0 fw-semibold py-2 px-1 d-flex flex-column align-items-center justify-content-center gap-1"
+          style="flex:1 1 0; border-bottom:3px solid transparent !important;"
+          [style.borderBottomColor]="activeTab() === 'transfers' ? 'var(--cui-primary)' : 'transparent'"
+          [class.text-primary]="activeTab() === 'transfers'"
+          [class.text-body-secondary]="activeTab() !== 'transfers'"
+          (click)="selectTab('transfers')">
+    <span class="position-relative d-inline-flex">
+      <fa-icon icon="right-left" style="font-size:1rem;" />
+      @if (pendingTransfers().length) {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              style="font-size:.6rem; min-width:1.3em; padding:.2em .3em; line-height:1;">
+          {{ pendingTransfers().length }}
         </span>
-        <span style="font-size:.8rem;">Transferencias</span>
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link d-inline-flex align-items-center gap-2 py-2 px-3"
-              style="white-space:nowrap;"
-              [class.active]="activeTab() === 'cash'"
-              (click)="selectTab('cash')">
-        <fa-icon icon="money-bill-wave" />
-        <span style="font-size:.8rem;">Efectivo</span>
-      </button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link d-inline-flex align-items-center gap-2 py-2 px-3"
-              style="white-space:nowrap;"
-              [class.active]="activeTab() === 'debts'"
-              (click)="selectTab('debts')">
-        <span class="position-relative d-inline-flex">
-          <fa-icon icon="hand-holding-dollar" />
-          @if (debts().length) {
-            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                  style="font-size:.65rem; min-width:1.4em; padding:.2em .3em; line-height:1;">
-              {{ debts().length }}
-            </span>
-          }
+      }
+    </span>
+    <span class="d-md-none" style="font-size:.75rem; white-space:nowrap; line-height:1.1;">Transf.</span>
+    <span class="d-none d-md-inline" style="font-size:.75rem; white-space:nowrap; line-height:1.1;">Transferencias</span>
+  </button>
+
+  <button class="btn border-0 rounded-0 fw-semibold py-2 px-1 d-flex flex-column align-items-center justify-content-center gap-1"
+          style="flex:1 1 0; border-bottom:3px solid transparent !important;"
+          [style.borderBottomColor]="activeTab() === 'cash' ? 'var(--cui-primary)' : 'transparent'"
+          [class.text-primary]="activeTab() === 'cash'"
+          [class.text-body-secondary]="activeTab() !== 'cash'"
+          (click)="selectTab('cash')">
+    <fa-icon icon="money-bill-wave" style="font-size:1rem;" />
+    <span style="font-size:.75rem; white-space:nowrap; line-height:1.1;">Efectivo</span>
+  </button>
+
+  <button class="btn border-0 rounded-0 fw-semibold py-2 px-1 d-flex flex-column align-items-center justify-content-center gap-1"
+          style="flex:1 1 0; border-bottom:3px solid transparent !important;"
+          [style.borderBottomColor]="activeTab() === 'debts' ? 'var(--cui-primary)' : 'transparent'"
+          [class.text-primary]="activeTab() === 'debts'"
+          [class.text-body-secondary]="activeTab() !== 'debts'"
+          (click)="selectTab('debts')">
+    <span class="position-relative d-inline-flex">
+      <fa-icon icon="hand-holding-dollar" style="font-size:1rem;" />
+      @if (debts().length) {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              style="font-size:.6rem; min-width:1.3em; padding:.2em .3em; line-height:1;">
+          {{ debts().length }}
         </span>
-        <span style="font-size:.8rem;">Deudas</span>
-      </button>
-    </li>
-  </ul>
+      }
+    </span>
+    <span style="font-size:.75rem; white-space:nowrap; line-height:1.1;">Deudas</span>
+  </button>
 </div>
 
 <!-- ── Filtros ────────────────────────────────────────────────────────────── -->
@@ -85,6 +87,26 @@
             <option value="rejected">Rechazado</option>
           </select>
         </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label small mb-1">Banco</label>
+          <select class="form-select form-select-sm" [ngModel]="filters().bank_id" (ngModelChange)="onBankChange($event)">
+            <option [ngValue]="null">Todos</option>
+            @for (b of banks(); track b.id) {
+              <option [ngValue]="b.id">{{ b.name }}</option>
+            }
+          </select>
+        </div>
+        @if (bankMethods().length) {
+          <div class="col-6 col-md-3">
+            <label class="form-label small mb-1">Método</label>
+            <select class="form-select form-select-sm" [ngModel]="filters().payment_method_id" (ngModelChange)="setFilter('payment_method_id', $event)">
+              <option [ngValue]="null">Todos</option>
+              @for (m of bankMethods(); track m.id) {
+                <option [ngValue]="m.id">{{ m.name }}</option>
+              }
+            </select>
+          </div>
+        }
       }
       <div class="col-6 col-md-3">
         <label class="form-label small mb-1">Usuario</label>
@@ -167,8 +189,8 @@
               </div>
               <div class="fw-semibold" style="font-size:.9rem;">{{ d.deposited_by_name ?? '—' }}</div>
               <div class="text-body-secondary mt-1" style="font-size:.8rem;">
-                @if (d.payment_method?.bank?.name) {
-                  {{ d.payment_method!.bank!.name }} — {{ d.payment_method?.name }}
+                @if (d.bank?.name) {
+                  {{ d.bank!.name }} — {{ d.payment_method?.name }}
                 }
                 · Op. <span class="font-monospace">{{ d.operation_number }}</span>
                 @if (d.has_cross_duplicate) {
@@ -242,7 +264,7 @@
                   <td class="ps-3 font-monospace small">{{ d.code }}</td>
                   <td class="small fw-medium">{{ d.deposited_by_name ?? '—' }}</td>
                   <td class="small text-body-secondary">
-                    <div>{{ d.payment_method?.bank?.name }} · {{ d.payment_method?.name }}</div>
+                    <div>{{ d.bank?.name }} · {{ d.payment_method?.name }}</div>
                     <div class="font-monospace d-flex align-items-center gap-1">
                       {{ d.operation_number }}
                       @if (d.has_cross_duplicate) {
@@ -671,11 +693,51 @@
               }
               <span class="d-none d-sm-inline ms-1">PDF</span>
             </button>
-            <button type="button" class="btn-close" (click)="selectedDebtUser.set(null)"></button>
+            <button type="button" class="btn-close" (click)="selectedDebtUser.set(null); showOnlyUncovered.set(false)"></button>
           </div>
         </div>
         <!-- Body -->
         <div class="modal-body p-0">
+
+          <!-- Desglose del cálculo de deuda -->
+          <div class="px-3 pt-3 pb-2 border-bottom" style="background:var(--bs-tertiary-bg); font-size:.82rem;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="text-body-secondary">Total cobrado en efectivo</span>
+              <span class="fw-semibold font-monospace">S/ {{ u.cash_total | number:'1.2-2' }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="text-body-secondary">− Depósitos validados</span>
+              <span class="text-success font-monospace">− S/ {{ u.deposited | number:'1.2-2' }}</span>
+            </div>
+            @if (u.pending_deposits > 0) {
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-body-secondary">− Depósitos pendientes de validar</span>
+                <span class="text-warning font-monospace">− S/ {{ u.pending_deposits | number:'1.2-2' }}</span>
+              </div>
+            }
+            <div class="d-flex justify-content-between align-items-center pt-2 mt-1 border-top fw-bold">
+              <span class="text-danger">= Deuda neta sin depositar</span>
+              <span class="text-danger font-monospace">S/ {{ u.total_debt | number:'1.2-2' }}</span>
+            </div>
+            <div class="text-body-secondary mt-2" style="font-size:.72rem;">
+              Los cobros de abajo son el historial completo. La deuda neta es lo que falta depositar.
+            </div>
+          </div>
+
+          <!-- Toggle filtro -->
+          <div class="px-3 py-2 border-bottom d-flex align-items-center gap-2" style="font-size:.8rem;">
+            <button class="btn btn-sm"
+                    [class.btn-danger]="showOnlyUncovered()"
+                    [class.btn-outline-secondary]="!showOnlyUncovered()"
+                    (click)="showOnlyUncovered.update(v => !v)">
+              <fa-icon icon="filter" class="me-1" />
+              {{ showOnlyUncovered() ? 'Mostrando sin cubrir' : 'Mostrar solo sin cubrir' }}
+            </button>
+            <span class="text-body-secondary" style="font-size:.75rem;">
+              {{ showOnlyUncovered() ? uncoveredCount(u) : u.collections.length }} cobro{{ u.collections.length !== 1 ? 's' : '' }}
+            </span>
+          </div>
+
           <table class="table mb-0 align-middle" style="font-size:.83rem;">
             <thead style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; background:#f8f9fa;">
               <tr>
@@ -683,41 +745,56 @@
                 <th>Pedido / Cliente</th>
                 <th>Fecha</th>
                 <th class="text-end">Monto</th>
+                <th class="text-end pe-1">Sin cubrir</th>
                 <th class="pe-3">Antigüedad</th>
               </tr>
             </thead>
             <tbody>
               @for (c of u.collections; track c.id) {
-                <tr>
-                  <td class="ps-3 font-monospace small">{{ c.code }}</td>
-                  <td class="small">
-                    @if (c.order_code) {
-                      <div class="font-monospace text-body-secondary" style="font-size:.76rem;">{{ c.order_code }}</div>
-                    }
-                    @if (c.client_name) {
-                      <div>{{ c.client_name }}</div>
-                    }
-                  </td>
-                  <td class="small text-body-secondary" style="white-space:nowrap;">{{ c.date | date:'dd/MM/yy' }}</td>
-                  <td class="text-end fw-semibold">S/ {{ c.amount | number:'1.2-2' }}</td>
-                  <td class="pe-3">
-                    <span class="badge rounded-pill"
-                          style="font-size:.68rem;"
-                          [class.text-bg-secondary]="c.days_ago <= 3"
-                          [class.text-bg-warning]="c.days_ago > 3 && c.days_ago <= 7"
-                          [class.text-bg-danger]="c.days_ago > 7">
-                      {{ daysLabel(c.days_ago) }}
-                    </span>
-                  </td>
-                </tr>
+                @if (!showOnlyUncovered() || c.uncovered_amount > 0) {
+                  <tr>
+                    <td class="ps-3 font-monospace small">{{ c.code }}</td>
+                    <td class="small">
+                      @if (c.order_code) {
+                        <div class="font-monospace text-body-secondary" style="font-size:.76rem;">{{ c.order_code }}</div>
+                      }
+                      @if (c.client_name) {
+                        <div>{{ c.client_name }}</div>
+                      }
+                    </td>
+                    <td class="small text-body-secondary" style="white-space:nowrap;">{{ c.date | date:'dd/MM/yy' }}</td>
+                    <td class="text-end fw-semibold">S/ {{ c.amount | number:'1.2-2' }}</td>
+                    <td class="text-end pe-1">
+                      @if (c.uncovered_amount > 0) {
+                        <span class="fw-bold text-danger" style="font-size:.82rem;">
+                          S/ {{ c.uncovered_amount | number:'1.2-2' }}
+                        </span>
+                        @if (c.covered_amount > 0) {
+                          <div class="text-body-secondary" style="font-size:.7rem;">parcial</div>
+                        }
+                      } @else {
+                        <fa-icon icon="check" class="text-success" style="font-size:.8rem;" />
+                      }
+                    </td>
+                    <td class="pe-3">
+                      <span class="badge rounded-pill"
+                            style="font-size:.68rem;"
+                            [class.text-bg-secondary]="c.days_ago <= 3"
+                            [class.text-bg-warning]="c.days_ago > 3 && c.days_ago <= 7"
+                            [class.text-bg-danger]="c.days_ago > 7">
+                        {{ daysLabel(c.days_ago) }}
+                      </span>
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
             <tfoot>
               <tr style="border-top:2px solid #dee2e6;">
-                <td colspan="3" class="ps-3 fw-semibold text-end text-body-secondary" style="font-size:.78rem;">
-                  TOTAL DEUDA
+                <td colspan="4" class="ps-3 fw-semibold text-end text-body-secondary" style="font-size:.78rem;">
+                  DEUDA NETA
                 </td>
-                <td class="text-end fw-bold text-danger">S/ {{ u.total_debt | number:'1.2-2' }}</td>
+                <td class="text-end fw-bold text-danger pe-1">S/ {{ u.total_debt | number:'1.2-2' }}</td>
                 <td class="pe-3"></td>
               </tr>
             </tfoot>
@@ -838,7 +915,7 @@
               </div>
               <div class="col-6">
                 <div class="text-body-secondary" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.04em;">Banco / Método</div>
-                <div>{{ vd.payment_method?.bank?.name }}</div>
+                <div>{{ vd.bank?.name }}</div>
                 <div class="text-body-secondary small">{{ vd.payment_method?.name }}</div>
               </div>
               <div class="col-6">

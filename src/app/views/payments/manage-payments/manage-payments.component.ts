@@ -8,7 +8,7 @@ import {
 } from '@coreui/angular';
 import { CollectionService } from '../collection.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderCollection, UserDeposit, Collector, UserDebtSummary,
+import { Bank, BankPaymentMethod, OrderCollection, UserDeposit, Collector, UserDebtSummary,
          COLLECTION_STATUS_LABEL, COLLECTION_STATUS_COLOR,
          DEPOSIT_STATUS_LABEL, DEPOSIT_STATUS_COLOR } from '../collection.model';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
@@ -24,6 +24,8 @@ interface ManagePaymentsFilters {
   operation_number: string;
   date_from: string;
   date_to: string;
+  bank_id: number | null;
+  payment_method_id: number | null;
 }
 
 @Component({
@@ -54,8 +56,9 @@ export class ManagePaymentsComponent implements OnInit {
   deletingCollection = signal<OrderCollection | null>(null);
   deletingDeposit    = signal<UserDeposit | null>(null);
 
-  selectedDebtUser   = signal<UserDebtSummary | null>(null);
-  downloadingDebtPdf = signal(false);
+  selectedDebtUser    = signal<UserDebtSummary | null>(null);
+  showOnlyUncovered   = signal(false);
+  downloadingDebtPdf  = signal(false);
 
   // Typed accessors for template narrowing
   readonly vDeposit = computed(() => {
@@ -80,17 +83,21 @@ export class ManagePaymentsComponent implements OnInit {
   /** Usuarios con cobros o depósitos registrados, para el filtro "Usuario". */
   people = signal<Collector[]>([]);
 
-  filters = signal<ManagePaymentsFilters>({ status: '', person: null, operation_number: '', date_from: '', date_to: '' });
+  banks       = signal<Bank[]>([]);
+  bankMethods = signal<BankPaymentMethod[]>([]);
+
+  filters = signal<ManagePaymentsFilters>({ status: '', person: null, operation_number: '', date_from: '', date_to: '', bank_id: null, payment_method_id: null });
   downloadingPdf = signal(false);
 
   hasActiveFilters = computed(() => {
     const f = this.filters();
-    return !!(f.status || f.person || f.operation_number || f.date_from || f.date_to);
+    return !!(f.status || f.person || f.operation_number || f.date_from || f.date_to || f.bank_id || f.payment_method_id);
   });
 
   ngOnInit(): void {
     this.loadAll();
     this.svc.collectors().subscribe({ next: c => this.people.set(c) });
+    this.svc.banks().subscribe({ next: b => this.banks.set(b) });
   }
 
   loadAll(): void {
@@ -101,6 +108,7 @@ export class ManagePaymentsComponent implements OnInit {
       status: f.status || undefined, deposited_by: f.person ?? undefined,
       operation_number: f.operation_number || undefined,
       date_from: f.date_from || undefined, date_to: f.date_to || undefined,
+      bank_id: f.bank_id ?? undefined, payment_method_id: f.payment_method_id ?? undefined,
     }).subscribe({
       next: res => { this.deposits.set(res.data); this.loading.set(false); },
       error: () => this.loading.set(false),
@@ -110,6 +118,7 @@ export class ManagePaymentsComponent implements OnInit {
       status: f.status || undefined, registered_by: f.person ?? undefined,
       operation_number: f.operation_number || undefined,
       date_from: f.date_from || undefined, date_to: f.date_to || undefined,
+      bank_id: f.bank_id ?? undefined, payment_method_id: f.payment_method_id ?? undefined,
     }).subscribe({
       next: res => this.transfers.set(res.data),
     });
@@ -147,8 +156,17 @@ export class ManagePaymentsComponent implements OnInit {
     this.loadAll();
   }
 
+  onBankChange(bankId: number | null): void {
+    this.filters.update(f => ({ ...f, bank_id: bankId, payment_method_id: null }));
+    this.bankMethods.set([]);
+    if (bankId) {
+      this.svc.paymentMethodsByBank(bankId).subscribe({ next: m => this.bankMethods.set(m) });
+    }
+  }
+
   clearFilters(): void {
-    this.filters.set({ status: '', person: null, operation_number: '', date_from: '', date_to: '' });
+    this.filters.set({ status: '', person: null, operation_number: '', date_from: '', date_to: '', bank_id: null, payment_method_id: null });
+    this.bankMethods.set([]);
     this.loadAll();
   }
 
@@ -156,6 +174,10 @@ export class ManagePaymentsComponent implements OnInit {
     if (days === 0) return 'Hoy';
     if (days === 1) return 'Ayer';
     return `${days}d`;
+  }
+
+  uncoveredCount(u: UserDebtSummary): number {
+    return u.collections.filter(c => c.uncovered_amount > 0).length;
   }
 
   downloadDebtPdf(userId: number): void {
@@ -186,6 +208,7 @@ export class ManagePaymentsComponent implements OnInit {
       tab,
       status: f.status || undefined, registered_by: f.person ?? undefined,
       date_from: f.date_from || undefined, date_to: f.date_to || undefined,
+      bank_id: f.bank_id ?? undefined, payment_method_id: f.payment_method_id ?? undefined,
     }).subscribe({
       next: blob => {
         const url   = URL.createObjectURL(blob);

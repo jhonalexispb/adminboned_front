@@ -9,7 +9,7 @@ import {
 import { IconDirective } from '@coreui/icons-angular';
 import { CollectionService } from '../collection.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { OrderCollection, UserDeposit, CashHistoryDay,
+import { Bank, BankPaymentMethod, OrderCollection, UserDeposit, CashHistoryDay,
          COLLECTION_STATUS_LABEL, COLLECTION_STATUS_COLOR,
          DEPOSIT_STATUS_LABEL, DEPOSIT_STATUS_COLOR } from '../collection.model';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
@@ -19,6 +19,8 @@ import { RegisterDepositModalComponent } from '../register-deposit-modal/registe
 interface MyCollectionFilters {
   status: string;
   form: string;
+  bank_id: number | null;
+  payment_method_id: number | null;
   operation_number: string;
   date_from: string;
   date_to: string;
@@ -39,12 +41,14 @@ export class MyCollectionsComponent implements OnInit {
   private svc   = inject(CollectionService);
   private toast = inject(ToastService);
 
-  collections = signal<OrderCollection[]>([]);
-  deposits    = signal<UserDeposit[]>([]);
+  collections  = signal<OrderCollection[]>([]);
+  deposits     = signal<UserDeposit[]>([]);
+  banks        = signal<Bank[]>([]);
+  bankMethods  = signal<BankPaymentMethod[]>([]);
   /** Deuda compartida con el header — así un depósito hecho desde el atajo del header también actualiza esta vista. */
-  debt        = this.svc.debt;
-  loading     = signal(true);
-  activeTab   = signal<'collections' | 'deposits' | 'history'>('collections');
+  debt         = this.svc.debt;
+  loading      = signal(true);
+  activeTab    = signal<'collections' | 'deposits' | 'history'>('collections');
 
   cashHistory     = signal<CashHistoryDay[]>([]);
   loadingHistory  = signal(false);
@@ -59,15 +63,15 @@ export class MyCollectionsComponent implements OnInit {
   readonly depStatusLabel  = DEPOSIT_STATUS_LABEL;
   readonly depStatusColor  = DEPOSIT_STATUS_COLOR;
 
-  filters = signal<MyCollectionFilters>({ status: '', form: '', operation_number: '', date_from: '', date_to: '' });
+  filters = signal<MyCollectionFilters>({ status: '', form: '', bank_id: null, payment_method_id: null, operation_number: '', date_from: '', date_to: '' });
   downloadingPdf = signal(false);
 
   hasActiveFilters = computed(() => {
     const f = this.filters();
-    return !!(f.status || f.form || f.operation_number || f.date_from || f.date_to);
+    return !!(f.status || f.form || f.bank_id || f.payment_method_id || f.operation_number || f.date_from || f.date_to);
   });
 
-  setFilter(key: keyof MyCollectionFilters, value: string): void {
+  setFilter(key: 'status' | 'form' | 'operation_number' | 'date_from' | 'date_to', value: string): void {
     this.filters.update(f => ({ ...f, [key]: value }));
   }
 
@@ -95,8 +99,23 @@ export class MyCollectionsComponent implements OnInit {
     this.loadAll();
   }
 
+  onBankChange(bankId: number | null): void {
+    this.filters.update(f => ({ ...f, bank_id: bankId, payment_method_id: null }));
+    this.bankMethods.set([]);
+    if (bankId) {
+      this.svc.paymentMethodsByBank(bankId).subscribe({
+        next: methods => this.bankMethods.set(methods),
+      });
+    }
+  }
+
+  setMethodFilter(value: number | null): void {
+    this.filters.update(f => ({ ...f, payment_method_id: value }));
+  }
+
   clearFilters(): void {
-    this.filters.set({ status: '', form: '', operation_number: '', date_from: '', date_to: '' });
+    this.filters.set({ status: '', form: '', bank_id: null, payment_method_id: null, operation_number: '', date_from: '', date_to: '' });
+    this.bankMethods.set([]);
     this.loadAll();
   }
 
@@ -107,10 +126,12 @@ export class MyCollectionsComponent implements OnInit {
     const f = this.filters();
     this.svc.downloadMyCollectionsPdf({
       tab,
-      form: tab === 'collections' ? (f.form || undefined) : undefined,
-      status: tab !== 'history' ? (f.status || undefined) : undefined,
-      date_from: tab !== 'history' ? (f.date_from || undefined) : undefined,
-      date_to: tab !== 'history' ? (f.date_to || undefined) : undefined,
+      form:              tab === 'collections' ? (f.form || undefined) : undefined,
+      status:            tab !== 'history' ? (f.status || undefined) : undefined,
+      bank_id:           tab !== 'history' ? (f.bank_id ?? undefined) : undefined,
+      payment_method_id: tab !== 'history' ? (f.payment_method_id ?? undefined) : undefined,
+      date_from:         tab !== 'history' ? (f.date_from || undefined) : undefined,
+      date_to:           tab !== 'history' ? (f.date_to || undefined) : undefined,
     }).subscribe({
       next: blob => {
         const names: Record<typeof tab, string> = { collections: 'mis-cobros', deposits: 'mis-depositos', history: 'historial-efectivo' };
@@ -128,6 +149,7 @@ export class MyCollectionsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadAll();
+    this.svc.banks().subscribe({ next: banks => this.banks.set(banks) });
   }
 
   loadAll(): void {
@@ -136,18 +158,25 @@ export class MyCollectionsComponent implements OnInit {
     this.svc.myDebt().subscribe({ error: () => {} });
     this.svc.listCollections({
       mine: true, per_page: 50,
-      status: f.status || undefined, form: f.form || undefined,
-      operation_number: f.operation_number || undefined,
-      date_from: f.date_from || undefined, date_to: f.date_to || undefined,
+      status:            f.status || undefined,
+      form:              f.form || undefined,
+      bank_id:           f.bank_id ?? undefined,
+      payment_method_id: f.payment_method_id ?? undefined,
+      operation_number:  f.operation_number || undefined,
+      date_from:         f.date_from || undefined,
+      date_to:           f.date_to || undefined,
     }).subscribe({
       next: res => { this.collections.set(res.data); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
     this.svc.listDeposits({
       mine: true, per_page: 50,
-      status: f.status || undefined,
-      operation_number: f.operation_number || undefined,
-      date_from: f.date_from || undefined, date_to: f.date_to || undefined,
+      status:            f.status || undefined,
+      bank_id:           f.bank_id ?? undefined,
+      payment_method_id: f.payment_method_id ?? undefined,
+      operation_number:  f.operation_number || undefined,
+      date_from:         f.date_from || undefined,
+      date_to:           f.date_to || undefined,
     }).subscribe({
       next: res => this.deposits.set(res.data),
     });

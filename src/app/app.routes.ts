@@ -162,6 +162,44 @@ export const routes: Routes = [
         loadChildren: () => import('./views/expenses/routes').then(m => m.routes),
         data: { title: 'Gastos' }
       },
+      {
+        path: 'sale-zones',
+        loadChildren: () => import('./views/sale-zones/routes').then(m => m.routes),
+        canActivate: [permissionGuard('users')],
+        data: { title: 'Zonas de Venta' }
+      },
+      {
+        path: 'activity-log',
+        loadChildren: () => import('./views/activity-log/routes').then(m => m.routes),
+        canActivate: [permissionGuard('users')],
+        data: { title: 'Bitácora de Actividad' }
+      },
+      {
+        path: 'comisiones',
+        loadChildren: () => import('./views/comisiones/routes').then(m => m.routes),
+        canActivate: [permissionGuard('comisiones')],
+        data: { title: 'Comisiones' }
+      },
+      {
+        path: 'viaticos',
+        loadChildren: () => import('./views/viaticos/routes').then(m => m.VIATICOS_ROUTES),
+        data: { title: 'Viáticos' }
+      },
+      {
+        path: 'seguimiento',
+        loadChildren: () => import('./views/seguimiento/routes').then(m => m.SEGUIMIENTO_ROUTES),
+        data: { title: 'Seguimiento' }
+      },
+      {
+        path: 'bank-operations',
+        loadChildren: () => import('./views/bank-operations/routes').then(m => m.BANK_OPERATIONS_ROUTES),
+        data: { title: 'Operaciones Bancarias' }
+      },
+      {
+        path: 'document-audit',
+        loadChildren: () => import('./views/document-audit/routes').then(m => m.DOCUMENT_AUDIT_ROUTES),
+        data: { title: 'Auditoría de Documentos' }
+      },
     ]
   },
   // Páginas públicas

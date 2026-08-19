@@ -10,6 +10,7 @@ import { iconSubset } from './icons/icon-subset';
 import { LoadingOverlayComponent } from './shared/components/loading-overlay/loading-overlay.component';
 import { ToasterComponent } from './shared/components/toaster/toaster.component';
 import { EmpresaService } from './core/services/empresa.service';
+import { GeoTrackingService } from './core/services/geo-tracking.service';
 
 @Component({
     selector: 'app-root',
@@ -31,6 +32,9 @@ export class AppComponent implements OnInit {
   readonly #colorModeService = inject(ColorModeService);
   readonly #iconSetService = inject(IconSetService);
   readonly #empresaSvc = inject(EmpresaService);
+  // Se instancia aquí (no en el interceptor) para que el watch de ubicación
+  // arranque apenas hay sesión, sin esperar a la primera request HTTP.
+  readonly #geoTracking = inject(GeoTrackingService);
 
   constructor() {
     this.#titleService.setTitle('Cargando...');

@@ -4,6 +4,8 @@ export interface UserItem {
   email: string;
   phone: string | null;
   active: boolean;
+  allow_all_clients: boolean;
+  tracking_enabled: boolean;
   deleted_at: string | null;
   roles: string[];
   created_at: string;

@@ -28,7 +28,9 @@ export const navItems: NavItem[] = [
   // ── Ventas ───────────────────────────────────────────────────────────────────
   { title: true, name: 'Ventas' },
   { name: 'Pedidos de Catálogo', url: '/catalog-requests', iconComponent: { name: 'cil-cart' }, permission: 'catalog_requests' },
-  { name: 'Cotizaciones', url: '/quotations', iconComponent: { name: 'cil-description' }, permission: 'quotations' },
+  { name: 'Cotizaciones', url: '/quotations/list', iconComponent: { name: 'cil-description' }, permission: 'quotations',
+    linkProps: { routerLinkActiveOptions: { exact: true } } },
+  { name: 'Supervisar Cotizaciones', url: '/quotations/supervisar', iconComponent: { name: 'cil-settings' }, permission: 'quotations_manage' },
   { name: 'Pedidos',      url: '/orders',      iconComponent: { name: 'cil-clipboard' },  permission: 'orders' },
   { name: 'Almacén',      url: '/warehouse',   iconComponent: { name: 'cil-storage' },    permission: 'orders_warehouse' },
   { name: 'Despacho',     url: '/dispatch',    iconComponent: { name: 'cil-truck' },      permission: 'orders_dispatch' },
@@ -75,10 +77,25 @@ export const navItems: NavItem[] = [
   { title: true, name: 'Finanzas' },
   { name: 'Gastos', url: '/expenses', iconComponent: { name: 'cil-money' }, permission: 'expenses' },
 
+  // ── Campo ─────────────────────────────────────────────────────────────────────
+  { title: true, name: 'Campo' },
+  { name: 'Comisiones',         url: '/comisiones',         iconComponent: { name: 'cil-task' },      permission: 'comisiones' },
+  { name: 'Mis Viáticos',       url: '/viaticos',           iconComponent: { name: 'cil-money' },    permission: 'viaticos',
+    linkProps: { routerLinkActiveOptions: { exact: true } } },
+  { name: 'Gestionar Viáticos', url: '/viaticos/gestionar', iconComponent: { name: 'cil-settings' }, permission: 'viaticos_manage' },
+  { name: 'Seguimiento',        url: '/seguimiento',        iconComponent: { name: 'cil-location-pin' }, permission: 'seguimiento' },
+
+  // ── Auditoría ────────────────────────────────────────────────────────────────
+  { title: true, name: 'Auditoría' },
+  { name: 'Operaciones Bancarias', url: '/bank-operations', iconComponent: { name: 'cil-credit-card' }, permission: 'bank_operations' },
+  { name: 'Auditoría de Documentos', url: '/document-audit', iconComponent: { name: 'cil-file' }, permission: 'document_audit' },
+
   // ── Configuración ────────────────────────────────────────────────────────────
   { title: true, name: 'Configuración' },
   { name: 'Usuarios',        url: '/users',           iconComponent: { name: 'cil-people' },   permission: 'users' },
+  { name: 'Zonas de Venta',  url: '/sale-zones',      iconComponent: { name: 'cil-map' },       permission: 'sale_zones' },
   { name: 'Roles y Permisos', url: '/roles',          iconComponent: { name: 'cil-lock-locked' }, permission: 'roles' },
   { name: 'Geografía',       url: '/geography',       iconComponent: { name: 'cil-map' },        permission: 'geography' },
   { name: 'Mi Empresa',      url: '/settings/empresa', iconComponent: { name: 'cil-settings' }, permission: 'settings' },
+  { name: 'Bitácora',        url: '/activity-log',     iconComponent: { name: 'cil-list' },     permission: 'users' },
 ];

@@ -110,6 +110,24 @@
         </div>
       }
       <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Banco</label>
+        <select class="form-select form-select-sm" [ngModel]="filters().bank_id ?? ''" (ngModelChange)="onBankChange($event ? +$event : null)">
+          <option value="">Todos</option>
+          @for (b of banks(); track b.id) {
+            <option [value]="b.id">{{ b.name }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Método de pago</label>
+        <select class="form-select form-select-sm" [disabled]="!filters().bank_id" [ngModel]="filters().payment_method_id ?? ''" (ngModelChange)="setMethodFilter($event ? +$event : null)">
+          <option value="">Todos</option>
+          @for (m of bankMethods(); track m.id) {
+            <option [value]="m.id">{{ m.name }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
         <label class="form-label small mb-1">N° Operación</label>
         <input type="text" class="form-control form-control-sm" placeholder="Buscar..."
                [ngModel]="filters().operation_number" (ngModelChange)="setFilter('operation_number', $event)"
@@ -147,35 +165,49 @@
 
 <!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
 <div class="d-flex border-bottom mb-3">
-  <button class="btn border-0 rounded-0 fw-semibold px-4 py-2 d-flex align-items-center gap-2"
-          style="border-bottom: 3px solid transparent !important; font-size:.9rem;"
+  <button class="btn border-0 rounded-0 fw-semibold py-2 px-2 d-flex flex-column flex-md-row align-items-center justify-content-center gap-1 gap-md-2"
+          style="flex:1 1 0; border-bottom:3px solid transparent !important;"
           [style.borderBottomColor]="activeTab() === 'collections' ? 'var(--cui-primary)' : 'transparent'"
           [class.text-primary]="activeTab() === 'collections'"
           [class.text-body-secondary]="activeTab() !== 'collections'"
           (click)="selectTab('collections')">
-    <fa-icon icon="money-bill-wave" />Cobros
-    @if (collections().length) {
-      <c-badge color="primary" shape="rounded-pill" style="font-size:.7rem;">{{ collections().length }}</c-badge>
-    }
+    <fa-icon icon="money-bill-wave" style="font-size:1rem;" />
+    <span class="d-flex align-items-center gap-1" style="font-size:.78rem; white-space:nowrap; line-height:1.1;">
+      Cobros
+      @if (collections().length) {
+        <c-badge color="primary" shape="rounded-pill" style="font-size:.62rem;">{{ collections().length }}</c-badge>
+      }
+    </span>
   </button>
-  <button class="btn border-0 rounded-0 fw-semibold px-4 py-2 d-flex align-items-center gap-2"
-          style="border-bottom: 3px solid transparent !important; font-size:.9rem;"
+  <button class="btn border-0 rounded-0 fw-semibold py-2 px-2 d-flex flex-column flex-md-row align-items-center justify-content-center gap-1 gap-md-2"
+          style="flex:1 1 0; border-bottom:3px solid transparent !important;"
           [style.borderBottomColor]="activeTab() === 'deposits' ? 'var(--cui-primary)' : 'transparent'"
           [class.text-primary]="activeTab() === 'deposits'"
           [class.text-body-secondary]="activeTab() !== 'deposits'"
           (click)="selectTab('deposits')">
-    <fa-icon icon="building-columns" />Mis Depósitos
-    @if (deposits().length) {
-      <c-badge color="primary" shape="rounded-pill" style="font-size:.7rem;">{{ deposits().length }}</c-badge>
-    }
+    <fa-icon icon="building-columns" style="font-size:1rem;" />
+    <span class="d-flex align-items-center gap-1 d-md-none" style="font-size:.78rem; white-space:nowrap; line-height:1.1;">
+      Mis Depós.
+      @if (deposits().length) {
+        <c-badge color="primary" shape="rounded-pill" style="font-size:.62rem;">{{ deposits().length }}</c-badge>
+      }
+    </span>
+    <span class="d-none d-md-flex align-items-center gap-1" style="font-size:.78rem; white-space:nowrap; line-height:1.1;">
+      Mis Depósitos
+      @if (deposits().length) {
+        <c-badge color="primary" shape="rounded-pill" style="font-size:.62rem;">{{ deposits().length }}</c-badge>
+      }
+    </span>
   </button>
-  <button class="btn border-0 rounded-0 fw-semibold px-4 py-2 d-flex align-items-center gap-2"
-          style="border-bottom: 3px solid transparent !important; font-size:.9rem;"
+  <button class="btn border-0 rounded-0 fw-semibold py-2 px-2 d-flex flex-column flex-md-row align-items-center justify-content-center gap-1 gap-md-2"
+          style="flex:1 1 0; border-bottom:3px solid transparent !important;"
           [style.borderBottomColor]="activeTab() === 'history' ? 'var(--cui-primary)' : 'transparent'"
           [class.text-primary]="activeTab() === 'history'"
           [class.text-body-secondary]="activeTab() !== 'history'"
           (click)="selectTab('history')">
-    <fa-icon icon="calendar-days" />Historial diario
+    <fa-icon icon="calendar-days" style="font-size:1rem;" />
+    <span class="d-md-none" style="font-size:.78rem; white-space:nowrap; line-height:1.1;">Hist. diario</span>
+    <span class="d-none d-md-inline" style="font-size:.78rem; white-space:nowrap; line-height:1.1;">Historial diario</span>
   </button>
 </div>
 
@@ -408,10 +440,12 @@
               <!-- Banco + monto -->
               <div class="d-flex align-items-start justify-content-between gap-2" style="font-size:.82rem;">
                 <div class="flex-grow-1">
-                  @if (d.payment_method?.bank?.name) {
+                  @if (d.bank?.name || d.payment_method?.name) {
                     <div class="text-body-secondary">
                       <fa-icon icon="building-columns" class="me-1" />
-                      <strong class="text-body">{{ d.payment_method!.bank!.name }}</strong>
+                      @if (d.bank?.name) {
+                        <strong class="text-body">{{ d.bank!.name }}</strong>
+                      }
                       @if (d.payment_method?.name) { — {{ d.payment_method!.name }} }
                     </div>
                   }
@@ -485,8 +519,8 @@
                   <tr>
                     <td class="ps-3 font-monospace small">{{ d.code }}</td>
                     <td class="small">
-                      @if (d.payment_method?.bank?.name) {
-                        {{ d.payment_method!.bank!.name }} ·
+                      @if (d.bank?.name) {
+                        <strong>{{ d.bank!.name }}</strong> ·
                       }
                       {{ d.payment_method?.name }}
                     </td>

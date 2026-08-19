@@ -62,5 +62,13 @@
   (registered)="onDepositRegistered($event)"
   (cancelled)="collectionService.showNewDeposit.set(false)" />
 
+<!-- Registrar depósito de vuelto de viáticos (acceso rápido desde el header) -->
+<app-register-deposit-modal
+  source="viatico"
+  [open]="viaticoReturnService.showNewDeposit()"
+  [deposit]="null"
+  (registered)="onViaticoDepositRegistered($event)"
+  (cancelled)="viaticoReturnService.showNewDeposit.set(false)" />
+
 <!-- Notificaciones (acceso rápido desde la campana en el header) -->
 <app-notifications-modal />

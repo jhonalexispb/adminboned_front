@@ -19,6 +19,8 @@ export interface QuotationFilters {
   date_from?: string;
   date_to?: string;
   awaiting_approval?: boolean;
+  /** Modo "Supervisar Cotizaciones" — pide todas, no solo las propias. Requiere permiso quotations_manage. */
+  supervise?: boolean;
   per_page?: number;
   page?: number;
 }
@@ -59,6 +61,7 @@ export class SalesService {
     if (f.date_from)                       p = p.set('date_from', f.date_from);
     if (f.date_to)                         p = p.set('date_to',   f.date_to);
     if (f.awaiting_approval)               p = p.set('awaiting_approval', '1');
+    if (f.supervise)                       p = p.set('supervise', '1');
     if (f.per_page)                        p = p.set('per_page',  String(f.per_page));
     if (f.page)                            p = p.set('page',      String(f.page));
     return this.http.get<PaginatedResponse<Quotation>>(`${this.base}/quotations`, { params: p });

@@ -22,6 +22,7 @@ import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { loadingInterceptor } from './core/interceptors/loading.interceptor';
+import { geoLocationInterceptor } from './core/interceptors/geo-location.interceptor';
 
 registerLocaleData(localeEsPe);
 
@@ -45,7 +46,7 @@ export const appConfig: ApplicationConfig = {
       withViewTransitions(),
       withHashLocation()
     ),
-    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor, loadingInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor, loadingInterceptor, geoLocationInterceptor])),
     IconSetService,
     provideAnimationsAsync(),
     providePrimeNG({

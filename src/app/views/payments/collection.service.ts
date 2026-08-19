@@ -26,18 +26,20 @@ export class CollectionService {
 
   // ── Cobros por pedido ────────────────────────────────────────────────────
 
-  listCollections(f: { order_id?: number; mine?: boolean; form?: string; status?: string; operation_number?: string; date_from?: string; date_to?: string; registered_by?: number; per_page?: number; page?: number } = {}): Observable<any> {
+  listCollections(f: { order_id?: number; mine?: boolean; form?: string; status?: string; bank_id?: number; payment_method_id?: number; operation_number?: string; date_from?: string; date_to?: string; registered_by?: number; per_page?: number; page?: number } = {}): Observable<any> {
     let p = new HttpParams();
-    if (f.order_id)        p = p.set('order_id',        String(f.order_id));
-    if (f.mine)            p = p.set('mine',            'true');
-    if (f.form)            p = p.set('form',            f.form);
-    if (f.status)          p = p.set('status',          f.status);
-    if (f.operation_number) p = p.set('operation_number', f.operation_number);
-    if (f.date_from)       p = p.set('date_from',       f.date_from);
-    if (f.date_to)         p = p.set('date_to',         f.date_to);
-    if (f.registered_by)   p = p.set('registered_by',   String(f.registered_by));
-    if (f.per_page)        p = p.set('per_page',        String(f.per_page));
-    if (f.page)            p = p.set('page',            String(f.page));
+    if (f.order_id)          p = p.set('order_id',          String(f.order_id));
+    if (f.mine)              p = p.set('mine',              'true');
+    if (f.form)              p = p.set('form',              f.form);
+    if (f.status)            p = p.set('status',            f.status);
+    if (f.bank_id)           p = p.set('bank_id',           String(f.bank_id));
+    if (f.payment_method_id) p = p.set('payment_method_id', String(f.payment_method_id));
+    if (f.operation_number)  p = p.set('operation_number',  f.operation_number);
+    if (f.date_from)         p = p.set('date_from',         f.date_from);
+    if (f.date_to)           p = p.set('date_to',           f.date_to);
+    if (f.registered_by)     p = p.set('registered_by',     String(f.registered_by));
+    if (f.per_page)          p = p.set('per_page',          String(f.per_page));
+    if (f.page)              p = p.set('page',              String(f.page));
     return this.http.get<any>(`${this.base}/collections`, { params: p });
   }
 
@@ -47,22 +49,26 @@ export class CollectionService {
   }
 
   /** PDF de "Mis Cobros", limitado a la pestaña activa (cobros, depósitos propios o historial diario), según los filtros aplicados. */
-  downloadMyCollectionsPdf(f: { tab: 'collections' | 'deposits' | 'history'; form?: string; status?: string; date_from?: string; date_to?: string }): Observable<Blob> {
+  downloadMyCollectionsPdf(f: { tab: 'collections' | 'deposits' | 'history'; form?: string; status?: string; bank_id?: number; payment_method_id?: number; date_from?: string; date_to?: string }): Observable<Blob> {
     let p = new HttpParams().set('tab', f.tab);
-    if (f.form)      p = p.set('form',      f.form);
-    if (f.status)    p = p.set('status',    f.status);
-    if (f.date_from) p = p.set('date_from', f.date_from);
-    if (f.date_to)   p = p.set('date_to',   f.date_to);
+    if (f.form)              p = p.set('form',              f.form);
+    if (f.status)            p = p.set('status',            f.status);
+    if (f.bank_id)           p = p.set('bank_id',           String(f.bank_id));
+    if (f.payment_method_id) p = p.set('payment_method_id', String(f.payment_method_id));
+    if (f.date_from)         p = p.set('date_from',         f.date_from);
+    if (f.date_to)           p = p.set('date_to',           f.date_to);
     return this.http.get(`${this.base}/collections/my-pdf`, { params: p, responseType: 'blob' });
   }
 
   /** PDF de "Gestionar Pagos", limitado a la pestaña activa (depósitos, transferencias o efectivo), según los filtros aplicados. */
-  downloadPaymentsPdf(f: { tab: 'deposits' | 'transfers' | 'cash'; status?: string; registered_by?: number; date_from?: string; date_to?: string }): Observable<Blob> {
+  downloadPaymentsPdf(f: { tab: 'deposits' | 'transfers' | 'cash'; status?: string; registered_by?: number; bank_id?: number; payment_method_id?: number; date_from?: string; date_to?: string }): Observable<Blob> {
     let p = new HttpParams().set('tab', f.tab);
-    if (f.status)        p = p.set('status',        f.status);
-    if (f.registered_by) p = p.set('registered_by', String(f.registered_by));
-    if (f.date_from)     p = p.set('date_from',     f.date_from);
-    if (f.date_to)       p = p.set('date_to',       f.date_to);
+    if (f.status)            p = p.set('status',            f.status);
+    if (f.registered_by)     p = p.set('registered_by',     String(f.registered_by));
+    if (f.bank_id)           p = p.set('bank_id',           String(f.bank_id));
+    if (f.payment_method_id) p = p.set('payment_method_id', String(f.payment_method_id));
+    if (f.date_from)         p = p.set('date_from',         f.date_from);
+    if (f.date_to)           p = p.set('date_to',           f.date_to);
     return this.http.get(`${this.base}/collections/payments-pdf`, { params: p, responseType: 'blob' });
   }
 
@@ -106,17 +112,24 @@ export class CollectionService {
 
   // ── Depósitos del repartidor ─────────────────────────────────────────────
 
-  listDeposits(f: { mine?: boolean; status?: string; operation_number?: string; date_from?: string; date_to?: string; deposited_by?: number; per_page?: number; page?: number } = {}): Observable<any> {
+  listDeposits(f: { source?: 'collection' | 'viatico'; mine?: boolean; status?: string; bank_id?: number; payment_method_id?: number; operation_number?: string; date_from?: string; date_to?: string; deposited_by?: number; per_page?: number; page?: number } = {}): Observable<any> {
     let p = new HttpParams();
-    if (f.mine)            p = p.set('mine',            'true');
-    if (f.status)          p = p.set('status',          f.status);
-    if (f.operation_number) p = p.set('operation_number', f.operation_number);
-    if (f.date_from)       p = p.set('date_from',       f.date_from);
-    if (f.date_to)         p = p.set('date_to',         f.date_to);
-    if (f.deposited_by)    p = p.set('deposited_by',    String(f.deposited_by));
-    if (f.per_page)        p = p.set('per_page',        String(f.per_page));
-    if (f.page)            p = p.set('page',            String(f.page));
+    if (f.source)            p = p.set('source',            f.source);
+    if (f.mine)              p = p.set('mine',              'true');
+    if (f.status)            p = p.set('status',            f.status);
+    if (f.bank_id)           p = p.set('bank_id',           String(f.bank_id));
+    if (f.payment_method_id) p = p.set('payment_method_id', String(f.payment_method_id));
+    if (f.operation_number)  p = p.set('operation_number',  f.operation_number);
+    if (f.date_from)         p = p.set('date_from',         f.date_from);
+    if (f.date_to)           p = p.set('date_to',           f.date_to);
+    if (f.deposited_by)      p = p.set('deposited_by',      String(f.deposited_by));
+    if (f.per_page)          p = p.set('per_page',          String(f.per_page));
+    if (f.page)              p = p.set('page',              String(f.page));
     return this.http.get<any>(`${this.base}/deposits`, { params: p });
+  }
+
+  paymentMethodsByBank(bankId: number): Observable<BankPaymentMethod[]> {
+    return this.http.get<BankPaymentMethod[]>(`${this.base}/banks/${bankId}/methods`);
   }
 
   registerDeposit(formData: FormData): Observable<{ message: string; deposit: UserDeposit }> {

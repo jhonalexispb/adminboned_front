@@ -137,6 +137,12 @@ export class QuotationDetailModalComponent {
     return c ? (c.business_name || c.name) : '—';
   }
 
+  /** Nombre comercial, si existe y es distinto de la razón social — se muestra debajo. */
+  clientTradeName(q: Quotation): string | null {
+    const c = q.client;
+    return c && c.name && c.name !== c.business_name ? c.name : null;
+  }
+
   groupedItems(items: QuotationItem[]): { productId: number; productName: string; productLaboratory: string | null; lots: QuotationItem[] }[] {
     const map = new Map<number, { productId: number; productName: string; productLaboratory: string | null; lots: QuotationItem[] }>();
     for (const item of items) {
