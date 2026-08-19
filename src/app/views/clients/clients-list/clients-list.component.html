@@ -54,6 +54,49 @@
       </div>
 
     </div>
+
+    <div class="row g-2 align-items-end mt-1">
+
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Departamento</label>
+        <p-select [options]="departments()" optionLabel="name" optionValue="id"
+          [ngModel]="filters.department_id" (ngModelChange)="onDepartmentChange($event)"
+          placeholder="Todos" filter="true" showClear="true" styleClass="w-100 p-inputtext-sm" />
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Provincia</label>
+        <p-select [options]="provinces()" optionLabel="name" optionValue="id"
+          [ngModel]="filters.province_id" (ngModelChange)="onProvinceChange($event)"
+          [disabled]="!filters.department_id || loadingProvs()"
+          placeholder="Todas" filter="true" showClear="true" styleClass="w-100 p-inputtext-sm" />
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Distrito</label>
+        <p-select [options]="districts()" optionLabel="name" optionValue="id"
+          [ngModel]="filters.district_id" (ngModelChange)="onDistrictChange($event)"
+          [disabled]="!filters.province_id || loadingDists()"
+          placeholder="Todos" filter="true" showClear="true" styleClass="w-100 p-inputtext-sm" />
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1 text-body-secondary">Vendedor</label>
+        <p-select [options]="sellers()" optionLabel="name" optionValue="id"
+          [ngModel]="filters.seller_id" (ngModelChange)="onSellerChange($event)"
+          placeholder="Todos" filter="true" showClear="true" styleClass="w-100 p-inputtext-sm" />
+      </div>
+
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-outline-primary btn-sm" type="button"
+                [disabled]="downloadingPdf()" (click)="downloadPdf()">
+          @if (downloadingPdf()) {
+            <fa-icon icon="spinner" spin class="me-1" />
+          } @else {
+            <fa-icon icon="file-pdf" class="me-1" />
+          }
+          Descargar PDF
+        </button>
+      </div>
+
+    </div>
   </c-card-body>
 </c-card>
 
