@@ -1,4 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
@@ -30,8 +31,10 @@ import { OrderDetailModalComponent } from '../../orders/order-detail-modal/order
 import { QuotationDetailModalComponent } from '../quotation-detail-modal/quotation-detail-modal.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { ComisionService } from '../../comisiones/comision.service';
-import { Comision } from '../../comisiones/comision.model';
+import { Comision, ComisionZona } from '../../comisiones/comision.model';
 import { CatalogRequestService, PendingCatalogCart } from '../../catalog-requests/catalog-request.service';
+import { SaleZonesService } from '../../sale-zones/sale-zones.service';
+import { UserSaleZone } from '../../sale-zones/sale-zones.model';
 import { environment } from '../../../../environments/environment';
 
 type ClientOption = Client & { displayLabel: string };
@@ -91,6 +94,10 @@ export class QuotationsListComponent implements OnInit {
 
   /** Comisión abierta del vendedor logueado, con la proyección de ventas — null si no aplica (admin) o no tiene una abierta. */
   myOpenComision = signal<Comision | null>(null);
+  /** true una vez se resolvió si tengo o no comisión abierta — evita mostrar el aviso de "sin comisión" mientras carga. */
+  myComisionLoaded = signal(false);
+  /** Mis zonas de venta asignadas — para explicar por qué no ve nada si aún no tiene comisión abierta. */
+  myZones = signal<UserSaleZone[]>([]);
 
   /** Clientes de mi zona con un carrito de catálogo armado sin enviar — para llamarlos. */
   pendingCarts = signal<PendingCatalogCart[]>([]);
@@ -138,6 +145,7 @@ export class QuotationsListComponent implements OnInit {
     private toast: ToastService,
     private comisionSvc: ComisionService,
     private catalogRequestSvc: CatalogRequestService,
+    private saleZonesSvc: SaleZonesService,
     private route: ActivatedRoute,
   ) {}
 
@@ -157,12 +165,27 @@ export class QuotationsListComponent implements OnInit {
     if (!this.supervising()) {
       this.loadMyOpenComision();
       this.loadPendingCarts();
+      this.loadMyZones();
     }
   }
 
   private loadMyOpenComision(): void {
     this.comisionSvc.myList({ open_only: true, per_page: 1 }).subscribe({
-      next: r => this.myOpenComision.set(r.data[0] ?? null),
+      next: r => { this.myOpenComision.set(r.data[0] ?? null); this.myComisionLoaded.set(true); },
+      error: () => this.myComisionLoaded.set(true),
+    });
+  }
+
+  zoneLabel(z: ComisionZona): string {
+    return z.zone_type === 'department' ? `Dpto. ${z.department_name ?? '?'}`
+      : z.zone_type === 'province' ? `Prov. ${z.province_name ?? '?'}`
+      : `Dist. ${z.district_name ?? '?'}`;
+  }
+
+  private loadMyZones(): void {
+    this.saleZonesSvc.mine().subscribe({
+      next: cfg => this.myZones.set(cfg.zones),
+      error: () => {},
     });
   }
 
@@ -213,9 +236,12 @@ export class QuotationsListComponent implements OnInit {
           Swal.fire({ icon: 'success', title: 'Cliente encontrado' }).then(proceed);
         }
       },
-      error: () => {
+      error: (err: HttpErrorResponse) => {
         this.ventaCatalogoLoading.set(false);
-        this.toast.error('No se pudo verificar el cliente.');
+        const detail = err.status === 403
+          ? 'No tienes permiso para consultar clientes.'
+          : (err.error?.message ?? `Error ${err.status || 'de red'}.`);
+        this.toast.error(`No se pudo verificar el cliente. ${detail}`);
       },
     });
   }

@@ -4,7 +4,6 @@ import { Router, RouterLink } from '@angular/router';
 
 import {
   BadgeComponent,
-  BreadcrumbRouterComponent,
   ButtonDirective,
   ColorModeService,
   ContainerComponent,
@@ -31,7 +30,7 @@ import { ViaticoReturnService } from '../../../views/viaticos/viatico-return.ser
   imports: [
     NgTemplateOutlet, RouterLink, DecimalPipe,
     ContainerComponent, HeaderTogglerDirective, SidebarToggleDirective,
-    HeaderNavComponent, BreadcrumbRouterComponent, IconDirective, BadgeComponent,
+    HeaderNavComponent, IconDirective, BadgeComponent,
     DropdownComponent, DropdownToggleDirective, DropdownMenuDirective,
     DropdownItemDirective, DropdownDividerDirective, ButtonDirective,
   ]

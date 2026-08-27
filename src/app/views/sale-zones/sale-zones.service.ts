@@ -44,6 +44,11 @@ export class SaleZonesService {
     return this.http.get<UserZoneConfig>(`${this.base}/${userId}`);
   }
 
+  /** Mis propias zonas de venta (sin necesitar el permiso admin 'sale_zones'). */
+  mine(): Observable<UserZoneConfig> {
+    return this.http.get<UserZoneConfig>(`${this.base}/mine`);
+  }
+
   toggleAllowAll(userId: number): Observable<{ message: string; allow_all_clients: boolean }> {
     return this.http.patch<{ message: string; allow_all_clients: boolean }>(
       `${this.base}/${userId}/allow-all`, {},

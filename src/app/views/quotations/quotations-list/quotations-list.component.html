@@ -45,11 +45,32 @@
   </c-modal>
 }
 
+<!-- ── Aviso: sin comisión abierta (no afecta poder vender por catálogo) ──── -->
+@if (!supervising() && myComisionLoaded() && !myOpenComision()) {
+  <c-card class="mb-3 border-warning">
+    <c-card-body class="py-2 px-3 small">
+      <fa-icon icon="circle-info" class="me-1 text-warning" />
+      @if (myZones().length) {
+        Tienes zonas asignadas ({{ myZones().slice(0, 3).map(z => z.label).join(', ') }}{{ myZones().length > 3 ? ' y ' + (myZones().length - 3) + ' más' : '' }})
+        pero no tienes una comisión abierta — solicita al administrador que te asigne una para ver aquí las ventas que te corresponden.
+      } @else {
+        No tienes una comisión abierta — solicita al administrador que te asigne una para ver aquí las ventas que te corresponden.
+      }
+      <span class="text-body-secondary">Mientras tanto puedes seguir vendiendo normalmente con "Venta Catálogo".</span>
+    </c-card-body>
+  </c-card>
+}
+
 <!-- ── Barras de comisión (solo vendedor con comisión abierta) ────────────── -->
 @if (myOpenComision(); as c) {
   @if (c.ventas_resumen; as vr) {
     <c-card class="mb-3">
       <c-card-body class="py-2 px-3">
+        <div class="small text-body-secondary mb-2">
+          <fa-icon icon="circle-check" class="me-1 text-success" />
+          Comisión activa: {{ c.date_from | date:'dd/MM/yy' }} – {{ c.date_to | date:'dd/MM/yy' }}
+          @if (c.zonas?.length) { · {{ c.zonas.map(z => zoneLabel(z)).join(', ') }} }
+        </div>
         <div class="d-flex justify-content-between align-items-center small mb-1">
           <span>
             <fa-icon icon="sack-dollar" class="me-1 text-success" />

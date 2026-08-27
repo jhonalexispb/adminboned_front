@@ -36,8 +36,8 @@ export class CatalogRequestService {
     return this.http.post<{ message: string; request: CatalogRequest }>(`${this.base}/catalog-requests/${id}/validate-stock`, {});
   }
 
-  convert(id: number, sellerId?: number | null): Observable<{ message: string; quotation: Quotation }> {
-    return this.http.post<{ message: string; quotation: Quotation }>(`${this.base}/catalog-requests/${id}/convert`, sellerId ? { seller_id: sellerId } : {});
+  convert(id: number): Observable<{ message: string; quotation: Quotation }> {
+    return this.http.post<{ message: string; quotation: Quotation }>(`${this.base}/catalog-requests/${id}/convert`, {});
   }
 
   cancel(id: number, sellerNotes?: string): Observable<{ message: string; request: CatalogRequest }> {

@@ -14,7 +14,6 @@ import {
   CATALOG_ITEM_STATUS_LABELS, CATALOG_ITEM_STATUS_COLORS,
 } from '../catalog-request.model';
 import { ToastService } from '../../../core/services/toast.service';
-import { UserService } from '../../users/user.service';
 
 @Component({
   selector: 'app-catalog-request-detail-modal',
@@ -39,7 +38,6 @@ export class CatalogRequestDetailModalComponent implements OnChanges {
 
   editing         = signal(false);
   draftQuantities = signal<Record<number, number>>({});
-  sellers         = signal<{ id: number; name: string }[]>([]);
 
   readonly statusLabels     = CATALOG_REQUEST_STATUS_LABELS;
   readonly statusColors     = CATALOG_REQUEST_STATUS_COLORS;
@@ -48,14 +46,9 @@ export class CatalogRequestDetailModalComponent implements OnChanges {
 
   constructor(
     private catalogRequestService: CatalogRequestService,
-    private userService: UserService,
     private toast: ToastService,
     private router: Router,
-  ) {
-    this.userService.listUsers({ permission: 'quotations', per_page: 100 }).subscribe(res => {
-      this.sellers.set(res.data.filter(u => !u.deleted_at && u.active));
-    });
-  }
+  ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['request']) {
@@ -185,17 +178,10 @@ export class CatalogRequestDetailModalComponent implements OnChanges {
     if (!this.request) return;
     const r = this.request;
 
-    const sellerOptions: Record<string, string> = { '': 'Sin asignar (se define al cerrar la comisión)' };
-    for (const s of this.sellers()) sellerOptions[String(s.id)] = s.name;
-
     const result = await Swal.fire({
       title: '¿Convertir a cotización?',
-      html: `Se creará una cotización en borrador a partir de ${r.code} y se reservará el stock.`,
+      html: `Se creará una cotización en borrador a partir de ${r.code} y se reservará el stock. El vendedor se define solo, según quién tenga comisión abierta sobre la zona del cliente.`,
       icon: 'question',
-      input: 'select',
-      inputOptions: sellerOptions,
-      inputValue: '',
-      inputLabel: 'Vendedor asignado (opcional — déjalo sin asignar salvo que quieras fijarlo ya)',
       showCancelButton: true,
       confirmButtonColor: '#198754',
       cancelButtonColor: '#6c757d',
@@ -203,10 +189,9 @@ export class CatalogRequestDetailModalComponent implements OnChanges {
       cancelButtonText: 'Cancelar',
     });
     if (!result.isConfirmed) return;
-    const sellerId = result.value ? Number(result.value) : undefined;
 
     this.converting.set(true);
-    this.catalogRequestService.convert(r.id, sellerId).subscribe({
+    this.catalogRequestService.convert(r.id).subscribe({
       next: async res => {
         this.converting.set(false);
         const updated = { ...r, status: 'converted' as const, quotation_id: res.quotation.id };

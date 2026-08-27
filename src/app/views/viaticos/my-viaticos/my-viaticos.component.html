@@ -85,9 +85,11 @@
                 <div class="small text-muted">{{ comision.gastos_count }} gastos</div>
                 <div class="fw-bold text-primary">S/ {{ comision.gastos_total | number:'1.2-2' }}</div>
               </div>
-              <button cButton color="success" size="sm" (click)="openAddGasto(comision)">
-                <fa-icon [icon]="faPlus" class="me-1" /> Gasto
-              </button>
+              @if (comision.status === 'open' && comision.budget) {
+                <button cButton color="success" size="sm" (click)="openAddGasto(comision)">
+                  <fa-icon [icon]="faPlus" class="me-1" /> Gasto
+                </button>
+              }
             </div>
           </c-card-header>
 
@@ -118,8 +120,12 @@
             @if (!comision.gastos?.length) {
               <div class="text-center text-muted py-3">
                 <fa-icon [icon]="faReceipt" class="me-1" />
-                Sin gastos registrados.
-                <button type="button" class="btn btn-link btn-sm p-0 ms-1" (click)="openAddGasto(comision)">Agregar primero</button>
+                @if (comision.status === 'open' && comision.budget) {
+                  Sin gastos registrados.
+                  <button type="button" class="btn btn-link btn-sm p-0 ms-1" (click)="openAddGasto(comision)">Agregar primero</button>
+                } @else {
+                  Esta comisión no tiene un monto de viáticos asignado, por lo que no se pueden registrar gastos.
+                }
               </div>
             } @else {
               <ng-container [ngTemplateOutlet]="gastosList" [ngTemplateOutletContext]="{ gastos: comision.gastos, comision: comision }" />

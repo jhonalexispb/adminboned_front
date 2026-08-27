@@ -14,7 +14,6 @@ import {
 } from '../catalog-request.model';
 import { ClientService } from '../../clients/client.service';
 import { Client } from '../../clients/client.model';
-import { UserService } from '../../users/user.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { CatalogRequestDetailModalComponent } from '../catalog-request-detail-modal/catalog-request-detail-modal.component';
@@ -40,7 +39,6 @@ type ClientOption = Client & { displayLabel: string };
 export class CatalogRequestsListComponent implements OnInit {
   requests = signal<CatalogRequest[]>([]);
   clients  = signal<ClientOption[]>([]);
-  sellers  = signal<{ id: number; name: string }[]>([]);
   loading  = signal(false);
   total    = signal(0);
   lastPage = signal(1);
@@ -78,7 +76,6 @@ export class CatalogRequestsListComponent implements OnInit {
   constructor(
     private catalogRequestService: CatalogRequestService,
     private clientService: ClientService,
-    private userService: UserService,
     private sales: SalesService,
     private toast: ToastService,
     private router: Router,
@@ -90,9 +87,6 @@ export class CatalogRequestsListComponent implements OnInit {
         ...c,
         displayLabel: [c.business_name, c.name, c.ruc].filter(Boolean).join(' · '),
       })));
-    });
-    this.userService.listUsers({ permission: 'quotations', per_page: 100 }).subscribe(res => {
-      this.sellers.set(res.data.filter(u => !u.deleted_at && u.active));
     });
     this.load();
     // Se carga de una (no solo al entrar al tab) para que el número junto al tab avise sin tener que hacer clic.
@@ -202,17 +196,10 @@ export class CatalogRequestsListComponent implements OnInit {
   // ── Convertir a cotización ───────────────────────────────────────────────────
 
   async convert(r: CatalogRequest): Promise<void> {
-    const sellerOptions: Record<string, string> = { '': 'Automático (por zona de venta)' };
-    for (const s of this.sellers()) sellerOptions[String(s.id)] = s.name;
-
     const result = await Swal.fire({
       title: '¿Convertir a cotización?',
-      html: `Se creará una cotización en borrador a partir de ${r.code} y se reservará el stock.`,
+      html: `Se creará una cotización en borrador a partir de ${r.code} y se reservará el stock. El vendedor se define solo, según quién tenga comisión abierta sobre la zona del cliente.`,
       icon: 'question',
-      input: 'select',
-      inputOptions: sellerOptions,
-      inputValue: '',
-      inputLabel: 'Vendedor asignado (si la zona es compartida, elige manualmente)',
       showCancelButton: true,
       confirmButtonColor: '#198754',
       cancelButtonColor: '#6c757d',
@@ -220,10 +207,9 @@ export class CatalogRequestsListComponent implements OnInit {
       cancelButtonText: 'Cancelar',
     });
     if (!result.isConfirmed) return;
-    const sellerId = result.value ? Number(result.value) : undefined;
 
     this.actingId.set(r.id);
-    this.catalogRequestService.convert(r.id, sellerId).subscribe({
+    this.catalogRequestService.convert(r.id).subscribe({
       next: async res => {
         this.actingId.set(null);
         this.requests.update(list => list.map(x => x.id === r.id ? { ...x, status: 'converted' as const, quotation_id: res.quotation.id } : x));

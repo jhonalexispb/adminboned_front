@@ -69,11 +69,6 @@
 
     </c-header-nav>
   </c-container>
-
-  <!-- Breadcrumb -->
-  <c-container [fluid]="true" class="px-4">
-    <c-breadcrumb-router />
-  </c-container>
 </ng-container>
 
 <!-- ── Notificaciones ──────────────────────────────────────────────────── -->
@@ -138,13 +133,15 @@
         </div>
       </li>
       <li><hr cDropdownDivider /></li>
-      <li>
-        <a cDropdownItem routerLink="/settings/empresa" class="d-flex align-items-center gap-2">
-          <svg cIcon name="cilSettings" size="sm"></svg>
-          Mi Empresa
-        </a>
-      </li>
-      <li><hr cDropdownDivider /></li>
+      @if (auth.hasPermission('settings')) {
+        <li>
+          <a cDropdownItem routerLink="/settings/empresa" class="d-flex align-items-center gap-2">
+            <svg cIcon name="cilSettings" size="sm"></svg>
+            Mi Empresa
+          </a>
+        </li>
+        <li><hr cDropdownDivider /></li>
+      }
       <li>
         <button cDropdownItem (click)="logout()"
                 class="d-flex align-items-center gap-2 text-danger">
